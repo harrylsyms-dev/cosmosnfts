@@ -266,7 +266,19 @@ export default function AdminDashboard() {
 
           {/* Quick Links */}
           <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <Link href="/admin/sales" className="bg-gray-900 rounded-lg p-6 border border-green-800 hover:border-green-500 transition-colors">
+              <div className="text-3xl mb-2">💰</div>
+              <h3 className="font-bold mb-1">Sales Dashboard</h3>
+              <p className="text-gray-400 text-sm">Revenue & analytics</p>
+            </Link>
+
+            <Link href="/admin/orders" className="bg-gray-900 rounded-lg p-6 border border-blue-800 hover:border-blue-500 transition-colors">
+              <div className="text-3xl mb-2">📦</div>
+              <h3 className="font-bold mb-1">Orders</h3>
+              <p className="text-gray-400 text-sm">View & manage orders</p>
+            </Link>
+
             <Link href="/admin/auctions" className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition-colors">
               <div className="text-3xl mb-2">🔨</div>
               <h3 className="font-bold mb-1">Auctions</h3>
