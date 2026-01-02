@@ -243,20 +243,10 @@ export default function CosmicBackground() {
   }, []);
 
   return (
-    <>
-      {/* Test div - should show a visible gradient if component mounts */}
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          zIndex: -2,
-          background: 'linear-gradient(135deg, #1a0030 0%, #000020 50%, #001a1a 100%)'
-        }}
-      />
-      <canvas
-        ref={canvasRef}
-        className="fixed inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: -1 }}
-      />
-    </>
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 w-full h-full pointer-events-none"
+      style={{ zIndex: -1 }}
+    />
   );
 }
