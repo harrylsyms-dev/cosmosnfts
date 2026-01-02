@@ -325,6 +325,13 @@ model SiteSettings {
   pauseDurationMs   Int       @default(0) @map("pause_duration_ms")
   contractPaused    Boolean   @default(false) @map("contract_paused")
 
+  // Wallet & Revenue Configuration
+  ownerWalletAddress      String?   @map("owner_wallet_address")
+  benefactorWalletAddress String?   @map("benefactor_wallet_address")
+  benefactorName          String?   @default("Space Exploration Fund") @map("benefactor_name")
+  ownerSharePercent       Int       @default(70) @map("owner_share_percent")
+  benefactorSharePercent  Int       @default(30) @map("benefactor_share_percent")
+
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("site_settings")

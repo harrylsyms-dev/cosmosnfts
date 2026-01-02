@@ -21,22 +21,33 @@ interface SiteSettings {
   comingSoonMessage: string | null;
 }
 
+interface WalletConfig {
+  ownerWalletAddress: string | null;
+  benefactorWalletAddress: string | null;
+  benefactorName: string | null;
+  ownerSharePercent: number;
+  benefactorSharePercent: number;
+}
+
 export default function AdminSettings() {
   const router = useRouter();
   const [admin, setAdmin] = useState<Admin | null>(null);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [walletConfig, setWalletConfig] = useState<WalletConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Password change form
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
   // Coming soon form
   const [comingSoonTitle, setComingSoonTitle] = useState('');
   const [comingSoonMessage, setComingSoonMessage] = useState('');
+
+  // Wallet config form
+  const [ownerWallet, setOwnerWallet] = useState('');
+  const [benefactorWallet, setBenefactorWallet] = useState('');
+  const [benefactorName, setBenefactorName] = useState('');
+  const [ownerShare, setOwnerShare] = useState(70);
+  const [benefactorShare, setBenefactorShare] = useState(30);
 
   useEffect(() => {
     checkAuth();
@@ -58,7 +69,7 @@ export default function AdminSettings() {
       const data = await res.json();
       setAdmin(data.admin);
 
-      await fetchSettings();
+      await Promise.all([fetchSettings(), fetchWalletConfig()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
@@ -85,51 +96,25 @@ export default function AdminSettings() {
     }
   }
 
-  async function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: 'New passwords do not match' });
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setMessage({ type: 'error', text: 'Password must be at least 8 characters' });
-      return;
-    }
-
-    setActionLoading('password');
+  async function fetchWalletConfig() {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/change-password`, {
-        method: 'POST',
+      const res = await fetch(`${apiUrl}/api/admin/wallet-config`, {
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ currentPassword, newPassword }),
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
-      const data = await res.json();
-
       if (res.ok) {
-        setMessage({ type: 'success', text: 'Password changed successfully. Please login again.' });
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        // Redirect to login after a short delay
-        setTimeout(() => {
-          localStorage.removeItem('adminToken');
-          router.push('/admin/login');
-        }, 2000);
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to change password' });
+        const data = await res.json();
+        setWalletConfig(data.config);
+        setOwnerWallet(data.config.ownerWalletAddress || '');
+        setBenefactorWallet(data.config.benefactorWalletAddress || '');
+        setBenefactorName(data.config.benefactorName || '');
+        setOwnerShare(data.config.ownerSharePercent);
+        setBenefactorShare(data.config.benefactorSharePercent);
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to change password' });
-    } finally {
-      setActionLoading(null);
+      console.error('Failed to fetch wallet config:', error);
     }
   }
 
@@ -221,6 +206,59 @@ export default function AdminSettings() {
       setMessage({ type: 'error', text: 'Failed to toggle maintenance' });
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleSaveWalletConfig(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (ownerShare + benefactorShare !== 100) {
+      setMessage({ type: 'error', text: 'Owner and benefactor shares must add up to 100%' });
+      return;
+    }
+
+    setActionLoading('wallet');
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/wallet-config`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          ownerWalletAddress: ownerWallet || null,
+          benefactorWalletAddress: benefactorWallet || null,
+          benefactorName: benefactorName || null,
+          ownerSharePercent: ownerShare,
+          benefactorSharePercent: benefactorShare,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setWalletConfig(data.config);
+        setMessage({ type: 'success', text: 'Wallet configuration saved successfully' });
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to save wallet configuration' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save wallet configuration' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function handleShareChange(type: 'owner' | 'benefactor', value: number) {
+    if (value < 0 || value > 100) return;
+    if (type === 'owner') {
+      setOwnerShare(value);
+      setBenefactorShare(100 - value);
+    } else {
+      setBenefactorShare(value);
+      setOwnerShare(100 - value);
     }
   }
 
@@ -370,52 +408,117 @@ export default function AdminSettings() {
             </div>
           </div>
 
-          {/* Change Password */}
-          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-            <h2 className="text-xl font-bold mb-6">Change Password</h2>
+          {/* Wallet & Revenue Configuration */}
+          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
+            <h2 className="text-xl font-bold mb-6">Wallet & Revenue Split</h2>
 
-            <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Current Password</label>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 outline-none"
-                  required
-                />
+            <form onSubmit={handleSaveWalletConfig} className="space-y-6">
+              {/* Revenue Split Slider */}
+              <div className="border-b border-gray-700 pb-6">
+                <h3 className="font-bold mb-4">Revenue Split</h3>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex-1">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-blue-400">Owner: {ownerShare}%</span>
+                      <span className="text-purple-400">Benefactor: {benefactorShare}%</span>
+                    </div>
+                    <div className="relative h-4 bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="absolute left-0 top-0 h-full bg-blue-500"
+                        style={{ width: `${ownerShare}%` }}
+                      />
+                      <div
+                        className="absolute right-0 top-0 h-full bg-purple-500"
+                        style={{ width: `${benefactorShare}%` }}
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={ownerShare}
+                      onChange={(e) => handleShareChange('owner', parseInt(e.target.value))}
+                      className="w-full mt-2 opacity-0 h-4 cursor-pointer absolute"
+                      style={{ marginTop: '-24px' }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">Owner Share (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={ownerShare}
+                      onChange={(e) => handleShareChange('owner', parseInt(e.target.value) || 0)}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">Benefactor Share (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={benefactorShare}
+                      onChange={(e) => handleShareChange('benefactor', parseInt(e.target.value) || 0)}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">New Password</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 outline-none"
-                  minLength={8}
-                  required
-                />
-              </div>
+              {/* Wallet Addresses */}
+              <div className="space-y-4">
+                <h3 className="font-bold">Wallet Addresses</h3>
 
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Confirm New Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 outline-none"
-                  minLength={8}
-                  required
-                />
+                <div>
+                  <label className="block text-gray-400 text-sm mb-2">
+                    Owner Wallet Address
+                    <span className="text-gray-500 ml-2">(receives {ownerShare}%)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={ownerWallet}
+                    onChange={(e) => setOwnerWallet(e.target.value)}
+                    placeholder="0x..."
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-mono text-sm focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-400 text-sm mb-2">
+                    Benefactor Wallet Address
+                    <span className="text-gray-500 ml-2">(receives {benefactorShare}%)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={benefactorWallet}
+                    onChange={(e) => setBenefactorWallet(e.target.value)}
+                    placeholder="0x..."
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-mono text-sm focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-400 text-sm mb-2">Benefactor Name</label>
+                  <input
+                    type="text"
+                    value={benefactorName}
+                    onChange={(e) => setBenefactorName(e.target.value)}
+                    placeholder="Space Exploration Fund"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none"
+                  />
+                </div>
               </div>
 
               <button
                 type="submit"
-                disabled={actionLoading === 'password'}
-                className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-lg disabled:opacity-50"
+                disabled={actionLoading === 'wallet'}
+                className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-3 rounded-lg disabled:opacity-50"
               >
-                {actionLoading === 'password' ? 'Changing...' : 'Change Password'}
+                {actionLoading === 'wallet' ? 'Saving...' : 'Save Wallet Configuration'}
               </button>
             </form>
           </div>

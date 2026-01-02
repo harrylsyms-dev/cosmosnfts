@@ -13,6 +13,12 @@ interface SiteSettings {
   pausedAt: Date | null;
   pauseDurationMs: number;
   contractPaused: boolean;
+  // Wallet & Revenue Configuration
+  ownerWalletAddress: string | null;
+  benefactorWalletAddress: string | null;
+  benefactorName: string | null;
+  ownerSharePercent: number;
+  benefactorSharePercent: number;
 }
 
 class SiteSettingsService {
@@ -49,6 +55,11 @@ class SiteSettingsService {
       pausedAt: settings.pausedAt,
       pauseDurationMs: settings.pauseDurationMs,
       contractPaused: settings.contractPaused,
+      ownerWalletAddress: settings.ownerWalletAddress,
+      benefactorWalletAddress: settings.benefactorWalletAddress,
+      benefactorName: settings.benefactorName,
+      ownerSharePercent: settings.ownerSharePercent,
+      benefactorSharePercent: settings.benefactorSharePercent,
     };
   }
 
@@ -95,6 +106,11 @@ class SiteSettingsService {
       pausedAt: settings.pausedAt,
       pauseDurationMs: settings.pauseDurationMs,
       contractPaused: settings.contractPaused,
+      ownerWalletAddress: settings.ownerWalletAddress,
+      benefactorWalletAddress: settings.benefactorWalletAddress,
+      benefactorName: settings.benefactorName,
+      ownerSharePercent: settings.ownerSharePercent,
+      benefactorSharePercent: settings.benefactorSharePercent,
     };
   }
 

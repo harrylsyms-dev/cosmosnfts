@@ -1107,6 +1107,98 @@ router.post('/change-password', requireAdmin, async (req, res) => {
   }
 });
 
+// ==================== WALLET & REVENUE CONFIGURATION ====================
+
+/**
+ * GET /api/admin/wallet-config
+ * Get wallet and revenue split configuration
+ */
+router.get('/wallet-config', requireAdmin, async (req, res) => {
+  try {
+    const settings = await siteSettingsService.getSettings();
+
+    res.json({
+      success: true,
+      config: {
+        ownerWalletAddress: settings.ownerWalletAddress,
+        benefactorWalletAddress: settings.benefactorWalletAddress,
+        benefactorName: settings.benefactorName,
+        ownerSharePercent: settings.ownerSharePercent,
+        benefactorSharePercent: settings.benefactorSharePercent,
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching wallet config:', error);
+    res.status(500).json({ error: 'Failed to fetch wallet configuration' });
+  }
+});
+
+/**
+ * PUT /api/admin/wallet-config
+ * Update wallet and revenue split configuration
+ */
+router.put('/wallet-config', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const {
+      ownerWalletAddress,
+      benefactorWalletAddress,
+      benefactorName,
+      ownerSharePercent,
+      benefactorSharePercent,
+    } = req.body;
+
+    // Validate percentages add up to 100
+    if (ownerSharePercent !== undefined && benefactorSharePercent !== undefined) {
+      if (ownerSharePercent + benefactorSharePercent !== 100) {
+        return res.status(400).json({ error: 'Owner and benefactor shares must add up to 100%' });
+      }
+    }
+
+    // Validate wallet addresses if provided
+    if (ownerWalletAddress && !/^0x[a-fA-F0-9]{40}$/.test(ownerWalletAddress)) {
+      return res.status(400).json({ error: 'Invalid owner wallet address' });
+    }
+    if (benefactorWalletAddress && !/^0x[a-fA-F0-9]{40}$/.test(benefactorWalletAddress)) {
+      return res.status(400).json({ error: 'Invalid benefactor wallet address' });
+    }
+
+    const updates: any = {};
+    if (ownerWalletAddress !== undefined) updates.ownerWalletAddress = ownerWalletAddress;
+    if (benefactorWalletAddress !== undefined) updates.benefactorWalletAddress = benefactorWalletAddress;
+    if (benefactorName !== undefined) updates.benefactorName = benefactorName;
+    if (ownerSharePercent !== undefined) updates.ownerSharePercent = ownerSharePercent;
+    if (benefactorSharePercent !== undefined) updates.benefactorSharePercent = benefactorSharePercent;
+
+    const settings = await siteSettingsService.updateSettings(updates);
+
+    // Audit log
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'WALLET_CONFIG_UPDATE',
+        details: JSON.stringify(updates),
+        ipAddress: req.ip,
+      },
+    });
+
+    res.json({
+      success: true,
+      config: {
+        ownerWalletAddress: settings.ownerWalletAddress,
+        benefactorWalletAddress: settings.benefactorWalletAddress,
+        benefactorName: settings.benefactorName,
+        ownerSharePercent: settings.ownerSharePercent,
+        benefactorSharePercent: settings.benefactorSharePercent,
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating wallet config:', error);
+    res.status(500).json({ error: 'Failed to update wallet configuration' });
+  }
+});
+
 // ==================== EMAIL BROADCAST ROUTE ====================
 
 /**
