@@ -82,6 +82,7 @@ async function main() {
     const ipfsHash = `Qm${Buffer.from(obj.name).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 44)}`;
 
     return {
+      tokenId: index + 1, // Token IDs start at 1
       name: obj.name,
       description: obj.description,
       image: `ipfs://${ipfsHash}`,
