@@ -9,17 +9,26 @@
   --cosmic-gold: #ffd700;
 }
 
-html,
+html {
+  background-color: var(--cosmic-dark);
+}
+
 body {
   padding: 0;
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background-color: var(--cosmic-dark);
+  background-color: transparent;
   color: #ffffff;
 }
 
 * {
   box-sizing: border-box;
+}
+
+#__next {
+  background-color: transparent;
+  position: relative;
+  z-index: 1;
 }
 
 a {
