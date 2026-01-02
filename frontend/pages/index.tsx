@@ -133,7 +133,7 @@ export default function Home() {
             <div className="text-gray-400">Base Rate × Score</div>
           </div>
           <div>
-            <div className="text-4xl font-bold text-purple-400">7.5%</div>
+            <div className="text-4xl font-bold text-purple-400">{pricing?.phaseIncreasePercent || 7.5}%</div>
             <div className="text-gray-400">Per Phase Increase</div>
           </div>
           <div>
@@ -269,7 +269,7 @@ export default function Home() {
             Prices Go Up Every Phase
           </h2>
           <p className="text-xl text-gray-300 mb-8">
-            Don't miss Phase 1 pricing. Once it ends, prices increase 7.5%.
+            Don't miss Phase 1 pricing. Once it ends, prices increase {pricing?.phaseIncreasePercent || 7.5}%.
           </p>
 
           {pricing && (

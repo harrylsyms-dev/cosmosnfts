@@ -86,7 +86,7 @@ router.get('/available', async (req: Request, res: Response) => {
         orderBy.totalScore = 'desc';
     }
 
-    const [total, nfts] = await Promise.all([
+    const [total, nfts, siteSettings] = await Promise.all([
       prisma.nFT.count({ where }),
       prisma.nFT.findMany({
         where,
@@ -94,12 +94,14 @@ router.get('/available', async (req: Request, res: Response) => {
         skip,
         take: limitNum,
       }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
     ]);
 
-    // Get current phase multiplier
+    // Get current phase multiplier with dynamic percentage
     const activeTier = await prisma.tier.findFirst({ where: { active: true } });
     const currentPhase = activeTier?.phase || 1;
-    const phaseMultiplier = Math.pow(1.075, currentPhase - 1);
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
 
     res.json({
       total,
@@ -107,6 +109,7 @@ router.get('/available', async (req: Request, res: Response) => {
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
       currentPhase,
+      phaseIncreasePercent: increasePercent,
       phaseMultiplier: phaseMultiplier.toFixed(4),
       items: nfts.map((nft) => {
         // Use totalScore (populated by seed) or cosmicScore
@@ -143,21 +146,25 @@ router.get('/search', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
 
-    const nfts = await prisma.nFT.findMany({
-      where: {
-        name: {
-          contains: q as string,
+    const [nfts, siteSettings] = await Promise.all([
+      prisma.nFT.findMany({
+        where: {
+          name: {
+            contains: q as string,
+          },
+          status: 'AVAILABLE',
         },
-        status: 'AVAILABLE',
-      },
-      take: Math.min(parseInt(limit as string), 50),
-      orderBy: { totalScore: 'desc' },
-    });
+        take: Math.min(parseInt(limit as string), 50),
+        orderBy: { totalScore: 'desc' },
+      }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+    ]);
 
-    // Get current phase multiplier
+    // Get current phase multiplier with dynamic percentage
     const activeTier = await prisma.tier.findFirst({ where: { active: true } });
     const currentPhase = activeTier?.phase || 1;
-    const phaseMultiplier = Math.pow(1.075, currentPhase - 1);
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
 
     res.json({
       query: q,
@@ -266,7 +273,7 @@ router.get('/by-phase', async (req: Request, res: Response) => {
       },
     };
 
-    const [total, nfts] = await Promise.all([
+    const [total, nfts, siteSettings] = await Promise.all([
       prisma.nFT.count({ where }),
       prisma.nFT.findMany({
         where,
@@ -274,10 +281,12 @@ router.get('/by-phase', async (req: Request, res: Response) => {
         skip: offsetNum,
         take: limitNum,
       }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
     ]);
 
-    // Calculate phase price multiplier
-    const phaseMultiplier = Math.pow(1.075, phaseNum - 1);
+    // Calculate phase price multiplier with dynamic percentage
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), phaseNum - 1);
 
     res.json({
       phase: phaseNum,
@@ -322,10 +331,15 @@ router.get('/:nftId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    // Get current phase multiplier
-    const activeTier = await prisma.tier.findFirst({ where: { active: true } });
+    // Get current phase multiplier with dynamic percentage
+    const [activeTier, siteSettings] = await Promise.all([
+      prisma.tier.findFirst({ where: { active: true } }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+    ]);
     const currentPhase = activeTier?.phase || 1;
-    const phaseMultiplier = Math.pow(1.075, currentPhase - 1);
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const multiplierBase = 1 + (increasePercent / 100);
+    const phaseMultiplier = Math.pow(multiplierBase, currentPhase - 1);
 
     // Use the correct score fields (from seed: fameScore, significanceScore, etc.)
     // Fall back to alternative fields if main ones are 0
@@ -340,9 +354,9 @@ router.get('/:nftId', async (req: Request, res: Response) => {
     // Price = $0.10 × Score × Phase Multiplier
     const currentPrice = 0.10 * totalScore * phaseMultiplier;
 
-    // Calculate price projections for future phases
-    const projections = [1, 2, 5, 10, 20, 30, 50, 81].map((phase) => {
-      const mult = Math.pow(1.075, phase - 1);
+    // Calculate price projections for future phases (77 total phases)
+    const projections = [1, 2, 5, 10, 20, 30, 50, 77].map((phase) => {
+      const mult = Math.pow(multiplierBase, phase - 1);
       const price = 0.10 * totalScore * mult;
       return {
         phase,

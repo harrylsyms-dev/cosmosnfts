@@ -7,6 +7,7 @@ interface PricingData {
   quantityAvailable: number;
   tierIndex: number;
   phaseName: string;
+  phaseIncreasePercent: number;
   tier: {
     price: string;
     quantityAvailable: number;

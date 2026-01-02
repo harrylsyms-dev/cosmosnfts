@@ -20,6 +20,7 @@ interface PhaseData {
   success?: boolean;
   currentPhase: (Phase & { isPaused?: boolean; pausedAt?: string | null; timeRemaining?: number }) | null;
   phases: Phase[];
+  phaseIncreasePercent: number;
 }
 
 export default function AdminPhases() {
@@ -30,10 +31,19 @@ export default function AdminPhases() {
   const [editingPhase, setEditingPhase] = useState<number | null>(null);
   const [newEndTime, setNewEndTime] = useState('');
   const [countdown, setCountdown] = useState<string>('');
+  const [increasePercent, setIncreasePercent] = useState<string>('7.5');
+  const [isEditingPercent, setIsEditingPercent] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
   }, []);
+
+  // Sync increasePercent state when data loads
+  useEffect(() => {
+    if (phaseData?.phaseIncreasePercent !== undefined) {
+      setIncreasePercent(phaseData.phaseIncreasePercent.toString());
+    }
+  }, [phaseData?.phaseIncreasePercent]);
 
   useEffect(() => {
     if (!phaseData?.currentPhase || phaseData.currentPhase.isPaused) return;
@@ -161,6 +171,73 @@ export default function AdminPhases() {
     }
   }
 
+  async function handleResetTimer() {
+    if (!confirm('Are you sure you want to reset the phase timer? This will restart the countdown from now.')) {
+      return;
+    }
+
+    setActionLoading('reset');
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/phases/reset`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        await fetchPhases();
+        alert('Phase timer reset successfully!');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to reset timer');
+      }
+    } catch (error) {
+      console.error('Failed to reset timer:', error);
+      alert('Failed to reset timer');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleUpdateIncreasePercent() {
+    const percentNum = parseFloat(increasePercent);
+    if (isNaN(percentNum) || percentNum < 0 || percentNum > 100) {
+      alert('Please enter a valid percentage between 0 and 100');
+      return;
+    }
+
+    setActionLoading('percent');
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/phases/increase-percent`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ percent: percentNum }),
+      });
+
+      if (res.ok) {
+        await fetchPhases();
+        setIsEditingPercent(false);
+        alert(`Phase increase updated to ${percentNum}%`);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to update percentage');
+      }
+    } catch (error) {
+      console.error('Failed to update percentage:', error);
+      alert('Failed to update percentage');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function handleUpdateEndTime(phase: number) {
     if (!newEndTime) {
       alert('Please select a new end time');
@@ -252,14 +329,14 @@ export default function AdminPhases() {
                 <div className="bg-gray-800 rounded-lg p-4">
                   <div className="text-gray-400 text-sm mb-1">Phase</div>
                   <div className="text-3xl font-bold text-purple-400">
-                    {currentPhase.phase} <span className="text-lg text-gray-500">/ 81</span>
+                    {currentPhase.phase} <span className="text-lg text-gray-500">/ 77</span>
                   </div>
                 </div>
 
                 <div className="bg-gray-800 rounded-lg p-4">
                   <div className="text-gray-400 text-sm mb-1">Base Price Multiplier</div>
                   <div className="text-3xl font-bold text-green-400">
-                    {(Math.pow(1.075, currentPhase.phase - 1)).toFixed(4)}x
+                    {(Math.pow(1 + (phaseData?.phaseIncreasePercent || 7.5) / 100, currentPhase.phase - 1)).toFixed(4)}x
                   </div>
                   <div className="text-sm text-gray-500">$0.10 per score point</div>
                 </div>
@@ -289,7 +366,7 @@ export default function AdminPhases() {
             )}
 
             {/* Control Buttons */}
-            <div className="flex gap-4 mt-6">
+            <div className="flex flex-wrap gap-4 mt-6">
               <button
                 onClick={handlePauseResume}
                 disabled={!!actionLoading}
@@ -307,29 +384,94 @@ export default function AdminPhases() {
               </button>
 
               <button
+                onClick={handleResetTimer}
+                disabled={!!actionLoading}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+              >
+                {actionLoading === 'reset' ? 'Resetting...' : 'Reset Timer'}
+              </button>
+
+              <button
                 onClick={handleAdvancePhase}
-                disabled={!!actionLoading || currentPhase?.phase === 81}
+                disabled={!!actionLoading || currentPhase?.phase === 77}
                 className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
               >
                 {actionLoading === 'advance' ? 'Advancing...' : 'Advance to Next Phase'}
               </button>
             </div>
 
-            {currentPhase?.phase === 81 && (
-              <p className="text-yellow-400 mt-4">This is the final phase (81/81)</p>
+            {currentPhase?.phase === 77 && (
+              <p className="text-yellow-400 mt-4">This is the final phase (77/77)</p>
             )}
+          </div>
+
+          {/* Phase Increase Configuration */}
+          <div className="bg-gray-900 rounded-lg p-6 mb-8 border border-gray-800">
+            <h2 className="text-xl font-bold text-white mb-4">Phase Increase Rate</h2>
+            <p className="text-gray-400 mb-4">
+              Price multiplier increases by this percentage each phase.
+            </p>
+
+            <div className="flex items-center gap-4">
+              {isEditingPercent ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={increasePercent}
+                      onChange={(e) => setIncreasePercent(e.target.value)}
+                      className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white w-24"
+                    />
+                    <span className="text-gray-400">%</span>
+                  </div>
+                  <button
+                    onClick={handleUpdateIncreasePercent}
+                    disabled={!!actionLoading}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold disabled:opacity-50"
+                  >
+                    {actionLoading === 'percent' ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditingPercent(false);
+                      setIncreasePercent((phaseData?.phaseIncreasePercent || 7.5).toString());
+                    }}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="text-3xl font-bold text-green-400">
+                    {phaseData?.phaseIncreasePercent || 7.5}%
+                  </div>
+                  <span className="text-gray-400">per phase</span>
+                  <button
+                    onClick={() => setIsEditingPercent(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold"
+                  >
+                    Edit
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Price Examples */}
           <div className="bg-gray-900 rounded-lg p-6 mb-8 border border-gray-800">
             <h2 className="text-xl font-bold text-white mb-4">Price Calculator</h2>
             <p className="text-gray-400 mb-4">
-              Formula: <code className="bg-gray-800 px-2 py-1 rounded">$0.10 x Score x Phase Multiplier</code>
+              Formula: <code className="bg-gray-800 px-2 py-1 rounded">$0.10 x Score x Phase Multiplier ({phaseData?.phaseIncreasePercent || 7.5}% increase per phase)</code>
             </p>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[350, 400, 425, 485].map((score) => {
-                const multiplier = Math.pow(1.075, (currentPhase?.phase || 1) - 1);
+                const multiplierBase = 1 + (phaseData?.phaseIncreasePercent || 7.5) / 100;
+                const multiplier = Math.pow(multiplierBase, (currentPhase?.phase || 1) - 1);
                 const price = 0.10 * score * multiplier;
                 return (
                   <div key={score} className="bg-gray-800 rounded-lg p-3">
@@ -344,7 +486,7 @@ export default function AdminPhases() {
           {/* All Phases Table */}
           <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
             <div className="p-6 border-b border-gray-800">
-              <h2 className="text-xl font-bold text-white">All 81 Phases</h2>
+              <h2 className="text-xl font-bold text-white">All 77 Phases</h2>
             </div>
 
             <div className="overflow-x-auto">
@@ -363,7 +505,8 @@ export default function AdminPhases() {
                 </thead>
                 <tbody className="divide-y divide-gray-800">
                   {phaseData?.phases?.map((phase) => {
-                    const multiplier = Math.pow(1.075, phase.phase - 1);
+                    const multiplierBase = 1 + (phaseData?.phaseIncreasePercent || 7.5) / 100;
+                    const multiplier = Math.pow(multiplierBase, phase.phase - 1);
                     const samplePrice = 0.10 * 400 * multiplier;
                     const endTime = getPhaseEndTime(phase);
                     const isPast = endTime < new Date() && !phase.active;

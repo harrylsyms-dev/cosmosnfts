@@ -7,6 +7,12 @@ const router = Router();
 // GET /api/pricing - Returns current price, countdown, availability
 router.get('/', async (req: Request, res: Response) => {
   try {
+    // Get site settings for phase increase percent
+    const siteSettings = await prisma.siteSettings.findUnique({
+      where: { id: 'main' },
+    });
+    const phaseIncreasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+
     // Get active tier from database (fallback when contract not deployed)
     const activeTier = await prisma.tier.findFirst({
       where: { active: true },
@@ -40,6 +46,7 @@ router.get('/', async (req: Request, res: Response) => {
         quantityAvailable: phase1.quantityAvailable - phase1.quantitySold,
         tierIndex: 0,
         phaseName: 'Phase 1',
+        phaseIncreasePercent,
         tier: {
           price: (phase1.price * 1e18).toString(),
           quantityAvailable: phase1.quantityAvailable,
@@ -51,9 +58,10 @@ router.get('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Calculate time until tier ends
+    // Calculate time until tier ends (accounting for pause duration)
     const tierEndTime = new Date(activeTier.startTime.getTime() + activeTier.duration * 1000);
-    const timeUntilNextTier = Math.max(0, Math.floor((tierEndTime.getTime() - Date.now()) / 1000));
+    const adjustedEndTime = new Date(tierEndTime.getTime() + (siteSettings?.pauseDurationMs || 0));
+    const timeUntilNextTier = Math.max(0, Math.floor((adjustedEndTime.getTime() - Date.now()) / 1000));
 
     // Format price display
     const displayPrice = activeTier.price < 1
@@ -67,6 +75,7 @@ router.get('/', async (req: Request, res: Response) => {
       quantityAvailable: activeTier.quantityAvailable - activeTier.quantitySold,
       tierIndex: activeTier.phase - 1,
       phaseName: `Phase ${activeTier.phase}`,
+      phaseIncreasePercent,
       tier: {
         price: (activeTier.price * 1e18).toString(),
         quantityAvailable: activeTier.quantityAvailable,
@@ -121,18 +130,21 @@ router.get('/projection/:nftId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    // Get current tier
-    const activeTier = await prisma.tier.findFirst({
-      where: { active: true },
-    });
+    // Get current tier and site settings
+    const [activeTier, siteSettings] = await Promise.all([
+      prisma.tier.findFirst({ where: { active: true } }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+    ]);
 
     const currentPhase = activeTier?.phase || 1;
     const score = nft.cosmicScore;
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const multiplierBase = 1 + (increasePercent / 100);
 
-    // Calculate prices for phases 1, 2, 5, 10, 20, 30, 50, 81
+    // Calculate prices for phases 1, 2, 5, 10, 20, 30, 50, 77
     // Formula: Price = Base ($0.10) × Score × Phase Multiplier
-    const projections = [1, 2, 5, 10, 20, 30, 50, 81].map((phase) => {
-      const multiplier = Math.pow(1.075, phase - 1);
+    const projections = [1, 2, 5, 10, 20, 30, 50, 77].map((phase) => {
+      const multiplier = Math.pow(multiplierBase, phase - 1);
       const price = 0.10 * score * multiplier;
       return {
         phase,

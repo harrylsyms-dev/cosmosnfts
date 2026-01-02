@@ -291,8 +291,12 @@ router.get('/phases', requireAdmin, async (req, res) => {
       timeRemaining = Math.max(0, Math.floor((adjustedEndTime.getTime() - Date.now()) / 1000));
     }
 
+    const increasePercent = settings.phaseIncreasePercent || 7.5;
+    const multiplierBase = 1 + (increasePercent / 100);
+
     res.json({
       success: true,
+      phaseIncreasePercent: increasePercent,
       currentPhase: {
         phase: activeTier.phase,
         price: activeTier.price,
@@ -309,7 +313,7 @@ router.get('/phases', requireAdmin, async (req, res) => {
         phase: t.phase,
         price: t.price,
         displayPrice: `$${t.price.toFixed(4)}`,
-        multiplier: Math.pow(1.075, t.phase - 1).toFixed(4),
+        multiplier: Math.pow(multiplierBase, t.phase - 1).toFixed(4),
         quantityAvailable: t.quantityAvailable,
         quantitySold: t.quantitySold,
         startTime: t.startTime,
@@ -471,7 +475,9 @@ router.post('/phases/advance', requireAdmin, async (req, res) => {
     });
 
     // Update NFT prices with new multiplier
-    const newMultiplier = Math.pow(1.075, nextTier.phase - 1);
+    const settings = await siteSettingsService.getSettings();
+    const increasePercent = settings.phaseIncreasePercent || 7.5;
+    const newMultiplier = Math.pow(1 + (increasePercent / 100), nextTier.phase - 1);
     await updateNFTPrices(newMultiplier);
 
     // Log audit
@@ -502,6 +508,111 @@ router.post('/phases/advance', requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Error advancing phase:', error);
     res.status(500).json({ error: 'Failed to advance phase' });
+  }
+});
+
+/**
+ * POST /api/admin/phases/reset
+ * Reset the current phase timer (start fresh)
+ */
+router.post('/phases/reset', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    // Get current active tier
+    const activeTier = await prisma.tier.findFirst({
+      where: { active: true },
+    });
+
+    if (!activeTier) {
+      return res.status(400).json({ error: 'No active tier found' });
+    }
+
+    // Reset the timer - set startTime to now and clear any pause
+    await prisma.$transaction([
+      prisma.tier.update({
+        where: { id: activeTier.id },
+        data: { startTime: new Date() },
+      }),
+      prisma.siteSettings.update({
+        where: { id: 'main' },
+        data: {
+          phasePaused: false,
+          pausedAt: null,
+          pauseDurationMs: 0,
+        },
+      }),
+    ]);
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_RESET',
+        details: JSON.stringify({
+          phase: activeTier.phase,
+          resetAt: new Date().toISOString(),
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase ${activeTier.phase} timer reset by admin: ${req.admin!.email}`);
+    res.json({
+      success: true,
+      message: `Phase ${activeTier.phase} timer has been reset`,
+      newStartTime: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error('Error resetting phase timer:', error);
+    res.status(500).json({ error: 'Failed to reset phase timer' });
+  }
+});
+
+/**
+ * PUT /api/admin/phases/increase-percent
+ * Update the phase increase percentage
+ */
+router.put('/phases/increase-percent', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { percent } = req.body;
+
+    if (percent === undefined || percent === null) {
+      return res.status(400).json({ error: 'Percent is required' });
+    }
+
+    const percentNum = parseFloat(percent);
+    if (isNaN(percentNum) || percentNum < 0 || percentNum > 100) {
+      return res.status(400).json({ error: 'Percent must be between 0 and 100' });
+    }
+
+    await prisma.siteSettings.update({
+      where: { id: 'main' },
+      data: { phaseIncreasePercent: percentNum },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_INCREASE_PERCENT_UPDATE',
+        details: JSON.stringify({ newPercent: percentNum }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase increase percent updated to ${percentNum}% by admin: ${req.admin!.email}`);
+    res.json({
+      success: true,
+      message: `Phase increase percent updated to ${percentNum}%`,
+      phaseIncreasePercent: percentNum,
+    });
+  } catch (error) {
+    logger.error('Error updating phase increase percent:', error);
+    res.status(500).json({ error: 'Failed to update phase increase percent' });
   }
 });
 
