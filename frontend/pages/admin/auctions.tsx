@@ -82,6 +82,9 @@ export default function AdminAuctions() {
   const [previewPhase, setPreviewPhase] = useState('1');
   const [selectedAuction, setSelectedAuction] = useState<ScheduledAuction | null>(null);
   const [currentWeek, setCurrentWeek] = useState(0);
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [newPrice, setNewPrice] = useState('');
+  const [isSavingPrice, setIsSavingPrice] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -156,6 +159,58 @@ export default function AdminAuctions() {
       default:
         return '✨';
     }
+  }
+
+  function handleEditPrice(auction: ScheduledAuction) {
+    setEditingPrice(true);
+    setNewPrice((auction.startingBidCents / 100).toString());
+  }
+
+  async function handleSavePrice() {
+    if (!selectedAuction || !newPrice) return;
+
+    setIsSavingPrice(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/auctions/admin/scheduled/price`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: selectedAuction.name,
+          startingBidCents: Math.round(parseFloat(newPrice) * 100),
+        }),
+      });
+
+      if (res.ok) {
+        setSuccess('Starting bid updated successfully');
+        setEditingPrice(false);
+        await fetchScheduledAuctions();
+        // Update selected auction with new price
+        const updatedPrice = Math.round(parseFloat(newPrice) * 100);
+        setSelectedAuction({
+          ...selectedAuction,
+          startingBidCents: updatedPrice,
+          startingBidDisplay: `$${(updatedPrice / 100).toLocaleString()}`,
+        });
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to update price');
+      }
+    } catch (error) {
+      setError('Failed to update price');
+    } finally {
+      setIsSavingPrice(false);
+    }
+  }
+
+  function handleCloseModal() {
+    setSelectedAuction(null);
+    setEditingPrice(false);
+    setNewPrice('');
   }
 
   async function fetchAuctions() {
@@ -366,7 +421,7 @@ export default function AdminAuctions() {
                       </p>
                     </div>
                     <button
-                      onClick={() => setSelectedAuction(null)}
+                      onClick={handleCloseModal}
                       className="text-gray-400 hover:text-white text-2xl"
                     >
                       &times;
@@ -391,10 +446,50 @@ export default function AdminAuctions() {
                           <span className="text-gray-400">Week</span>
                           <span className="font-medium">Week {selectedAuction.week}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                           <span className="text-gray-400">Starting Bid</span>
-                          <span className="font-medium text-green-400">{selectedAuction.startingBidDisplay}</span>
+                          {editingPrice ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400">$</span>
+                              <input
+                                type="number"
+                                value={newPrice}
+                                onChange={(e) => setNewPrice(e.target.value)}
+                                className="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-right"
+                                step="0.01"
+                                min="0"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-green-400">{selectedAuction.startingBidDisplay}</span>
+                              <button
+                                onClick={() => handleEditPrice(selectedAuction)}
+                                className="text-gray-400 hover:text-white text-sm"
+                                title="Edit price"
+                              >
+                                ✏️
+                              </button>
+                            </div>
+                          )}
                         </div>
+                        {editingPrice && (
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={handleSavePrice}
+                              disabled={isSavingPrice}
+                              className="flex-1 bg-green-600 hover:bg-green-500 text-white text-sm px-3 py-1 rounded disabled:opacity-50"
+                            >
+                              {isSavingPrice ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              onClick={() => setEditingPrice(false)}
+                              className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-sm px-3 py-1 rounded"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
                         <div className="flex justify-between">
                           <span className="text-gray-400">Status</span>
                           <span className={`px-2 py-0.5 rounded text-sm ${getStatusColor(selectedAuction.status)}`}>
@@ -446,8 +541,35 @@ export default function AdminAuctions() {
                     </div>
                   )}
 
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-700">
+                    {selectedAuction.nft && (
+                      <Link
+                        href={`/nft/${selectedAuction.nft.tokenId}`}
+                        className="flex-1 bg-purple-600 hover:bg-purple-500 text-white text-center font-medium px-4 py-2 rounded-lg"
+                        target="_blank"
+                      >
+                        View NFT Page
+                      </Link>
+                    )}
+                    {selectedAuction.nft && (
+                      <Link
+                        href={`/admin/nfts?search=${encodeURIComponent(selectedAuction.name)}`}
+                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-center font-medium px-4 py-2 rounded-lg"
+                      >
+                        Manage NFT
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleCloseModal}
+                      className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-lg"
+                    >
+                      Close
+                    </button>
+                  </div>
+
                   {selectedAuction.nft && (
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 mt-4">
                       Token ID: #{selectedAuction.nft.tokenId}
                     </div>
                   )}

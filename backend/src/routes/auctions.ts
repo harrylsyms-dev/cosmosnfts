@@ -225,6 +225,10 @@ router.get('/admin/scheduled', requireAdmin, async (req, res) => {
       },
     });
 
+    // Get price overrides
+    const priceOverrides = await prisma.auctionScheduleOverride.findMany();
+    const overrideMap = new Map(priceOverrides.map((o) => [o.name.toLowerCase(), o.startingBidCents]));
+
     // Map auction schedule with NFT details
     const schedule = AUCTION_SCHEDULE.map((item) => {
       // Find matching NFT (case insensitive search)
@@ -241,11 +245,14 @@ router.get('/admin/scheduled', requireAdmin, async (req, res) => {
           a.nftName.toLowerCase().includes(item.name.toLowerCase())
       );
 
+      // Use override price if available, otherwise use default
+      const effectivePrice = overrideMap.get(item.name.toLowerCase()) ?? item.startingBidCents;
+
       return {
         name: item.name,
         week: item.week,
-        startingBidCents: item.startingBidCents,
-        startingBidDisplay: `$${(item.startingBidCents / 100).toLocaleString()}`,
+        startingBidCents: effectivePrice,
+        startingBidDisplay: `$${(effectivePrice / 100).toLocaleString()}`,
         weeksUntil: Math.max(0, item.week - currentWeek),
         status: existingAuction
           ? existingAuction.status
@@ -285,6 +292,54 @@ router.get('/admin/scheduled', requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Error fetching scheduled auctions:', error);
     res.status(500).json({ error: 'Failed to fetch scheduled auctions' });
+  }
+});
+
+/**
+ * PUT /api/auctions/admin/scheduled/price (Admin only)
+ * Update the starting bid for a scheduled auction
+ */
+router.put('/admin/scheduled/price', requireAdmin, async (req, res) => {
+  try {
+    const { name, startingBidCents } = req.body;
+
+    if (!name || typeof startingBidCents !== 'number') {
+      return res.status(400).json({ error: 'Name and startingBidCents are required' });
+    }
+
+    if (startingBidCents < 100) {
+      return res.status(400).json({ error: 'Starting bid must be at least $1.00' });
+    }
+
+    // Check if the name is in our schedule
+    const scheduledItem = AUCTION_SCHEDULE.find(
+      (a) => a.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (!scheduledItem) {
+      return res.status(404).json({ error: 'Auction not found in schedule' });
+    }
+
+    // Upsert the override
+    const override = await prisma.auctionScheduleOverride.upsert({
+      where: { name: name },
+      update: { startingBidCents },
+      create: { name, startingBidCents },
+    });
+
+    logger.info(`Updated auction starting bid: ${name} -> $${(startingBidCents / 100).toFixed(2)}`);
+
+    res.json({
+      success: true,
+      override: {
+        name: override.name,
+        startingBidCents: override.startingBidCents,
+        startingBidDisplay: `$${(override.startingBidCents / 100).toLocaleString()}`,
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating auction price:', error);
+    res.status(500).json({ error: 'Failed to update auction price' });
   }
 });
 

@@ -350,3 +350,14 @@ model UserSession {
   @@index([userId])
   @@map("user_sessions")
 }
+
+// Auction Schedule Overrides (for custom pricing)
+model AuctionScheduleOverride {
+  id                String   @id @default(uuid())
+  name              String   @unique  // Name of the celestial object
+  startingBidCents  Int      @map("starting_bid_cents")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("auction_schedule_overrides")
+}
