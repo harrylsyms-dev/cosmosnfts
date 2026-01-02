@@ -29,14 +29,11 @@ export default function Header() {
             <Link href="/browse" className="text-gray-300 hover:text-white transition-colors">
               Browse
             </Link>
+            <Link href="/marketplace" className="text-gray-300 hover:text-white transition-colors">
+              Marketplace
+            </Link>
             <Link href="/auctions" className="text-gray-300 hover:text-white transition-colors">
               Auctions
-            </Link>
-            <Link href="/about" className="text-gray-300 hover:text-white transition-colors">
-              About
-            </Link>
-            <Link href="/impact" className="text-gray-300 hover:text-white transition-colors">
-              Our Impact
             </Link>
           </nav>
 

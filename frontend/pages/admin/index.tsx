@@ -285,16 +285,52 @@ export default function AdminDashboard() {
               <p className="text-gray-400 text-sm">Create and manage auctions</p>
             </Link>
 
+            <Link href="/admin/trading" className="bg-gray-900 rounded-lg p-6 border border-purple-800 hover:border-purple-500 transition-colors">
+              <div className="text-3xl mb-2">🔄</div>
+              <h3 className="font-bold mb-1">Marketplace</h3>
+              <p className="text-gray-400 text-sm">Listings & offers</p>
+            </Link>
+
             <Link href="/admin/nfts" className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition-colors">
               <div className="text-3xl mb-2">🌟</div>
               <h3 className="font-bold mb-1">NFTs</h3>
               <p className="text-gray-400 text-sm">Browse and manage NFTs</p>
             </Link>
 
+            <Link href="/admin/phases" className="bg-gray-900 rounded-lg p-6 border border-orange-800 hover:border-orange-500 transition-colors">
+              <div className="text-3xl mb-2">⏱️</div>
+              <h3 className="font-bold mb-1">Phases & Pricing</h3>
+              <p className="text-gray-400 text-sm">Timer controls & pricing</p>
+            </Link>
+
+            <Link href="/admin/users" className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition-colors">
+              <div className="text-3xl mb-2">👥</div>
+              <h3 className="font-bold mb-1">Users</h3>
+              <p className="text-gray-400 text-sm">User management</p>
+            </Link>
+
+            <Link href="/admin/benefactor-dashboard" className="bg-gray-900 rounded-lg p-6 border border-pink-800 hover:border-pink-500 transition-colors">
+              <div className="text-3xl mb-2">💝</div>
+              <h3 className="font-bold mb-1">Benefactor</h3>
+              <p className="text-gray-400 text-sm">Donation tracking</p>
+            </Link>
+
             <Link href="/admin/images" className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition-colors">
               <div className="text-3xl mb-2">🎨</div>
               <h3 className="font-bold mb-1">Image Generation</h3>
               <p className="text-gray-400 text-sm">Generate NFT images</p>
+            </Link>
+
+            <Link href="/admin/site" className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition-colors">
+              <div className="text-3xl mb-2">🌐</div>
+              <h3 className="font-bold mb-1">Site Management</h3>
+              <p className="text-gray-400 text-sm">Whitelist & broadcasts</p>
+            </Link>
+
+            <Link href="/admin/security" className="bg-gray-900 rounded-lg p-6 border border-red-800 hover:border-red-500 transition-colors">
+              <div className="text-3xl mb-2">🔐</div>
+              <h3 className="font-bold mb-1">Security</h3>
+              <p className="text-gray-400 text-sm">Audit logs & access</p>
             </Link>
 
             <Link href="/admin/settings" className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition-colors">
