@@ -29,6 +29,9 @@ export default function Header() {
             <Link href="/browse" className="text-gray-300 hover:text-white transition-colors">
               Browse
             </Link>
+            <Link href="/auctions" className="text-gray-300 hover:text-white transition-colors">
+              Auctions
+            </Link>
             <Link href="/about" className="text-gray-300 hover:text-white transition-colors">
               About
             </Link>
@@ -47,7 +50,7 @@ export default function Header() {
             {/* Account */}
             <Link
               href={isAuthenticated ? '/account' : '/account/login'}
-              className="text-gray-300 hover:text-white transition-colors hidden md:block"
+              className="text-gray-300 hover:text-white transition-colors"
             >
               {isAuthenticated ? 'My Account' : 'Sign In'}
             </Link>

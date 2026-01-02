@@ -369,6 +369,167 @@ class AuctionService {
       winnerDisplay: `${h.winnerAddress.slice(0, 6)}...${h.winnerAddress.slice(-4)}`,
     }));
   }
+
+  /**
+   * Auto-populate auctions for a phase
+   * Runs every other phase (1, 3, 5, 7, etc.)
+   * Selects top-scoring NFTs from that phase
+   */
+  async autoPopulateAuctions(phase: number, count: number = 5): Promise<number> {
+    // Only run on odd phases (1, 3, 5, 7, etc.)
+    if (phase % 2 === 0) {
+      logger.info(`Phase ${phase} is even - skipping auction auto-population`);
+      return 0;
+    }
+
+    // Calculate ID range for this phase
+    let minId: number, maxId: number;
+    if (phase === 1) {
+      minId = 1;
+      maxId = 1000;
+    } else {
+      minId = 1001 + (phase - 2) * 250;
+      maxId = minId + 249;
+    }
+
+    // Get top-scoring available NFTs from this phase
+    const topNFTs = await prisma.nFT.findMany({
+      where: {
+        id: { gte: minId, lte: maxId },
+        status: 'AVAILABLE',
+      },
+      orderBy: { totalScore: 'desc' },
+      take: count,
+    });
+
+    if (topNFTs.length === 0) {
+      logger.info(`No available NFTs found for phase ${phase} auctions`);
+      return 0;
+    }
+
+    let createdCount = 0;
+
+    for (const nft of topNFTs) {
+      try {
+        // Calculate starting bid based on score (higher score = higher starting bid)
+        // Base: $500 for average score (~350), scales with score
+        const scoreMultiplier = nft.totalScore / 350;
+        const startingBidCents = Math.round(50000 * scoreMultiplier); // Base $500
+
+        await this.createAuction({
+          tokenId: nft.tokenId,
+          nftName: nft.name,
+          startingBidCents,
+          durationDays: 7, // 7-day auctions
+        });
+
+        createdCount++;
+        logger.info(`Auto-created auction for ${nft.name} (Token #${nft.tokenId})`);
+      } catch (error) {
+        logger.error(`Failed to auto-create auction for ${nft.name}:`, error);
+      }
+    }
+
+    logger.info(`Auto-populated ${createdCount} auctions for phase ${phase}`);
+    return createdCount;
+  }
+
+  /**
+   * Get NFTs reserved for upcoming auctions
+   * Returns high-scoring NFTs that will be auctioned in future phases
+   */
+  async getReservedForAuction(phase: number, count: number = 5) {
+    // Calculate ID range for the phase
+    let minId: number, maxId: number;
+    if (phase === 1) {
+      minId = 1;
+      maxId = 1000;
+    } else {
+      minId = 1001 + (phase - 2) * 250;
+      maxId = minId + 249;
+    }
+
+    // Get top-scoring available NFTs (these will be auctioned)
+    const topNFTs = await prisma.nFT.findMany({
+      where: {
+        id: { gte: minId, lte: maxId },
+        status: 'AVAILABLE',
+      },
+      orderBy: { totalScore: 'desc' },
+      take: count,
+      select: {
+        id: true,
+        tokenId: true,
+        name: true,
+        totalScore: true,
+        badgeTier: true,
+      },
+    });
+
+    return topNFTs;
+  }
+
+  /**
+   * Get upcoming auction schedule
+   * Shows which phases will have auctions
+   */
+  async getUpcomingAuctionSchedule() {
+    // Get current phase
+    const activeTier = await prisma.tier.findFirst({
+      where: { active: true },
+      orderBy: { phase: 'asc' },
+    });
+
+    const currentPhase = activeTier?.phase || 1;
+
+    // Next 5 auction phases (odd numbers)
+    const upcomingPhases: number[] = [];
+    let phase = currentPhase;
+    while (upcomingPhases.length < 5) {
+      if (phase % 2 === 1) {
+        upcomingPhases.push(phase);
+      }
+      phase++;
+    }
+
+    // Get reserved NFTs for each upcoming phase
+    const schedule = await Promise.all(
+      upcomingPhases.map(async (p) => {
+        const reserved = await this.getReservedForAuction(p, 5);
+        return {
+          phase: p,
+          nftCount: reserved.length,
+          topNFTs: reserved.slice(0, 3).map((n) => n.name),
+        };
+      })
+    );
+
+    return schedule;
+  }
+
+  /**
+   * Get auction stats for admin dashboard
+   */
+  async getAuctionStats() {
+    const [active, ended, finalized, totalBids, totalRevenue] = await Promise.all([
+      prisma.auction.count({ where: { status: 'ACTIVE' } }),
+      prisma.auction.count({ where: { status: 'ENDED' } }),
+      prisma.auction.count({ where: { status: 'FINALIZED' } }),
+      prisma.auctionBid.count(),
+      prisma.auctionHistory.aggregate({
+        _sum: { finalPriceCents: true },
+      }),
+    ]);
+
+    return {
+      active,
+      ended,
+      finalized,
+      total: active + ended + finalized,
+      totalBids,
+      totalRevenue: (totalRevenue._sum.finalPriceCents || 0) / 100,
+    };
+  }
 }
 
 export const auctionService = new AuctionService();

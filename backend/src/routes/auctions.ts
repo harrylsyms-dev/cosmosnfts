@@ -1,5 +1,6 @@
 import express from 'express';
 import { auctionService } from '../services/auction.service';
+import { requireAdmin } from '../middleware/adminAuth';
 import { logger } from '../utils/logger';
 
 const router = express.Router();
@@ -184,12 +185,109 @@ router.post('/:auctionId/bid', async (req, res) => {
 });
 
 /**
+ * GET /api/auctions/schedule
+ * Get upcoming auction schedule (public)
+ */
+router.get('/schedule', async (req, res) => {
+  try {
+    const schedule = await auctionService.getUpcomingAuctionSchedule();
+
+    res.json({
+      success: true,
+      schedule,
+    });
+  } catch (error) {
+    logger.error('Error fetching auction schedule:', error);
+    res.status(500).json({ error: 'Failed to fetch auction schedule' });
+  }
+});
+
+/**
+ * GET /api/auctions/admin/stats (Admin only)
+ * Get auction statistics for admin dashboard
+ */
+router.get('/admin/stats', requireAdmin, async (req, res) => {
+  try {
+    const stats = await auctionService.getAuctionStats();
+
+    res.json({
+      success: true,
+      stats,
+    });
+  } catch (error) {
+    logger.error('Error fetching auction stats:', error);
+    res.status(500).json({ error: 'Failed to fetch auction stats' });
+  }
+});
+
+/**
+ * GET /api/auctions/admin/reserved/:phase (Admin only)
+ * Get NFTs reserved for auction in a specific phase
+ */
+router.get('/admin/reserved/:phase', requireAdmin, async (req, res) => {
+  try {
+    const phase = parseInt(req.params.phase);
+    const count = parseInt(req.query.count as string) || 5;
+
+    if (isNaN(phase) || phase < 1) {
+      return res.status(400).json({ error: 'Invalid phase number' });
+    }
+
+    const reserved = await auctionService.getReservedForAuction(phase, count);
+
+    res.json({
+      success: true,
+      phase,
+      reserved,
+      isAuctionPhase: phase % 2 === 1,
+    });
+  } catch (error) {
+    logger.error('Error fetching reserved NFTs:', error);
+    res.status(500).json({ error: 'Failed to fetch reserved NFTs' });
+  }
+});
+
+/**
+ * POST /api/auctions/admin/auto-populate (Admin only)
+ * Trigger auction auto-population for a phase
+ */
+router.post('/admin/auto-populate', requireAdmin, async (req, res) => {
+  try {
+    const { phase, count = 5 } = req.body;
+
+    if (!phase || isNaN(parseInt(phase))) {
+      return res.status(400).json({ error: 'Phase number is required' });
+    }
+
+    const phaseNum = parseInt(phase);
+
+    if (phaseNum % 2 === 0) {
+      return res.status(400).json({
+        error: 'Auctions only run on odd-numbered phases (1, 3, 5, etc.)',
+        phase: phaseNum,
+      });
+    }
+
+    const createdCount = await auctionService.autoPopulateAuctions(phaseNum, count);
+
+    res.json({
+      success: true,
+      phase: phaseNum,
+      auctionsCreated: createdCount,
+      message: `Created ${createdCount} auctions for Phase ${phaseNum}`,
+    });
+  } catch (error: any) {
+    logger.error('Error auto-populating auctions:', error);
+    res.status(500).json({ error: error.message || 'Failed to auto-populate auctions' });
+  }
+});
+
+/**
  * POST /api/auctions/create (Admin only)
  * Create a new auction
  */
-router.post('/create', async (req, res) => {
+router.post('/create', requireAdmin, async (req, res) => {
   try {
-    // TODO: Add admin authentication middleware
     const { tokenId, nftName, startingBidCents, durationDays } = req.body;
 
     if (!tokenId || !nftName || !startingBidCents || !durationDays) {
@@ -224,9 +322,8 @@ router.post('/create', async (req, res) => {
  * POST /api/auctions/:auctionId/finalize (Admin only)
  * Manually finalize an ended auction
  */
-router.post('/:auctionId/finalize', async (req, res) => {
+router.post('/:auctionId/finalize', requireAdmin, async (req, res) => {
   try {
-    // TODO: Add admin authentication middleware
     const { auctionId } = req.params;
 
     const result = await auctionService.finalizeAuction(auctionId);
