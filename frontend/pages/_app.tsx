@@ -2,14 +2,9 @@ import type { AppProps } from 'next/app';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useRouter } from 'next/router';
-import dynamic from 'next/dynamic';
+import { useEffect, useState } from 'react';
 import '../styles/globals.css';
-
-// Dynamic import to avoid SSR issues with canvas
-const CosmicBackground = dynamic(
-  () => import('../components/CosmicBackground'),
-  { ssr: false }
-);
+import CosmicBackground from '../components/CosmicBackground';
 
 // Load Stripe
 const stripePromise = loadStripe(
@@ -18,9 +13,15 @@ const stripePromise = loadStripe(
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  // Only render cosmic background on client side
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Show cosmic background on homepage
-  const showCosmic = router.pathname === '/';
+  const showCosmic = mounted && router.pathname === '/';
 
   return (
     <>
