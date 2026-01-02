@@ -262,7 +262,7 @@ export default function AdminImages() {
               <div className="flex items-end">
                 <button
                   type="submit"
-                  disabled={isGenerating || (apiStatus && (!apiStatus.configured.leonardo || !apiStatus.configured.pinata))}
+                  disabled={isGenerating || !!(apiStatus && (!apiStatus.configured.leonardo || !apiStatus.configured.pinata))}
                   className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGenerating ? 'Starting...' : `Generate Phase ${selectedPhase}`}
