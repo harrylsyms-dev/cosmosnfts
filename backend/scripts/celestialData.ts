@@ -15,6 +15,20 @@ export interface CelestialObject {
   distance?: string;
 }
 
+// Solar System Objects - Premium Auction Items (10 objects)
+export const solarSystemObjects: CelestialObject[] = [
+  { name: 'Sun', description: 'Our star, a G-type main-sequence star at the heart of our solar system. The source of all life on Earth, its nuclear fusion powers the entire system.', fameVisibility: 100, scientificSignificance: 100, rarity: 100, discoveryRecency: 30, culturalImpact: 100, discoveryYear: -10000, objectType: 'Star', distance: '0' },
+  { name: 'Earth', description: 'Our home planet, the only known world to harbor life. A pale blue dot suspended in a sunbeam, precious beyond measure.', fameVisibility: 100, scientificSignificance: 100, rarity: 100, discoveryRecency: 30, culturalImpact: 100, discoveryYear: -10000, objectType: 'Planet', distance: '0' },
+  { name: 'Moon', description: 'Earth\'s only natural satellite, shaping our tides and nights. The first celestial body visited by humans in 1969.', fameVisibility: 100, scientificSignificance: 98, rarity: 95, discoveryRecency: 30, culturalImpact: 100, discoveryYear: -10000, objectType: 'Moon', distance: '384,400 km' },
+  { name: 'Mars', description: 'The Red Planet, named for the god of war. Our best hope for human colonization, with evidence of ancient water.', fameVisibility: 98, scientificSignificance: 98, rarity: 90, discoveryRecency: 40, culturalImpact: 98, discoveryYear: -2000, objectType: 'Planet', distance: '225M km' },
+  { name: 'Venus', description: 'Earth\'s twin in size, shrouded in thick clouds. The hottest planet with surface temperatures that melt lead.', fameVisibility: 95, scientificSignificance: 92, rarity: 88, discoveryRecency: 35, culturalImpact: 92, discoveryYear: -3000, objectType: 'Planet', distance: '108M km' },
+  { name: 'Jupiter', description: 'The king of planets, a gas giant with 95 known moons. Its Great Red Spot has raged for centuries.', fameVisibility: 98, scientificSignificance: 95, rarity: 92, discoveryRecency: 38, culturalImpact: 95, discoveryYear: -700, objectType: 'Planet', distance: '778M km' },
+  { name: 'Saturn', description: 'The ringed wonder of our solar system. Its spectacular rings span 282,000 km but are only 10 meters thick.', fameVisibility: 98, scientificSignificance: 94, rarity: 94, discoveryRecency: 40, culturalImpact: 98, discoveryYear: -700, objectType: 'Planet', distance: '1.4B km' },
+  { name: 'Uranus', description: 'The ice giant that spins on its side, likely knocked over by an ancient collision. First planet discovered by telescope.', fameVisibility: 85, scientificSignificance: 88, rarity: 90, discoveryRecency: 55, culturalImpact: 78, discoveryYear: 1781, objectType: 'Planet', distance: '2.9B km' },
+  { name: 'Neptune', description: 'The windiest planet with storms reaching 2,100 km/h. Its existence was predicted by mathematics before being seen.', fameVisibility: 82, scientificSignificance: 90, rarity: 92, discoveryRecency: 58, culturalImpact: 75, discoveryYear: 1846, objectType: 'Planet', distance: '4.5B km' },
+  { name: 'Milky Way', description: 'Our home galaxy, a barred spiral containing 100-400 billion stars. We orbit its center once every 230 million years.', fameVisibility: 100, scientificSignificance: 100, rarity: 100, discoveryRecency: 35, culturalImpact: 100, discoveryYear: -10000, objectType: 'Galaxy', distance: '0' },
+];
+
 // Famous Stars (100 objects)
 export const famousStars: CelestialObject[] = [
   { name: 'Sirius', description: 'The brightest star in the night sky, a binary star system in Canis Major. Known as the "Dog Star", it has guided navigators for millennia.', fameVisibility: 98, scientificSignificance: 88, rarity: 75, discoveryRecency: 60, culturalImpact: 98, discoveryYear: -3000, objectType: 'Star', constellation: 'Canis Major', distance: '8.6 ly' },
@@ -161,6 +175,7 @@ export const starClusters: CelestialObject[] = [
 // Generate more unique objects to reach 1000
 export function generateAllCelestialObjects(): CelestialObject[] {
   const allObjects: CelestialObject[] = [
+    ...solarSystemObjects,
     ...famousStars,
     ...exoplanets,
     ...galaxies,
