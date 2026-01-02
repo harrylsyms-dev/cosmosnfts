@@ -231,7 +231,7 @@ export default function AdminSales() {
                           borderRadius: '8px',
                           color: '#fff'
                         }}
-                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+                        formatter={(value) => [`$${(value as number)?.toLocaleString() ?? '0'}`, 'Revenue']}
                         labelFormatter={(label) => `Date: ${label}`}
                       />
                       <Area
@@ -271,7 +271,7 @@ export default function AdminSales() {
                           borderRadius: '8px',
                           color: '#fff'
                         }}
-                        formatter={(value: number) => [value, 'Orders']}
+                        formatter={(value) => [value ?? 0, 'Orders']}
                         labelFormatter={(label) => `Date: ${label}`}
                       />
                       <Bar
@@ -316,8 +316,8 @@ export default function AdminSales() {
                           borderRadius: '8px',
                           color: '#fff'
                         }}
-                        formatter={(value: number, name: string) => [
-                          name === 'revenue' ? `$${value.toLocaleString()}` : value,
+                        formatter={(value, name) => [
+                          name === 'revenue' ? `$${(value as number)?.toLocaleString() ?? '0'}` : (value ?? 0),
                           name === 'revenue' ? 'Revenue' : 'Orders'
                         ]}
                         labelFormatter={(label) => `Date: ${label}`}
