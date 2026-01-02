@@ -28,9 +28,14 @@ router.get('/', async (req: Request, res: Response) => {
         data: { active: true },
       });
 
+      // Format price display (show more decimals for small prices)
+      const displayPrice = phase1.price < 1
+        ? phase1.price.toFixed(2)
+        : phase1.price.toFixed(2);
+
       return res.json({
         currentPrice: (phase1.price * 1e18).toString(),
-        displayPrice: phase1.price.toFixed(2),
+        displayPrice,
         timeUntilNextTier: phase1.duration,
         quantityAvailable: phase1.quantityAvailable - phase1.quantitySold,
         tierIndex: 0,
@@ -50,9 +55,14 @@ router.get('/', async (req: Request, res: Response) => {
     const tierEndTime = new Date(activeTier.startTime.getTime() + activeTier.duration * 1000);
     const timeUntilNextTier = Math.max(0, Math.floor((tierEndTime.getTime() - Date.now()) / 1000));
 
+    // Format price display
+    const displayPrice = activeTier.price < 1
+      ? activeTier.price.toFixed(2)
+      : activeTier.price.toFixed(2);
+
     res.json({
       currentPrice: (activeTier.price * 1e18).toString(),
-      displayPrice: activeTier.price.toFixed(2),
+      displayPrice,
       timeUntilNextTier,
       quantityAvailable: activeTier.quantityAvailable - activeTier.quantitySold,
       tierIndex: activeTier.phase - 1,
@@ -111,15 +121,20 @@ router.get('/projection/:nftId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    const basePrice = nft.cosmicScore; // Score = base price in dollars
+    // Get current tier to determine base price
+    const activeTier = await prisma.tier.findFirst({
+      where: { active: true },
+    });
 
-    // Calculate prices for phases 1, 2, 5, 10, 20, 30
-    const projections = [1, 2, 5, 10, 20, 30].map((phase) => {
+    const basePrice = activeTier?.price || 0.10; // $0.10 base price
+
+    // Calculate prices for phases 1, 2, 5, 10, 20, 30, 50, 81
+    const projections = [1, 2, 5, 10, 20, 30, 50, 81].map((phase) => {
       const multiplier = Math.pow(1.075, phase - 1);
-      const price = basePrice * multiplier;
+      const price = 0.10 * multiplier; // Always calculate from base $0.10
       return {
         phase,
-        price: price.toFixed(2),
+        price: price < 1 ? price.toFixed(4) : price.toFixed(2),
         multiplier: multiplier.toFixed(4),
       };
     });
@@ -127,7 +142,8 @@ router.get('/projection/:nftId', async (req: Request, res: Response) => {
     res.json({
       nftId: nft.id,
       name: nft.name,
-      basePrice,
+      cosmicScore: nft.cosmicScore,
+      currentPrice: basePrice,
       projections,
     });
   } catch (error) {

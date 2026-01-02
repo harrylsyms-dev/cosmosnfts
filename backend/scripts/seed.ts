@@ -16,22 +16,23 @@ async function main() {
   console.log('✓ Cleared existing data\n');
 
   // Create pricing tiers (81 phases)
+  // NEW PRICING: Base $0.10, 7.5% weekly increase
   console.log('Creating 81 pricing tiers...');
-  const basePrice = 350;
+  const basePrice = 0.10; // $0.10 starting price
   const tiers = [];
 
   // Wednesday launch date (next Wednesday)
   const launchDate = getNextWednesday();
   console.log(`📅 Launch date set to: ${launchDate.toDateString()}\n`);
 
-  // Phase 1: 4 weeks, 1000 NFTs
+  // Phase 1: 1 week, 1000 NFTs at $0.10
   tiers.push({
     phase: 1,
     price: basePrice,
     quantityAvailable: 1000,
     quantitySold: 0,
     startTime: launchDate,
-    duration: 28 * 24 * 60 * 60, // 28 days in seconds
+    duration: 7 * 24 * 60 * 60, // 7 days in seconds
     active: true,
   });
 
@@ -40,11 +41,11 @@ async function main() {
     const multiplier = Math.pow(1.075, i - 1);
     const price = basePrice * multiplier;
     const startTime = new Date(launchDate);
-    startTime.setDate(startTime.getDate() + 28 + (i - 2) * 7);
+    startTime.setDate(startTime.getDate() + (i - 1) * 7); // Each phase is 1 week
 
     tiers.push({
       phase: i,
-      price: Math.round(price * 100) / 100,
+      price: Math.round(price * 10000) / 10000, // 4 decimal places for small values
       quantityAvailable: 250,
       quantitySold: 0,
       startTime,
@@ -57,11 +58,12 @@ async function main() {
   console.log(`✓ Created ${tiers.length} pricing tiers`);
 
   // Show price progression
-  console.log('\nPrice progression:');
-  console.log(`  Phase 1:  $${tiers[0].price.toFixed(2)}`);
-  console.log(`  Phase 10: $${tiers[9].price.toFixed(2)}`);
-  console.log(`  Phase 30: $${tiers[29].price.toFixed(2)}`);
-  console.log(`  Phase 50: $${tiers[49].price.toFixed(2)}`);
+  console.log('\nPrice progression (7.5% weekly increase):');
+  console.log(`  Phase 1:  $${tiers[0].price.toFixed(4)}`);
+  console.log(`  Phase 10: $${tiers[9].price.toFixed(4)}`);
+  console.log(`  Phase 20: $${tiers[19].price.toFixed(4)}`);
+  console.log(`  Phase 40: $${tiers[39].price.toFixed(2)}`);
+  console.log(`  Phase 60: $${tiers[59].price.toFixed(2)}`);
   console.log(`  Phase 81: $${tiers[80].price.toFixed(2)}\n`);
 
   // Generate 1000 celestial objects
@@ -89,7 +91,7 @@ async function main() {
       discoveryRecency: obj.discoveryRecency,
       culturalImpact: obj.culturalImpact,
       cosmicScore,
-      currentPrice: cosmicScore, // Base price = cosmic score in dollars
+      currentPrice: basePrice, // All NFTs start at $0.10
       status: 'AVAILABLE',
       discoveryYear: obj.discoveryYear,
       objectType: obj.objectType,
@@ -150,7 +152,8 @@ async function main() {
   console.log('\n═══════════════════════════════════════════════');
   console.log('✅ Database seeding complete!');
   console.log(`📅 Launch: ${launchDate.toDateString()}`);
-  console.log(`💰 Starting Price: $${basePrice}`);
+  console.log(`💰 Starting Price: $${basePrice.toFixed(2)} (Phase 1)`);
+  console.log(`📈 Weekly Increase: 7.5%`);
   console.log(`🎯 Phase 1 NFTs: 1000`);
   console.log('═══════════════════════════════════════════════\n');
 }

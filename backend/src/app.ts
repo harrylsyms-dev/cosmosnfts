@@ -19,6 +19,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiting';
 import { startTierAdvancementJob } from './jobs/tierAdvance.job';
 import { startCartExpiryJob } from './jobs/cartExpiry.job';
+import { startAuctionDeploymentJob } from './jobs/auctionDeploy.job';
 import { logger } from './utils/logger';
 
 dotenv.config();
@@ -87,6 +88,7 @@ app.use(errorHandler);
 // Start cron jobs
 startTierAdvancementJob();
 startCartExpiryJob();
+startAuctionDeploymentJob();
 
 app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info(`Server running on port ${PORT}`);
