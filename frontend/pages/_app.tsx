@@ -20,8 +20,8 @@ interface SiteStatus {
   launchDate: string | null;
 }
 
-// Pages that should always be accessible (admin routes, etc.)
-const BYPASS_PATHS = ['/admin', '/coming-soon'];
+// Pages that should always be accessible (admin routes, account, etc.)
+const BYPASS_PATHS = ['/admin', '/coming-soon', '/account'];
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();

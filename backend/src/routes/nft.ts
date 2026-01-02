@@ -40,10 +40,10 @@ router.get('/available', async (req: Request, res: Response) => {
     };
 
     if (minScore) {
-      where.cosmicScore = { ...where.cosmicScore, gte: parseInt(minScore as string) };
+      where.totalScore = { ...where.totalScore, gte: parseInt(minScore as string) };
     }
     if (maxScore) {
-      where.cosmicScore = { ...where.cosmicScore, lte: parseInt(maxScore as string) };
+      where.totalScore = { ...where.totalScore, lte: parseInt(maxScore as string) };
     }
 
     // Object type filter
@@ -66,7 +66,7 @@ router.get('/available', async (req: Request, res: Response) => {
       };
       const range = badgeRanges[badge as string];
       if (range) {
-        where.cosmicScore = { gte: range.min, lte: range.max };
+        where.totalScore = { gte: range.min, lte: range.max };
       }
     }
 
@@ -74,7 +74,7 @@ router.get('/available', async (req: Request, res: Response) => {
     const orderBy: any = {};
     switch (sortBy) {
       case 'score':
-        orderBy.cosmicScore = actualOrder;
+        orderBy.totalScore = actualOrder;
         break;
       case 'price':
         orderBy.currentPrice = actualOrder;
@@ -83,7 +83,7 @@ router.get('/available', async (req: Request, res: Response) => {
         orderBy.name = actualOrder;
         break;
       default:
-        orderBy.cosmicScore = 'desc';
+        orderBy.totalScore = 'desc';
     }
 
     const [total, nfts] = await Promise.all([
@@ -101,18 +101,24 @@ router.get('/available', async (req: Request, res: Response) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
-      items: nfts.map((nft) => ({
-        id: nft.id,
-        name: nft.name,
-        image: nft.image,
-        score: nft.cosmicScore,
-        cosmicScore: nft.cosmicScore,
-        badge: getBadgeForScore(nft.cosmicScore),
-        currentPrice: nft.currentPrice,
-        displayPrice: `$${nft.currentPrice.toFixed(2)}`,
-        objectType: nft.objectType,
-        status: nft.status,
-      })),
+      items: nfts.map((nft) => {
+        // Use totalScore (populated by seed) or cosmicScore
+        const score = nft.totalScore || nft.cosmicScore || 0;
+        // Use currentPrice or calculate from basePriceCents
+        const price = nft.currentPrice || (nft.basePriceCents / 100) || 0;
+        return {
+          id: nft.id,
+          name: nft.name,
+          image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
+          score,
+          cosmicScore: score,
+          badge: nft.badgeTier || getBadgeForScore(score),
+          currentPrice: price,
+          displayPrice: `$${price.toFixed(2)}`,
+          objectType: nft.objectType,
+          status: nft.status,
+        };
+      }),
     });
   } catch (error) {
     logger.error('Error fetching available NFTs:', error);
@@ -137,20 +143,24 @@ router.get('/search', async (req: Request, res: Response) => {
         status: 'AVAILABLE',
       },
       take: Math.min(parseInt(limit as string), 50),
-      orderBy: { cosmicScore: 'desc' },
+      orderBy: { totalScore: 'desc' },
     });
 
     res.json({
       query: q,
       count: nfts.length,
-      items: nfts.map((nft) => ({
-        id: nft.id,
-        name: nft.name,
-        image: nft.image,
-        score: nft.cosmicScore,
-        badge: getBadgeForScore(nft.cosmicScore),
-        displayPrice: `$${nft.currentPrice.toFixed(2)}`,
-      })),
+      items: nfts.map((nft) => {
+        const score = nft.totalScore || nft.cosmicScore || 0;
+        const price = nft.currentPrice || (nft.basePriceCents / 100) || 0;
+        return {
+          id: nft.id,
+          name: nft.name,
+          image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
+          score,
+          badge: nft.badgeTier || getBadgeForScore(score),
+          displayPrice: `$${price.toFixed(2)}`,
+        };
+      }),
     });
   } catch (error) {
     logger.error('Error searching NFTs:', error);
@@ -166,24 +176,28 @@ router.get('/stats', async (req: Request, res: Response) => {
       availableNfts,
       soldNfts,
       avgScore,
+      withImages,
       badgeCounts,
     ] = await Promise.all([
       prisma.nFT.count(),
       prisma.nFT.count({ where: { status: 'AVAILABLE' } }),
       prisma.nFT.count({ where: { status: 'SOLD' } }),
-      prisma.nFT.aggregate({ _avg: { cosmicScore: true } }),
+      prisma.nFT.aggregate({ _avg: { totalScore: true } }),
+      prisma.nFT.count({ where: { imageIpfsHash: { not: null } } }),
       prisma.nFT.groupBy({
-        by: ['cosmicScore'],
+        by: ['badgeTier'],
         _count: true,
         where: { status: 'AVAILABLE' },
       }),
     ]);
 
-    // Calculate badge distribution
+    // Calculate badge distribution from actual badgeTier field
     const badges = { ELITE: 0, PREMIUM: 0, EXCEPTIONAL: 0, STANDARD: 0 };
     badgeCounts.forEach((item) => {
-      const badge = getBadgeForScore(item.cosmicScore);
-      badges[badge as keyof typeof badges] += item._count;
+      const tier = item.badgeTier as keyof typeof badges;
+      if (tier && badges[tier] !== undefined) {
+        badges[tier] += item._count;
+      }
     });
 
     res.json({
@@ -191,7 +205,8 @@ router.get('/stats', async (req: Request, res: Response) => {
       available: availableNfts,
       sold: soldNfts,
       reserved: totalNfts - availableNfts - soldNfts,
-      averageScore: Math.round(avgScore._avg.cosmicScore || 0),
+      averageScore: Math.round(avgScore._avg.totalScore || 0),
+      withImages,
       badgeDistribution: badges,
     });
   } catch (error) {
@@ -257,16 +272,20 @@ router.get('/by-phase', async (req: Request, res: Response) => {
       total,
       limit: limitNum,
       offset: offsetNum,
-      items: nfts.map((nft) => ({
-        id: nft.id,
-        name: nft.name,
-        image: nft.image,
-        score: nft.cosmicScore,
-        badge: getBadgeForScore(nft.cosmicScore),
-        objectType: nft.objectType,
-        status: nft.status,
-        displayPrice: `$${nft.currentPrice.toFixed(2)}`,
-      })),
+      items: nfts.map((nft) => {
+        const score = nft.totalScore || nft.cosmicScore || 0;
+        const price = nft.currentPrice || (nft.basePriceCents / 100) || 0;
+        return {
+          id: nft.id,
+          name: nft.name,
+          image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
+          score,
+          badge: nft.badgeTier || getBadgeForScore(score),
+          objectType: nft.objectType,
+          status: nft.status,
+          displayPrice: `$${price.toFixed(2)}`,
+        };
+      }),
     });
   } catch (error) {
     logger.error('Error fetching NFTs by phase:', error);
@@ -287,28 +306,41 @@ router.get('/:nftId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    // Calculate price projections
-    const basePrice = nft.cosmicScore;
+    // Use the correct score fields (from seed: fameScore, significanceScore, etc.)
+    // Fall back to alternative fields if main ones are 0
+    const fameScore = nft.fameScore || nft.fameVisibility || 0;
+    const significanceScore = nft.significanceScore || nft.scientificSignificance || 0;
+    const rarityScore = nft.rarityScore || nft.rarity || 0;
+    const discoveryScore = nft.discoveryRecencyScore || nft.discoveryRecency || 0;
+    const culturalScore = nft.culturalImpactScore || nft.culturalImpact || 0;
+
+    // Calculate total score and price
+    const totalScore = nft.totalScore || (fameScore + significanceScore + rarityScore + discoveryScore + culturalScore);
+    const currentPrice = nft.currentPrice || (nft.basePriceCents / 100) || (totalScore * 1);
+
+    // Calculate price projections based on current tier price
+    const basePrice = 350;
+    const tierPrice = basePrice * Math.pow(1.075, (nft.currentTier || 1) - 1);
     const projections = [1, 2, 5, 10, 20, 30].map((phase) => ({
       phase,
-      price: `$${(basePrice * Math.pow(1.075, phase - 1)).toFixed(2)}`,
+      price: `$${(tierPrice * Math.pow(1.075, phase - 1)).toFixed(2)}`,
     }));
 
     res.json({
       nftId: nft.id,
       name: nft.name,
       description: nft.description,
-      image: nft.image,
-      score: nft.cosmicScore,
-      badge: getBadgeForScore(nft.cosmicScore),
-      fameVisibility: nft.fameVisibility,
-      scientificSignificance: nft.scientificSignificance,
-      rarity: nft.rarity,
-      discoveryRecency: nft.discoveryRecency,
-      culturalImpact: nft.culturalImpact,
-      basePrice: (nft.cosmicScore * 1e18).toString(),
-      currentPhasePrice: (nft.currentPrice * 1e18).toString(),
-      displayPrice: `$${nft.currentPrice.toFixed(2)}`,
+      image: nft.image || nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null,
+      score: totalScore,
+      badge: getBadgeForScore(totalScore),
+      fameVisibility: fameScore,
+      scientificSignificance: significanceScore,
+      rarity: rarityScore,
+      discoveryRecency: discoveryScore,
+      culturalImpact: culturalScore,
+      basePrice: (totalScore * 1e18).toString(),
+      currentPhasePrice: (currentPrice * 1e18).toString(),
+      displayPrice: `$${currentPrice.toFixed(2)}`,
       status: nft.status,
       availablePhases: projections,
     });

@@ -14,6 +14,7 @@ import auctionRoutes from './routes/auctions';
 import imageRoutes from './routes/images';
 import adminRoutes from './routes/admin';
 import settingsRoutes from './routes/settings';
+import authRoutes from './routes/auth';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiting';
 import { startTierAdvancementJob } from './jobs/tierAdvance.job';
@@ -78,6 +79,7 @@ app.use('/api/auctions', auctionRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/auth', authRoutes);
 
 // Error handling
 app.use(errorHandler);

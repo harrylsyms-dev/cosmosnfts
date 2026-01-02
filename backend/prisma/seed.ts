@@ -178,19 +178,30 @@ async function main() {
     const totalScore = obj.fame + obj.significance + obj.rarity + obj.discovery + obj.cultural;
     const priceMultiplier = totalScore / 350; // Score 350 = base price
     const basePriceCents = Math.round(basePrice * priceMultiplier * 100);
+    const currentPrice = basePriceCents / 100; // Phase 1 price
 
     return {
       tokenId: index + 1,
       name: obj.name,
       description: obj.description,
       objectType: obj.type,
+      // Original score fields
       fameScore: obj.fame,
       significanceScore: obj.significance,
       rarityScore: obj.rarity,
       discoveryRecencyScore: obj.discovery,
       culturalImpactScore: obj.cultural,
+      // Alternative score fields (for API compatibility)
+      fameVisibility: obj.fame,
+      scientificSignificance: obj.significance,
+      rarity: obj.rarity,
+      discoveryRecency: obj.discovery,
+      culturalImpact: obj.cultural,
+      // Calculated fields
       totalScore,
+      cosmicScore: totalScore,
       basePriceCents,
+      currentPrice,
       badgeTier: getBadgeTier(totalScore),
       currentTier: 1,
       status: 'AVAILABLE',
@@ -203,23 +214,35 @@ async function main() {
   // Generate NFTs for Phases 2-81 (250 each = 20,000 total)
   let tokenId = 1001;
   for (let phase = 2; phase <= 81; phase++) {
+    const phasePrice = basePrice * Math.pow(1.075, phase - 1);
     const phaseNFTs = generateAdditionalObjects(250).map((obj) => {
       const totalScore = obj.fame + obj.significance + obj.rarity + obj.discovery + obj.cultural;
       const priceMultiplier = totalScore / 350;
       const basePriceCents = Math.round(basePrice * priceMultiplier * 100);
+      const currentPrice = Math.round(phasePrice * priceMultiplier * 100) / 100;
 
       return {
         tokenId: tokenId++,
         name: obj.name,
         description: obj.description,
         objectType: obj.type,
+        // Original score fields
         fameScore: obj.fame,
         significanceScore: obj.significance,
         rarityScore: obj.rarity,
         discoveryRecencyScore: obj.discovery,
         culturalImpactScore: obj.cultural,
+        // Alternative score fields (for API compatibility)
+        fameVisibility: obj.fame,
+        scientificSignificance: obj.significance,
+        rarity: obj.rarity,
+        discoveryRecency: obj.discovery,
+        culturalImpact: obj.cultural,
+        // Calculated fields
         totalScore,
+        cosmicScore: totalScore,
         basePriceCents,
+        currentPrice,
         badgeTier: getBadgeTier(totalScore),
         currentTier: phase,
         status: 'AVAILABLE',

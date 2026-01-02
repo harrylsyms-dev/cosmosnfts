@@ -1,14 +1,37 @@
 import express from 'express';
 import { leonardoService } from '../services/leonardo.service';
+import { requireAdmin } from '../middleware/adminAuth';
 import { logger } from '../utils/logger';
 
 const router = express.Router();
 
 /**
+ * GET /api/images/status
+ * Check if image generation is properly configured
+ */
+router.get('/status', requireAdmin, async (req, res) => {
+  const leonardoKey = process.env.LEONARDO_AI_API_KEY;
+  const pinataKey = process.env.PINATA_API_KEY;
+  const pinataSecret = process.env.PINATA_API_SECRET;
+
+  res.json({
+    success: true,
+    configured: {
+      leonardo: !!leonardoKey && leonardoKey.length > 10,
+      pinata: !!pinataKey && !!pinataSecret,
+    },
+    message: !leonardoKey ? 'LEONARDO_AI_API_KEY not configured' :
+             !pinataKey ? 'PINATA_API_KEY not configured' :
+             !pinataSecret ? 'PINATA_API_SECRET not configured' :
+             'All API keys configured',
+  });
+});
+
+/**
  * POST /api/images/generate-phase1
  * Generate images for Phase 1 NFTs
  */
-router.post('/generate-phase1', async (req, res) => {
+router.post('/generate-phase1', requireAdmin, async (req, res) => {
   try {
     // Start generation in background
     const generationPromise = leonardoService.generatePhase1();
@@ -34,7 +57,7 @@ router.post('/generate-phase1', async (req, res) => {
  * POST /api/images/generate-phase/:phaseNumber
  * Generate images for a specific phase
  */
-router.post('/generate-phase/:phaseNumber', async (req, res) => {
+router.post('/generate-phase/:phaseNumber', requireAdmin, async (req, res) => {
   try {
     const phaseNumber = parseInt(req.params.phaseNumber);
 
@@ -65,7 +88,7 @@ router.post('/generate-phase/:phaseNumber', async (req, res) => {
  * POST /api/images/verify
  * Verify images exist on IPFS
  */
-router.post('/verify', async (req, res) => {
+router.post('/verify', requireAdmin, async (req, res) => {
   try {
     const { tokenIds } = req.body;
 

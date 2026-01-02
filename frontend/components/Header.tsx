@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { useMetaMask } from '../hooks/useMetaMask';
 import { useCart } from '../hooks/useCart';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Header() {
   const { address, isConnected, connect, chainId } = useMetaMask();
   const { cart } = useCart();
+  const { isAuthenticated, user } = useAuth();
 
   const isPolygon = chainId === 137;
   const cartCount = cart?.itemCount || 0;
@@ -42,6 +44,14 @@ export default function Header() {
 
           {/* Right Side */}
           <div className="flex items-center gap-4">
+            {/* Account */}
+            <Link
+              href={isAuthenticated ? '/account' : '/account/login'}
+              className="text-gray-300 hover:text-white transition-colors hidden md:block"
+            >
+              {isAuthenticated ? 'My Account' : 'Sign In'}
+            </Link>
+
             {/* Cart */}
             <Link
               href="/cart"

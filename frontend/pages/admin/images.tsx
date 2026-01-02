@@ -11,10 +11,19 @@ interface NFTStats {
   withoutImages: number;
 }
 
+interface APIStatus {
+  configured: {
+    leonardo: boolean;
+    pinata: boolean;
+  };
+  message: string;
+}
+
 export default function AdminImages() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<NFTStats | null>(null);
+  const [apiStatus, setApiStatus] = useState<APIStatus | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedPhase, setSelectedPhase] = useState('1');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -37,11 +46,27 @@ export default function AdminImages() {
         return;
       }
 
-      await fetchStats();
+      await Promise.all([fetchStats(), fetchApiStatus()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchApiStatus() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/images/status`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setApiStatus(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch API status:', error);
     }
   }
 
@@ -182,6 +207,35 @@ export default function AdminImages() {
             </div>
           )}
 
+          {/* API Status */}
+          {apiStatus && (
+            <div className={`mb-6 p-4 rounded-lg border ${
+              apiStatus.configured.leonardo && apiStatus.configured.pinata
+                ? 'bg-green-900/20 border-green-600'
+                : 'bg-red-900/20 border-red-600'
+            }`}>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${apiStatus.configured.leonardo ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className={apiStatus.configured.leonardo ? 'text-green-400' : 'text-red-400'}>
+                    Leonardo AI: {apiStatus.configured.leonardo ? 'Configured' : 'Not Configured'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${apiStatus.configured.pinata ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className={apiStatus.configured.pinata ? 'text-green-400' : 'text-red-400'}>
+                    Pinata IPFS: {apiStatus.configured.pinata ? 'Configured' : 'Not Configured'}
+                  </span>
+                </div>
+              </div>
+              {(!apiStatus.configured.leonardo || !apiStatus.configured.pinata) && (
+                <p className="text-yellow-400 text-sm mt-2">
+                  Add the missing API keys to your Render environment variables to enable image generation.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Generate Form */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
             <h2 className="text-xl font-bold mb-4">Generate Images with Leonardo AI</h2>
@@ -208,24 +262,32 @@ export default function AdminImages() {
               <div className="flex items-end">
                 <button
                   type="submit"
-                  disabled={isGenerating}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg disabled:opacity-50"
+                  disabled={isGenerating || !apiStatus?.configured.leonardo || !apiStatus?.configured.pinata}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGenerating ? 'Starting...' : `Generate Phase ${selectedPhase}`}
                 </button>
               </div>
             </form>
 
-            <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
-              <p className="text-yellow-200 text-sm">
-                <strong>Required Environment Variables:</strong>
-              </p>
-              <ul className="text-yellow-200 text-sm mt-2 list-disc list-inside">
-                <li>LEONARDO_AI_API_KEY - Your Leonardo AI API key</li>
-                <li>PINATA_API_KEY - Pinata IPFS API key</li>
-                <li>PINATA_API_SECRET - Pinata IPFS secret</li>
-              </ul>
-            </div>
+            {(!apiStatus?.configured.leonardo || !apiStatus?.configured.pinata) && (
+              <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
+                <p className="text-yellow-200 text-sm">
+                  <strong>Required Environment Variables (add to Render):</strong>
+                </p>
+                <ul className="text-yellow-200 text-sm mt-2 list-disc list-inside">
+                  <li className={apiStatus?.configured.leonardo ? 'line-through opacity-50' : ''}>
+                    LEONARDO_AI_API_KEY - Your Leonardo AI API key
+                  </li>
+                  <li className={apiStatus?.configured.pinata ? 'line-through opacity-50' : ''}>
+                    PINATA_API_KEY - Pinata IPFS API key
+                  </li>
+                  <li className={apiStatus?.configured.pinata ? 'line-through opacity-50' : ''}>
+                    PINATA_API_SECRET - Pinata IPFS secret
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Verify Images */}
