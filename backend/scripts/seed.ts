@@ -15,9 +15,9 @@ async function main() {
   await prisma.tier.deleteMany();
   console.log('✓ Cleared existing data\n');
 
-  // Create pricing tiers (81 phases)
+  // Create pricing tiers (77 phases = 1000 + 76*250 = 20,000 NFTs)
   // NEW PRICING: Base $0.10, 7.5% weekly increase
-  console.log('Creating 81 pricing tiers...');
+  console.log('Creating 77 pricing tiers...');
   const basePrice = 0.10; // $0.10 starting price
   const tiers = [];
 
@@ -36,8 +36,8 @@ async function main() {
     active: true,
   });
 
-  // Phases 2-81: 1 week each, 250 NFTs, 7.5% increase
-  for (let i = 2; i <= 81; i++) {
+  // Phases 2-77: 1 week each, 250 NFTs, 7.5% increase
+  for (let i = 2; i <= 77; i++) {
     const multiplier = Math.pow(1.075, i - 1);
     const price = basePrice * multiplier;
     const startTime = new Date(launchDate);
@@ -64,7 +64,7 @@ async function main() {
   console.log(`  Phase 20: $${tiers[19].price.toFixed(4)}`);
   console.log(`  Phase 40: $${tiers[39].price.toFixed(2)}`);
   console.log(`  Phase 60: $${tiers[59].price.toFixed(2)}`);
-  console.log(`  Phase 81: $${tiers[80].price.toFixed(2)}\n`);
+  console.log(`  Phase 77: $${tiers[76].price.toFixed(2)}\n`);
 
   // Generate 1000 celestial objects
   console.log('Generating 1000 celestial objects for Phase 1...');
@@ -158,12 +158,12 @@ async function main() {
   const maxScore = stats._max.cosmicScore || 485;
   const phase1MinPrice = basePrice * minScore * 1.0;
   const phase1MaxPrice = basePrice * maxScore * 1.0;
-  const phase81Multiplier = Math.pow(1.075, 80);
+  const phase77Multiplier = Math.pow(1.075, 76);
 
   console.log('\n💰 PRICING MODEL:');
   console.log('   Formula: $0.10 × Score × Phase Multiplier');
   console.log(`   Phase 1 Price Range: $${phase1MinPrice.toFixed(2)} - $${phase1MaxPrice.toFixed(2)}`);
-  console.log(`   Phase 81 Price Range: $${(phase1MinPrice * phase81Multiplier).toFixed(2)} - $${(phase1MaxPrice * phase81Multiplier).toFixed(2)}`);
+  console.log(`   Phase 77 Price Range: $${(phase1MinPrice * phase77Multiplier).toFixed(2)} - $${(phase1MaxPrice * phase77Multiplier).toFixed(2)}`);
 
   console.log('\n═══════════════════════════════════════════════');
   console.log('✅ Database seeding complete!');

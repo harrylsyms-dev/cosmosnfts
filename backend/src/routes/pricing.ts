@@ -91,7 +91,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/pricing/all-tiers - Returns all 81 tiers
+// GET /api/pricing/all-tiers - Returns all 77 tiers
 router.get('/all-tiers', async (req: Request, res: Response) => {
   try {
     const tiers = await prisma.tier.findMany({

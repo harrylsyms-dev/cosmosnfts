@@ -148,9 +148,9 @@ async function main() {
     active: true,
   });
 
-  // Phases 2-81: 250 NFTs each, 1 week, 7.5% increase
+  // Phases 2-77: 250 NFTs each, 1 week, 7.5% increase (76 * 250 = 19,000 + 1000 = 20,000 total)
   let currentPrice = basePrice;
-  for (let i = 2; i <= 81; i++) {
+  for (let i = 2; i <= 77; i++) {
     currentPrice = Math.round(currentPrice * 1.075 * 100) / 100;
     const startTime = new Date();
     startTime.setDate(startTime.getDate() + 28 + (i - 2) * 7);
@@ -211,9 +211,9 @@ async function main() {
   await prisma.nFT.createMany({ data: nfts });
   console.log(`Created ${nfts.length} Phase 1 NFTs`);
 
-  // Generate NFTs for Phases 2-81 (250 each = 20,000 total)
+  // Generate NFTs for Phases 2-77 (250 each = 19,000 + Phase 1's 1000 = 20,000 total)
   let tokenId = 1001;
-  for (let phase = 2; phase <= 81; phase++) {
+  for (let phase = 2; phase <= 77; phase++) {
     const phasePrice = basePrice * Math.pow(1.075, phase - 1);
     const phaseNFTs = generateAdditionalObjects(250).map((obj) => {
       const totalScore = obj.fame + obj.significance + obj.rarity + obj.discovery + obj.cultural;

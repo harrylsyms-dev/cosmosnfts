@@ -61,8 +61,8 @@ router.post('/generate-phase/:phaseNumber', requireAdmin, async (req, res) => {
   try {
     const phaseNumber = parseInt(req.params.phaseNumber);
 
-    if (isNaN(phaseNumber) || phaseNumber < 1 || phaseNumber > 81) {
-      return res.status(400).json({ error: 'Invalid phase number (1-81)' });
+    if (isNaN(phaseNumber) || phaseNumber < 1 || phaseNumber > 77) {
+      return res.status(400).json({ error: 'Invalid phase number (1-77)' });
     }
 
     // Start generation in background
