@@ -32,8 +32,27 @@ app.get('/health', (req, res) => {
 
 // Middleware
 app.use(helmet());
+
+// CORS - allow multiple origins
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://cosmonfts.com',
+  'https://www.cosmonfts.com',
+  'https://cosmosnfts.vercel.app',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all for now
+    }
+  },
   credentials: true,
 }));
 app.use(cookieParser());
