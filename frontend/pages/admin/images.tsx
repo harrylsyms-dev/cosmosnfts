@@ -5,25 +5,20 @@ import Link from 'next/link';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
-interface GenerationJob {
-  id: string;
-  status: string;
-  totalNfts: number;
-  processedNfts: number;
-  startedAt: string;
-  completedAt: string | null;
+interface NFTStats {
+  total: number;
+  withImages: number;
+  withoutImages: number;
 }
 
 export default function AdminImages() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [jobs, setJobs] = useState<GenerationJob[]>([]);
+  const [stats, setStats] = useState<NFTStats | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generateForm, setGenerateForm] = useState({
-    startId: '1',
-    endId: '100',
-  });
+  const [selectedPhase, setSelectedPhase] = useState('1');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [verifyResult, setVerifyResult] = useState<{ verified: number; failed: number[] } | null>(null);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -42,7 +37,7 @@ export default function AdminImages() {
         return;
       }
 
-      await fetchJobs();
+      await fetchStats();
     } catch (error) {
       router.push('/admin/login');
     } finally {
@@ -50,55 +45,81 @@ export default function AdminImages() {
     }
   }
 
-  async function fetchJobs() {
+  async function fetchStats() {
     try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/images/jobs`, {
-        credentials: 'include',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
+      const res = await fetch(`${apiUrl}/api/nfts/stats`);
       if (res.ok) {
         const data = await res.json();
-        setJobs(data.jobs || []);
+        setStats({
+          total: data.total || 0,
+          withImages: data.withImages || 0,
+          withoutImages: data.total - (data.withImages || 0),
+        });
       }
     } catch (error) {
-      console.error('Failed to fetch jobs:', error);
+      console.error('Failed to fetch stats:', error);
     }
   }
 
-  async function handleGenerate(e: React.FormEvent) {
+  async function handleGeneratePhase(e: React.FormEvent) {
     e.preventDefault();
     setIsGenerating(true);
     setMessage(null);
 
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/images/generate`, {
+      const endpoint = selectedPhase === '1'
+        ? `${apiUrl}/api/images/generate-phase1`
+        : `${apiUrl}/api/images/generate-phase/${selectedPhase}`;
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          startId: parseInt(generateForm.startId),
-          endId: parseInt(generateForm.endId),
-        }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        setMessage({ type: 'success', text: `Image generation started for NFTs ${generateForm.startId}-${generateForm.endId}` });
-        await fetchJobs();
+        setMessage({
+          type: 'success',
+          text: `Phase ${selectedPhase} image generation started! ${data.estimatedTime || 'Check logs for progress.'}`
+        });
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to start generation' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to start generation' });
+      setMessage({ type: 'error', text: 'Failed to start generation. Check if LEONARDO_AI_API_KEY is configured.' });
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function handleVerify() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      // Verify first 100 NFTs as a sample
+      const tokenIds = Array.from({ length: 100 }, (_, i) => i + 1);
+
+      const res = await fetch(`${apiUrl}/api/images/verify`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ tokenIds }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setVerifyResult({ verified: data.verified, failed: data.failed });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to verify images' });
     }
   }
 
@@ -143,35 +164,46 @@ export default function AdminImages() {
 
           <h1 className="text-2xl font-bold mb-6">NFT Image Generation</h1>
 
+          {/* Stats */}
+          {stats && (
+            <div className="grid md:grid-cols-3 gap-4 mb-8">
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+                <p className="text-gray-400 text-sm">Total NFTs</p>
+                <p className="text-3xl font-bold">{stats.total.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-900 rounded-lg p-6 border border-green-800">
+                <p className="text-gray-400 text-sm">With Images</p>
+                <p className="text-3xl font-bold text-green-400">{stats.withImages.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-900 rounded-lg p-6 border border-yellow-800">
+                <p className="text-gray-400 text-sm">Need Images</p>
+                <p className="text-3xl font-bold text-yellow-400">{stats.withoutImages.toLocaleString()}</p>
+              </div>
+            </div>
+          )}
+
           {/* Generate Form */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
-            <h2 className="text-xl font-bold mb-4">Generate Images</h2>
+            <h2 className="text-xl font-bold mb-4">Generate Images with Leonardo AI</h2>
             <p className="text-gray-400 mb-4">
-              Generate AI images for NFTs that don't have images yet. This uses the configured image generation API.
+              Generate AI images for NFTs by phase. Images are uploaded to Pinata IPFS automatically.
             </p>
 
-            <form onSubmit={handleGenerate} className="grid md:grid-cols-3 gap-4">
+            <form onSubmit={handleGeneratePhase} className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-400 text-sm mb-2">Start NFT ID</label>
-                <input
-                  type="number"
-                  value={generateForm.startId}
-                  onChange={(e) => setGenerateForm({ ...generateForm, startId: e.target.value })}
+                <label className="block text-gray-400 text-sm mb-2">Select Phase</label>
+                <select
+                  value={selectedPhase}
+                  onChange={(e) => setSelectedPhase(e.target.value)}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                  min="1"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">End NFT ID</label>
-                <input
-                  type="number"
-                  value={generateForm.endId}
-                  onChange={(e) => setGenerateForm({ ...generateForm, endId: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                  min="1"
-                  required
-                />
+                >
+                  <option value="1">Phase 1 (1,000 NFTs)</option>
+                  {Array.from({ length: 80 }, (_, i) => i + 2).map((phase) => (
+                    <option key={phase} value={phase.toString()}>
+                      Phase {phase} (250 NFTs)
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-end">
                 <button
@@ -179,58 +211,60 @@ export default function AdminImages() {
                   disabled={isGenerating}
                   className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg disabled:opacity-50"
                 >
-                  {isGenerating ? 'Starting...' : 'Start Generation'}
+                  {isGenerating ? 'Starting...' : `Generate Phase ${selectedPhase}`}
                 </button>
               </div>
             </form>
 
             <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
               <p className="text-yellow-200 text-sm">
-                <strong>Note:</strong> Image generation requires an API key for the image generation service.
-                Make sure OPENAI_API_KEY or similar is configured in your environment.
+                <strong>Required Environment Variables:</strong>
               </p>
+              <ul className="text-yellow-200 text-sm mt-2 list-disc list-inside">
+                <li>LEONARDO_AI_API_KEY - Your Leonardo AI API key</li>
+                <li>PINATA_API_KEY - Pinata IPFS API key</li>
+                <li>PINATA_API_SECRET - Pinata IPFS secret</li>
+              </ul>
             </div>
           </div>
 
-          {/* Jobs List */}
-          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-            <h2 className="text-xl font-bold mb-4">Generation Jobs</h2>
+          {/* Verify Images */}
+          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
+            <h2 className="text-xl font-bold mb-4">Verify Images on IPFS</h2>
+            <p className="text-gray-400 mb-4">
+              Check if generated images are accessible on IPFS (samples first 100 NFTs).
+            </p>
 
-            {jobs.length === 0 ? (
-              <p className="text-gray-400 text-center py-8">No generation jobs yet</p>
-            ) : (
-              <div className="space-y-4">
-                {jobs.map((job) => (
-                  <div key={job.id} className="bg-gray-800 rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium">Job #{job.id.slice(0, 8)}</span>
-                      <span className={`px-2 py-1 rounded text-sm ${
-                        job.status === 'completed' ? 'bg-green-900 text-green-300' :
-                        job.status === 'running' ? 'bg-blue-900 text-blue-300' :
-                        job.status === 'failed' ? 'bg-red-900 text-red-300' :
-                        'bg-gray-700 text-gray-300'
-                      }`}>
-                        {job.status}
-                      </span>
-                    </div>
-                    <div className="text-gray-400 text-sm">
-                      Progress: {job.processedNfts} / {job.totalNfts}
-                    </div>
-                    {job.status === 'running' && (
-                      <div className="mt-2 bg-gray-700 rounded-full h-2">
-                        <div
-                          className="bg-blue-500 h-2 rounded-full transition-all"
-                          style={{ width: `${(job.processedNfts / job.totalNfts) * 100}%` }}
-                        />
-                      </div>
-                    )}
-                    <div className="text-gray-500 text-xs mt-2">
-                      Started: {new Date(job.startedAt).toLocaleString()}
-                    </div>
-                  </div>
-                ))}
+            <button
+              onClick={handleVerify}
+              className="bg-green-600 hover:bg-green-500 text-white font-bold px-6 py-2 rounded-lg"
+            >
+              Verify Images
+            </button>
+
+            {verifyResult && (
+              <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+                <p className="text-green-400">Verified: {verifyResult.verified}</p>
+                {verifyResult.failed.length > 0 && (
+                  <p className="text-red-400">Failed: {verifyResult.failed.length} ({verifyResult.failed.slice(0, 10).join(', ')}...)</p>
+                )}
               </div>
             )}
+          </div>
+
+          {/* How It Works */}
+          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+            <h2 className="text-xl font-bold mb-4">How Image Generation Works</h2>
+            <div className="space-y-3 text-gray-400">
+              <p><strong className="text-white">1.</strong> Select a phase to generate images for</p>
+              <p><strong className="text-white">2.</strong> Leonardo AI generates cosmic artwork based on NFT data</p>
+              <p><strong className="text-white">3.</strong> Images are uploaded to Pinata IPFS</p>
+              <p><strong className="text-white">4.</strong> Metadata JSON is created with IPFS links</p>
+              <p><strong className="text-white">5.</strong> Database is updated with IPFS hashes</p>
+            </div>
+            <p className="text-gray-500 text-sm mt-4">
+              Phase 1 (1,000 images) takes approximately 2-3 hours. Other phases (250 images) take ~45 minutes.
+            </p>
           </div>
 
           <div className="mt-8">
