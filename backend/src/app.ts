@@ -25,6 +25,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Simple health check BEFORE any middleware (for Railway)
+app.get('/health', (req, res) => {
+  res.status(200).json({ alive: true });
+});
+
 // Middleware
 app.use(helmet());
 app.use(cors({
@@ -62,7 +67,7 @@ app.use(errorHandler);
 startTierAdvancementJob();
 startCartExpiryJob();
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
