@@ -1,0 +1,259 @@
+import { Router, Request, Response } from 'express';
+import { prisma } from '../config/database';
+import { logger } from '../utils/logger';
+import { v4 as uuidv4 } from 'uuid';
+
+const router = Router();
+
+const CART_EXPIRY_MINUTES = 30;
+const MAX_CART_ITEMS = 5;
+
+// POST /api/cart/add - Add NFT to cart
+router.post('/add', async (req: Request, res: Response) => {
+  try {
+    const { nftId, userId } = req.body;
+
+    if (!nftId || !userId) {
+      return res.status(400).json({ error: 'nftId and userId are required' });
+    }
+
+    // Check if NFT exists and is available
+    const nft = await prisma.nFT.findUnique({
+      where: { id: parseInt(nftId) },
+    });
+
+    if (!nft) {
+      return res.status(404).json({ error: 'NFT not found' });
+    }
+
+    if (nft.status !== 'AVAILABLE') {
+      return res.status(400).json({ error: 'NFT is not available' });
+    }
+
+    // Get or create cart
+    let cart = await prisma.cart.findFirst({
+      where: {
+        userId,
+        expiresAt: { gt: new Date() },
+      },
+      include: { items: true },
+    });
+
+    const expiresAt = new Date(Date.now() + CART_EXPIRY_MINUTES * 60 * 1000);
+
+    if (!cart) {
+      cart = await prisma.cart.create({
+        data: {
+          id: uuidv4(),
+          userId,
+          expiresAt,
+        },
+        include: { items: true },
+      });
+    }
+
+    // Check cart limit
+    if (cart.items.length >= MAX_CART_ITEMS) {
+      return res.status(400).json({
+        error: `Maximum ${MAX_CART_ITEMS} items per cart`,
+      });
+    }
+
+    // Check if NFT already in cart
+    const existingItem = cart.items.find((item) => item.nftId === parseInt(nftId));
+    if (existingItem) {
+      return res.status(400).json({ error: 'NFT already in cart' });
+    }
+
+    // Add to cart and reserve NFT
+    await prisma.$transaction([
+      prisma.cartItem.create({
+        data: {
+          cartId: cart.id,
+          nftId: parseInt(nftId),
+          priceAtAdd: nft.currentPrice,
+        },
+      }),
+      prisma.nFT.update({
+        where: { id: parseInt(nftId) },
+        data: { status: 'RESERVED' },
+      }),
+    ]);
+
+    // Fetch updated cart
+    const updatedCart = await prisma.cart.findUnique({
+      where: { id: cart.id },
+      include: {
+        items: {
+          include: { nft: true },
+        },
+      },
+    });
+
+    const totalPrice = updatedCart!.items.reduce(
+      (sum, item) => sum + item.priceAtAdd,
+      0
+    );
+
+    res.json({
+      cartId: updatedCart!.id,
+      items: updatedCart!.items.map((item) => ({
+        nftId: item.nftId,
+        name: item.nft.name,
+        price: item.priceAtAdd,
+        expiresAt: updatedCart!.expiresAt,
+      })),
+      itemCount: updatedCart!.items.length,
+      totalPrice,
+      expiresAt: updatedCart!.expiresAt.getTime() / 1000,
+    });
+  } catch (error) {
+    logger.error('Error adding to cart:', error);
+    res.status(500).json({ error: 'Failed to add to cart' });
+  }
+});
+
+// GET /api/cart - Get current cart
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const cart = await prisma.cart.findFirst({
+      where: {
+        userId: userId as string,
+        expiresAt: { gt: new Date() },
+      },
+      include: {
+        items: {
+          include: { nft: true },
+        },
+      },
+    });
+
+    if (!cart) {
+      return res.json({
+        cartId: null,
+        items: [],
+        itemCount: 0,
+        totalPrice: 0,
+        expiresAt: null,
+      });
+    }
+
+    const totalPrice = cart.items.reduce(
+      (sum, item) => sum + item.priceAtAdd,
+      0
+    );
+
+    res.json({
+      cartId: cart.id,
+      items: cart.items.map((item) => ({
+        nftId: item.nftId,
+        name: item.nft.name,
+        price: item.priceAtAdd,
+        image: item.nft.image,
+        score: item.nft.cosmicScore,
+      })),
+      itemCount: cart.items.length,
+      totalPrice,
+      expiresAt: cart.expiresAt.getTime() / 1000,
+    });
+  } catch (error) {
+    logger.error('Error fetching cart:', error);
+    res.status(500).json({ error: 'Failed to fetch cart' });
+  }
+});
+
+// POST /api/cart/remove - Remove NFT from cart
+router.post('/remove', async (req: Request, res: Response) => {
+  try {
+    const { nftId, userId } = req.body;
+
+    if (!nftId || !userId) {
+      return res.status(400).json({ error: 'nftId and userId are required' });
+    }
+
+    const cart = await prisma.cart.findFirst({
+      where: {
+        userId,
+        expiresAt: { gt: new Date() },
+      },
+      include: { items: true },
+    });
+
+    if (!cart) {
+      return res.status(404).json({ error: 'Cart not found' });
+    }
+
+    const item = cart.items.find((i) => i.nftId === parseInt(nftId));
+    if (!item) {
+      return res.status(404).json({ error: 'Item not in cart' });
+    }
+
+    // Remove from cart and release NFT
+    await prisma.$transaction([
+      prisma.cartItem.delete({
+        where: { id: item.id },
+      }),
+      prisma.nFT.update({
+        where: { id: parseInt(nftId) },
+        data: { status: 'AVAILABLE' },
+      }),
+    ]);
+
+    res.json({ success: true, message: 'Item removed from cart' });
+  } catch (error) {
+    logger.error('Error removing from cart:', error);
+    res.status(500).json({ error: 'Failed to remove from cart' });
+  }
+});
+
+// POST /api/cart/clear - Clear entire cart
+router.post('/clear', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const cart = await prisma.cart.findFirst({
+      where: {
+        userId,
+        expiresAt: { gt: new Date() },
+      },
+      include: { items: true },
+    });
+
+    if (!cart) {
+      return res.json({ success: true, message: 'Cart already empty' });
+    }
+
+    // Release all NFTs and delete cart items
+    const nftIds = cart.items.map((item) => item.nftId);
+
+    await prisma.$transaction([
+      prisma.cartItem.deleteMany({
+        where: { cartId: cart.id },
+      }),
+      prisma.nFT.updateMany({
+        where: { id: { in: nftIds } },
+        data: { status: 'AVAILABLE' },
+      }),
+      prisma.cart.delete({
+        where: { id: cart.id },
+      }),
+    ]);
+
+    res.json({ success: true, message: 'Cart cleared' });
+  } catch (error) {
+    logger.error('Error clearing cart:', error);
+    res.status(500).json({ error: 'Failed to clear cart' });
+  }
+});
+
+export default router;

@@ -1,0 +1,266 @@
+import { useState, useEffect } from 'react';
+import Head from 'next/head';
+import Link from 'next/link';
+import { useMetaMask } from '../hooks/useMetaMask';
+import { usePricing } from '../hooks/usePricing';
+import { useCart } from '../hooks/useCart';
+import Layout from '../components/Layout';
+import NFTCard from '../components/NFTCard';
+import CountdownTimer from '../components/CountdownTimer';
+import PricingDisplay from '../components/PricingDisplay';
+
+interface NFT {
+  id: number;
+  name: string;
+  image: string;
+  score: number;
+  badge: string;
+  displayPrice: string;
+  currentPrice: number;
+}
+
+export default function Home() {
+  const { address, isConnected, connect } = useMetaMask();
+  const { pricing, isLoading: pricingLoading } = usePricing();
+  const { cart, addToCart } = useCart();
+  const [nfts, setNfts] = useState<NFT[]>([]);
+  const [isLoadingNfts, setIsLoadingNfts] = useState(true);
+
+  useEffect(() => {
+    fetchNfts();
+  }, []);
+
+  async function fetchNfts() {
+    try {
+      const res = await fetch('/api/nfts/available?limit=12');
+      const data = await res.json();
+      setNfts(data.items || []);
+    } catch (error) {
+      console.error('Failed to fetch NFTs:', error);
+    } finally {
+      setIsLoadingNfts(false);
+    }
+  }
+
+  return (
+    <Layout>
+      <Head>
+        <title>CosmoNFT - Own a Piece of the Universe</title>
+        <meta name="description" content="Celestial objects immortalized as NFTs. Scientifically scored. Dynamically priced." />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+
+      {/* Hero Section */}
+      <section className="relative py-20 px-4 text-center overflow-hidden">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-900/20 via-transparent to-transparent" />
+
+        <div className="relative z-10 max-w-4xl mx-auto">
+          <h1 className="text-5xl md:text-7xl font-bold mb-6">
+            <span className="gradient-text">Own a Piece</span>
+            <br />
+            of the Universe
+          </h1>
+
+          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+            Celestial objects immortalized as NFTs. Scientifically scored.
+            Dynamically priced. 30% funds space exploration.
+          </p>
+
+          {/* Pricing Display */}
+          <div className="max-w-md mx-auto mb-8">
+            <PricingDisplay pricing={pricing} isLoading={pricingLoading} />
+          </div>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="#nfts" className="btn-primary text-lg px-8 py-4">
+              Browse NFTs
+            </Link>
+
+            {!isConnected ? (
+              <button onClick={connect} className="btn-secondary text-lg px-8 py-4">
+                Connect MetaMask
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 bg-green-900/50 px-6 py-4 rounded-lg">
+                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+                <span className="text-green-300">
+                  {address?.slice(0, 6)}...{address?.slice(-4)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-12 px-4 border-y border-gray-800">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div>
+            <div className="text-4xl font-bold text-blue-400">20,000</div>
+            <div className="text-gray-400">Total NFTs</div>
+          </div>
+          <div>
+            <div className="text-4xl font-bold text-green-400">
+              {pricing ? `$${pricing.displayPrice}` : '$350'}
+            </div>
+            <div className="text-gray-400">Current Price</div>
+          </div>
+          <div>
+            <div className="text-4xl font-bold text-purple-400">7.5%</div>
+            <div className="text-gray-400">Per Phase Increase</div>
+          </div>
+          <div>
+            <div className="text-4xl font-bold text-yellow-400">30%</div>
+            <div className="text-gray-400">To Space Exploration</div>
+          </div>
+        </div>
+      </section>
+
+      {/* NFT Grid Section */}
+      <section id="nfts" className="py-16 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-3xl font-bold">Available Now</h2>
+            <Link href="/browse" className="text-blue-400 hover:text-blue-300">
+              View All &rarr;
+            </Link>
+          </div>
+
+          {isLoadingNfts ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="bg-gray-900 rounded-lg h-96 loading-shimmer" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {nfts.map((nft) => (
+                <NFTCard
+                  key={nft.id}
+                  nft={nft}
+                  onAddToCart={() => addToCart(nft.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-16 px-4 bg-gray-900/50">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center p-6">
+              <div className="text-5xl mb-4">1</div>
+              <h3 className="text-xl font-semibold mb-2">Browse & Select</h3>
+              <p className="text-gray-400">
+                Explore our collection of scientifically scored celestial objects.
+                Each has a unique Cosmic Score based on 5 factors.
+              </p>
+            </div>
+
+            <div className="text-center p-6">
+              <div className="text-5xl mb-4">2</div>
+              <h3 className="text-xl font-semibold mb-2">Purchase with Card</h3>
+              <p className="text-gray-400">
+                Pay securely with credit card via Stripe. No crypto needed to buy.
+                3D Secure protection for high-value purchases.
+              </p>
+            </div>
+
+            <div className="text-center p-6">
+              <div className="text-5xl mb-4">3</div>
+              <h3 className="text-xl font-semibold mb-2">Receive Your NFT</h3>
+              <p className="text-gray-400">
+                NFT mints automatically to your wallet on Polygon.
+                View and trade on OpenSea within minutes.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Badge Explanation */}
+      <section className="py-16 px-4">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Badge Tiers</h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-gray-900 rounded-lg p-6 border border-yellow-600">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">⭐</span>
+                <span className="badge-elite px-3 py-1 rounded font-bold">ELITE</span>
+              </div>
+              <p className="text-gray-300">Score 425+</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Top-tier celestial objects. Rare finds with highest scores across multiple categories.
+              </p>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-6 border border-blue-600">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">💫</span>
+                <span className="badge-premium px-3 py-1 rounded font-bold">PREMIUM</span>
+              </div>
+              <p className="text-gray-300">Score 400-424</p>
+              <p className="text-gray-400 text-sm mt-2">
+                The sweet spot. Most popular purchases with excellent balance of quality and value.
+              </p>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-6 border border-cyan-600">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">🌟</span>
+                <span className="badge-exceptional px-3 py-1 rounded font-bold">EXCEPTIONAL</span>
+              </div>
+              <p className="text-gray-300">Score 375-399</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Solid, respectable quality. Great foundation for building your collection.
+              </p>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-6 border border-gray-600">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">🔷</span>
+                <span className="badge-standard px-3 py-1 rounded font-bold">STANDARD</span>
+              </div>
+              <p className="text-gray-300">Score 350-374</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Entry-level celestial objects. Perfect for starting your cosmic journey.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 px-4 bg-gradient-to-r from-blue-900/30 via-purple-900/30 to-blue-900/30">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-4xl font-bold mb-6">
+            Prices Go Up Every Phase
+          </h2>
+          <p className="text-xl text-gray-300 mb-8">
+            Don't miss Phase 1 pricing. Once it ends, prices increase 7.5%.
+          </p>
+
+          {pricing && (
+            <div className="mb-8">
+              <CountdownTimer
+                targetTime={Date.now() + pricing.timeUntilNextTier * 1000}
+                onComplete={() => window.location.reload()}
+              />
+            </div>
+          )}
+
+          <Link href="#nfts" className="btn-primary text-lg px-12 py-4">
+            Start Collecting
+          </Link>
+        </div>
+      </section>
+    </Layout>
+  );
+}

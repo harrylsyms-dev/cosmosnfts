@@ -1,0 +1,322 @@
+// Prisma schema for CosmoNFT - Celestial NFT Marketplace
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// NFT Model - Celestial objects (20,000 total)
+model NFT {
+  id                      Int       @id @default(autoincrement())
+  tokenId                 Int       @unique @map("token_id")
+  name                    String
+  description             String
+  image                   String?   // Direct image URL
+  imageIpfsHash           String?   @map("image_ipfs_hash")
+  metadataIpfsHash        String?   @map("metadata_ipfs_hash")
+
+  // Scoring categories (0-100 each) - original field names
+  fameScore               Int       @default(0) @map("fame_score")
+  significanceScore       Int       @default(0) @map("significance_score")
+  rarityScore             Int       @default(0) @map("rarity_score")
+  discoveryRecencyScore   Int       @default(0) @map("discovery_recency_score")
+  culturalImpactScore     Int       @default(0) @map("cultural_impact_score")
+
+  // Alternative score field names (used by code)
+  fameVisibility          Int       @default(0) @map("fame_visibility")
+  scientificSignificance  Int       @default(0) @map("scientific_significance")
+  rarity                  Int       @default(0)
+  discoveryRecency        Int       @default(0) @map("discovery_recency")
+  culturalImpact          Int       @default(0) @map("cultural_impact")
+  discoveryYear           Int?      @map("discovery_year")
+
+  // Calculated score (sum of categories, max 500)
+  totalScore              Int       @default(0) @map("total_score")
+  cosmicScore             Int       @default(0) @map("cosmic_score")
+
+  // Pricing
+  basePriceCents          Int       @default(0) @map("base_price_cents")
+  currentPrice            Float     @default(0) @map("current_price")
+  currentTier             Int       @default(1) @map("current_tier")
+
+  // Status: AVAILABLE, RESERVED, AUCTIONED, MINTED, SOLD
+  status                  String    @default("AVAILABLE")
+
+  // Badge tier: STANDARD, EXCEPTIONAL, PREMIUM, ELITE
+  badgeTier               String?   @map("badge_tier")
+
+  // Blockchain data (after minting)
+  transactionHash         String?   @map("transaction_hash")
+  ownerAddress            String?   @map("owner_address")
+
+  // Metadata
+  objectType              String?   @map("object_type")
+
+  // Timestamps
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  mintedAt                DateTime? @map("minted_at")
+  soldAt                  DateTime? @map("sold_at")
+
+  // Relations
+  cartItems               CartItem[]
+  auctions                Auction[]
+
+  @@index([status])
+  @@index([totalScore])
+  @@index([cosmicScore])
+  @@index([badgeTier])
+  @@index([currentTier])
+  @@map("nfts")
+}
+
+// Shopping Cart
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @map("user_id")
+  expiresAt DateTime   @map("expires_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  items     CartItem[]
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("carts")
+}
+
+// Cart Items
+model CartItem {
+  id         Int      @id @default(autoincrement())
+  cartId     String   @map("cart_id")
+  nftId      Int      @map("nft_id")
+  priceAtAdd Float    @map("price_at_add")
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  nft        NFT      @relation(fields: [nftId], references: [id])
+
+  @@unique([cartId, nftId])
+  @@map("cart_items")
+}
+
+// Purchase Records
+model Purchase {
+  id                  String    @id @default(uuid())
+  email               String
+  walletAddress       String?   @map("wallet_address")
+  totalAmountCents    Int       @map("total_amount_cents")
+
+  // Status: PENDING, PROCESSING, MINTED, FAILED, MINT_FAILED, DISPUTED, REFUNDED
+  status              String    @default("PENDING")
+
+  // Stripe data
+  stripeTransactionId String?   @map("stripe_transaction_id")
+
+  // Blockchain data
+  transactionHash     String?   @map("transaction_hash")
+
+  // NFT IDs (stored as JSON string for SQLite compatibility)
+  nftIds              String    @map("nft_ids")
+
+  // Error handling
+  failureReason       String?   @map("failure_reason")
+
+  // Timestamps
+  createdAt           DateTime  @default(now()) @map("created_at")
+  mintedAt            DateTime? @map("minted_at")
+
+  @@index([email])
+  @@index([status])
+  @@index([stripeTransactionId])
+  @@map("purchases")
+}
+
+// Pricing Tiers
+model Tier {
+  id                Int      @id @default(autoincrement())
+  phase             Int      @unique
+  price             Float    // Base price in USD
+  quantityAvailable Int      @map("quantity_available")
+  quantitySold      Int      @default(0) @map("quantity_sold")
+  startTime         DateTime @map("start_time")
+  duration          Int      // Duration in seconds
+  active            Boolean  @default(false)
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("tiers")
+}
+
+// Chargeback Evidence
+model ChargebackEvidence {
+  id           Int      @id @default(autoincrement())
+  disputeId    String   @unique @map("dispute_id")
+  purchaseId   String   @map("purchase_id")
+  evidenceJson String   @map("evidence_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("chargeback_evidence")
+}
+
+// Payment Failures (for monitoring)
+model PaymentFailure {
+  id                  Int      @id @default(autoincrement())
+  email               String
+  stripeTransactionId String?  @map("stripe_transaction_id")
+  errorMessage        String   @map("error_message")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@map("payment_failures")
+}
+
+// Auctions (High-profile objects - 20% of inventory)
+model Auction {
+  id                    String      @id @default(uuid())
+  tokenId               Int         @map("token_id")
+  nftName               String      @map("nft_name")
+  startingBidCents      Int         @map("starting_bid_cents")
+  currentBidCents       Int         @map("current_bid_cents")
+  highestBidderAddress  String?     @map("highest_bidder_address")
+
+  // Status: PENDING, ACTIVE, ENDED, FINALIZED
+  status                String      @default("PENDING")
+
+  startTime             DateTime    @map("start_time")
+  endTime               DateTime    @map("end_time")
+  createdAt             DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  nft                   NFT         @relation(fields: [tokenId], references: [tokenId])
+  bids                  AuctionBid[]
+
+  @@index([status])
+  @@index([endTime])
+  @@map("auctions")
+}
+
+// Auction Bids (Bid history)
+model AuctionBid {
+  id                String    @id @default(uuid())
+  auctionId         String    @map("auction_id")
+  bidderAddress     String    @map("bidder_address")
+  bidderEmail       String?   @map("bidder_email")
+  bidAmountCents    Int       @map("bid_amount_cents")
+  timestamp         DateTime  @default(now())
+  paymentIntentId   String?   @map("payment_intent_id")
+
+  // Status: PENDING, CONFIRMED, REFUNDED
+  status            String    @default("PENDING")
+
+  // Relations
+  auction           Auction   @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId])
+  @@index([bidderAddress])
+  @@map("auction_bids")
+}
+
+// Auction History (Past auctions)
+model AuctionHistory {
+  id                String    @id @default(uuid())
+  tokenId           Int       @map("token_id")
+  nftName           String    @map("nft_name")
+  finalPriceCents   Int       @map("final_price_cents")
+  winnerAddress     String    @map("winner_address")
+  winnerEmail       String?   @map("winner_email")
+  auctionDate       DateTime  @map("auction_date")
+  blockchainHash    String?   @map("blockchain_hash")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([tokenId])
+  @@map("auction_history")
+}
+
+// Royalty Splits (Track revenue distribution)
+model RoyaltySplit {
+  id                        Int       @id @default(autoincrement())
+  transactionId             String    @map("transaction_id")
+
+  // Type: PURCHASE, SECONDARY_SALE, AUCTION
+  transactionType           String    @map("transaction_type")
+
+  totalAmountCents          Int       @map("total_amount_cents")
+  creatorShareCents         Int       @map("creator_share_cents")
+  planetarySocietyShareCents Int      @map("planetary_society_share_cents")
+  paidAt                    DateTime? @map("paid_at")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+
+  @@index([transactionId])
+  @@map("royalty_splits")
+}
+
+// Email Logs
+model EmailLog {
+  id          String    @id @default(uuid())
+  recipient   String
+
+  // Type: PURCHASE_RECEIPT, MINTED_NOTIFICATION, PAYMENT_FAILED, AUCTION_OUTBID, AUCTION_WON
+  emailType   String    @map("email_type")
+
+  // Status: SENT, FAILED, BOUNCED
+  status      String    @default("SENT")
+
+  sentAt      DateTime  @default(now()) @map("sent_at")
+
+  @@index([recipient])
+  @@map("email_logs")
+}
+
+// Admin Users
+model AdminUser {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String?
+  role          String    @default("ADMIN") // ADMIN, SUPER_ADMIN
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  sessions      AdminSession[]
+
+  @@map("admin_users")
+}
+
+// Admin Sessions
+model AdminSession {
+  id          String    @id @default(uuid())
+  adminId     String    @map("admin_id")
+  token       String    @unique
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @map("user_agent")
+
+  admin       AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([adminId])
+  @@map("admin_sessions")
+}
+
+// Site Settings (for maintenance mode, coming soon, etc.)
+model SiteSettings {
+  id              String    @id @default("main")
+  isLive          Boolean   @default(false) @map("is_live")
+  maintenanceMode Boolean   @default(false) @map("maintenance_mode")
+  comingSoonMode  Boolean   @default(true) @map("coming_soon_mode")
+  launchDate      DateTime? @map("launch_date")
+  comingSoonTitle String?   @map("coming_soon_title")
+  comingSoonMessage String? @map("coming_soon_message")
+  previewPassword String?   @map("preview_password")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
