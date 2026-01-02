@@ -2,6 +2,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -74,8 +86,6 @@ export default function AdminSales() {
       </div>
     );
   }
-
-  const maxRevenue = stats?.revenueByDay ? Math.max(...stats.revenueByDay.map(d => d.revenue), 1) : 1;
 
   return (
     <>
@@ -190,28 +200,148 @@ export default function AdminSales() {
                 </div>
               </div>
 
-              {/* Revenue Chart (Simple Bar Chart) */}
+              {/* Revenue Area Chart */}
               <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
-                <h3 className="text-lg font-semibold mb-4">Revenue (Last 30 Days)</h3>
-                <div className="h-48 flex items-end gap-1">
-                  {stats.revenueByDay.map((day, i) => (
-                    <div
-                      key={day.date}
-                      className="flex-1 bg-blue-600 hover:bg-blue-500 rounded-t transition-all cursor-pointer group relative"
-                      style={{ height: `${(day.revenue / maxRevenue) * 100}%`, minHeight: day.revenue > 0 ? '4px' : '0' }}
-                      title={`${day.date}: $${day.revenue.toLocaleString()} (${day.orders} orders)`}
-                    >
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                        {day.date}<br />
-                        ${day.revenue.toLocaleString()}<br />
-                        {day.orders} orders
-                      </div>
-                    </div>
-                  ))}
+                <h3 className="text-lg font-semibold mb-4">Revenue Trend (Last 30 Days)</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={stats.revenueByDay}>
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0.1}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#9CA3AF"
+                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                        tickFormatter={(value) => value.slice(5)}
+                      />
+                      <YAxis
+                        stroke="#9CA3AF"
+                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                        tickFormatter={(value) => `$${value}`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+                        labelFormatter={(label) => `Date: ${label}`}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#10B981"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorRevenue)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="flex justify-between mt-2 text-xs text-gray-500">
-                  <span>{stats.revenueByDay[0]?.date}</span>
-                  <span>{stats.revenueByDay[stats.revenueByDay.length - 1]?.date}</span>
+              </div>
+
+              {/* Orders Bar Chart */}
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
+                <h3 className="text-lg font-semibold mb-4">Daily Orders (Last 30 Days)</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.revenueByDay}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#9CA3AF"
+                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                        tickFormatter={(value) => value.slice(5)}
+                      />
+                      <YAxis
+                        stroke="#9CA3AF"
+                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                        formatter={(value: number) => [value, 'Orders']}
+                        labelFormatter={(label) => `Date: ${label}`}
+                      />
+                      <Bar
+                        dataKey="orders"
+                        fill="#3B82F6"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Combined Chart */}
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
+                <h3 className="text-lg font-semibold mb-4">Revenue vs Orders</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.revenueByDay}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#9CA3AF"
+                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                        tickFormatter={(value) => value.slice(5)}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        stroke="#10B981"
+                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                        tickFormatter={(value) => `$${value}`}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        stroke="#3B82F6"
+                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                        formatter={(value: number, name: string) => [
+                          name === 'revenue' ? `$${value.toLocaleString()}` : value,
+                          name === 'revenue' ? 'Revenue' : 'Orders'
+                        ]}
+                        labelFormatter={(label) => `Date: ${label}`}
+                      />
+                      <Legend
+                        wrapperStyle={{ color: '#9CA3AF' }}
+                        formatter={(value) => value === 'revenue' ? 'Revenue' : 'Orders'}
+                      />
+                      <Bar
+                        yAxisId="left"
+                        dataKey="revenue"
+                        fill="#10B981"
+                        radius={[4, 4, 0, 0]}
+                        name="revenue"
+                      />
+                      <Bar
+                        yAxisId="right"
+                        dataKey="orders"
+                        fill="#3B82F6"
+                        radius={[4, 4, 0, 0]}
+                        name="orders"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             </>
