@@ -2,6 +2,8 @@ import express from 'express';
 import { auctionService } from '../services/auction.service';
 import { requireAdmin } from '../middleware/adminAuth';
 import { logger } from '../utils/logger';
+import { prisma } from '../config/database';
+import { AUCTION_SCHEDULE, getCurrentWeek } from '../jobs/auctionDeploy.job';
 
 const router = express.Router();
 
@@ -181,6 +183,108 @@ router.post('/:auctionId/bid', async (req, res) => {
   } catch (error: any) {
     logger.error('Error placing bid:', error);
     res.status(400).json({ error: error.message || 'Failed to place bid' });
+  }
+});
+
+/**
+ * GET /api/auctions/admin/scheduled (Admin only)
+ * Get all 20 scheduled auctions with NFT details
+ */
+router.get('/admin/scheduled', requireAdmin, async (req, res) => {
+  try {
+    const currentWeek = await getCurrentWeek();
+
+    // Get all NFTs that are AUCTION_RESERVED
+    const reservedNFTs = await prisma.nFT.findMany({
+      where: { status: 'AUCTION_RESERVED' },
+      select: {
+        id: true,
+        tokenId: true,
+        name: true,
+        cosmicScore: true,
+        objectType: true,
+        imageIpfsHash: true,
+        description: true,
+        fameVisibility: true,
+        scientificSignificance: true,
+        rarity: true,
+        discoveryRecency: true,
+        culturalImpact: true,
+      },
+    });
+
+    // Get existing auctions to check status
+    const existingAuctions = await prisma.auction.findMany({
+      select: {
+        nftName: true,
+        status: true,
+        id: true,
+        startTime: true,
+        endTime: true,
+        currentBidCents: true,
+      },
+    });
+
+    // Map auction schedule with NFT details
+    const schedule = AUCTION_SCHEDULE.map((item) => {
+      // Find matching NFT (case insensitive search)
+      const nft = reservedNFTs.find(
+        (n) =>
+          n.name.toLowerCase() === item.name.toLowerCase() ||
+          n.name.toLowerCase().includes(item.name.toLowerCase())
+      );
+
+      // Check if auction already exists
+      const existingAuction = existingAuctions.find(
+        (a) =>
+          a.nftName.toLowerCase() === item.name.toLowerCase() ||
+          a.nftName.toLowerCase().includes(item.name.toLowerCase())
+      );
+
+      return {
+        name: item.name,
+        week: item.week,
+        startingBidCents: item.startingBidCents,
+        startingBidDisplay: `$${(item.startingBidCents / 100).toLocaleString()}`,
+        weeksUntil: Math.max(0, item.week - currentWeek),
+        status: existingAuction
+          ? existingAuction.status
+          : item.week <= currentWeek
+          ? 'READY'
+          : 'SCHEDULED',
+        existingAuctionId: existingAuction?.id || null,
+        nft: nft
+          ? {
+              id: nft.id,
+              tokenId: nft.tokenId,
+              name: nft.name,
+              cosmicScore: nft.cosmicScore,
+              objectType: nft.objectType,
+              image: nft.imageIpfsHash
+                ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}`
+                : null,
+              description: nft.description,
+              scores: {
+                fame: nft.fameVisibility,
+                significance: nft.scientificSignificance,
+                rarity: nft.rarity,
+                discoveryRecency: nft.discoveryRecency,
+                culturalImpact: nft.culturalImpact,
+              },
+            }
+          : null,
+      };
+    });
+
+    res.json({
+      success: true,
+      currentWeek,
+      totalScheduled: AUCTION_SCHEDULE.length,
+      schedule,
+    });
+  } catch (error) {
+    logger.error('Error fetching scheduled auctions:', error);
+    res.status(500).json({ error: 'Failed to fetch scheduled auctions' });
   }
 });
 

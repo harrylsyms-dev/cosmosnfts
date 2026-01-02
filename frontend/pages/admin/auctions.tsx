@@ -34,11 +34,38 @@ interface ReservedNFT {
   badgeTier: string;
 }
 
+interface ScheduledAuction {
+  name: string;
+  week: number;
+  startingBidCents: number;
+  startingBidDisplay: string;
+  weeksUntil: number;
+  status: string;
+  existingAuctionId: string | null;
+  nft: {
+    id: number;
+    tokenId: number;
+    name: string;
+    cosmicScore: number;
+    objectType: string;
+    image: string | null;
+    description: string;
+    scores: {
+      fame: number;
+      significance: number;
+      rarity: number;
+      discoveryRecency: number;
+      culturalImpact: number;
+    };
+  } | null;
+}
+
 export default function AdminAuctions() {
   const router = useRouter();
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [stats, setStats] = useState<AuctionStats | null>(null);
   const [reservedNFTs, setReservedNFTs] = useState<ReservedNFT[]>([]);
+  const [scheduledAuctions, setScheduledAuctions] = useState<ScheduledAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -53,6 +80,8 @@ export default function AdminAuctions() {
   const [autoPopulateCount, setAutoPopulateCount] = useState('5');
   const [isAutoPopulating, setIsAutoPopulating] = useState(false);
   const [previewPhase, setPreviewPhase] = useState('1');
+  const [selectedAuction, setSelectedAuction] = useState<ScheduledAuction | null>(null);
+  const [currentWeek, setCurrentWeek] = useState(0);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -71,11 +100,61 @@ export default function AdminAuctions() {
         return;
       }
 
-      await Promise.all([fetchAuctions(), fetchStats(), fetchReservedNFTs('1')]);
+      await Promise.all([fetchAuctions(), fetchStats(), fetchReservedNFTs('1'), fetchScheduledAuctions()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchScheduledAuctions() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/auctions/admin/scheduled`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setScheduledAuctions(data.schedule || []);
+        setCurrentWeek(data.currentWeek || 0);
+      }
+    } catch (error) {
+      console.error('Failed to fetch scheduled auctions:', error);
+    }
+  }
+
+  function getStatusColor(status: string) {
+    switch (status) {
+      case 'ACTIVE':
+        return 'bg-green-900 text-green-300';
+      case 'ENDED':
+        return 'bg-gray-700 text-gray-300';
+      case 'FINALIZED':
+        return 'bg-blue-900 text-blue-300';
+      case 'READY':
+        return 'bg-yellow-900 text-yellow-300';
+      default:
+        return 'bg-purple-900 text-purple-300';
+    }
+  }
+
+  function getObjectTypeIcon(objectType: string) {
+    switch (objectType?.toLowerCase()) {
+      case 'star':
+        return '⭐';
+      case 'planet':
+        return '🪐';
+      case 'galaxy':
+        return '🌌';
+      case 'nebula':
+        return '💫';
+      case 'moon':
+        return '🌙';
+      default:
+        return '✨';
     }
   }
 
@@ -273,6 +352,161 @@ export default function AdminAuctions() {
               </div>
             </div>
           )}
+
+          {/* Selected Auction Modal */}
+          {selectedAuction && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+              <div className="bg-gray-900 rounded-xl border border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold">{selectedAuction.name}</h2>
+                      <p className="text-gray-400">
+                        {getObjectTypeIcon(selectedAuction.nft?.objectType || '')} {selectedAuction.nft?.objectType || 'Celestial Object'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedAuction(null)}
+                      className="text-gray-400 hover:text-white text-2xl"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  {selectedAuction.nft?.image && (
+                    <div className="mb-6 bg-gray-800 rounded-lg p-4 flex justify-center">
+                      <img
+                        src={selectedAuction.nft.image}
+                        alt={selectedAuction.name}
+                        className="max-h-64 rounded-lg object-contain"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid md:grid-cols-2 gap-6 mb-6">
+                    <div className="bg-gray-800 rounded-lg p-4">
+                      <h3 className="text-sm text-gray-400 mb-2">Auction Details</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Week</span>
+                          <span className="font-medium">Week {selectedAuction.week}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Starting Bid</span>
+                          <span className="font-medium text-green-400">{selectedAuction.startingBidDisplay}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Status</span>
+                          <span className={`px-2 py-0.5 rounded text-sm ${getStatusColor(selectedAuction.status)}`}>
+                            {selectedAuction.status}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Weeks Until</span>
+                          <span className="font-medium">
+                            {selectedAuction.weeksUntil === 0 ? 'Now' : `${selectedAuction.weeksUntil} weeks`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedAuction.nft && (
+                      <div className="bg-gray-800 rounded-lg p-4">
+                        <h3 className="text-sm text-gray-400 mb-2">NFT Scores</h3>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400">Cosmic Score</span>
+                            <span className="font-bold text-xl text-purple-400">{selectedAuction.nft.cosmicScore}/500</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Fame</span>
+                            <span>{selectedAuction.nft.scores.fame}/100</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Significance</span>
+                            <span>{selectedAuction.nft.scores.significance}/100</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Rarity</span>
+                            <span>{selectedAuction.nft.scores.rarity}/100</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Cultural Impact</span>
+                            <span>{selectedAuction.nft.scores.culturalImpact}/100</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedAuction.nft?.description && (
+                    <div className="bg-gray-800 rounded-lg p-4 mb-6">
+                      <h3 className="text-sm text-gray-400 mb-2">Description</h3>
+                      <p className="text-gray-200">{selectedAuction.nft.description}</p>
+                    </div>
+                  )}
+
+                  {selectedAuction.nft && (
+                    <div className="text-sm text-gray-500">
+                      Token ID: #{selectedAuction.nft.tokenId}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Scheduled Auctions Section */}
+          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-xl font-bold">Premium Auction Schedule</h2>
+                <p className="text-gray-400 text-sm">
+                  20 premium celestial objects scheduled for bi-weekly auctions
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-400">Current Week</p>
+                <p className="text-2xl font-bold text-purple-400">{currentWeek}</p>
+              </div>
+            </div>
+
+            {scheduledAuctions.length > 0 ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {scheduledAuctions.map((auction) => (
+                  <button
+                    key={auction.name}
+                    onClick={() => setSelectedAuction(auction)}
+                    className="bg-gray-800 hover:bg-gray-700 rounded-lg p-4 text-left transition-all border border-gray-700 hover:border-purple-500"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="text-2xl">
+                        {getObjectTypeIcon(auction.nft?.objectType || '')}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${getStatusColor(auction.status)}`}>
+                        {auction.status}
+                      </span>
+                    </div>
+                    <h3 className="font-medium truncate mb-1">{auction.name}</h3>
+                    <p className="text-xs text-gray-400 mb-2">Week {auction.week}</p>
+                    <p className="text-sm text-green-400 font-medium">{auction.startingBidDisplay}</p>
+                    {auction.weeksUntil > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {auction.weeksUntil} week{auction.weeksUntil !== 1 ? 's' : ''} away
+                      </p>
+                    )}
+                    {!auction.nft && (
+                      <p className="text-xs text-red-400 mt-2">NFT not found</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <p>Loading scheduled auctions...</p>
+              </div>
+            )}
+          </div>
 
           {/* Auto-Populate Section */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
