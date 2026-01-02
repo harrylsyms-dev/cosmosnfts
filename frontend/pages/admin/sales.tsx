@@ -27,7 +27,7 @@ interface SalesStats {
   weekOrders: number;
   monthRevenue: number;
   monthOrders: number;
-  tpsShare: number;
+  benefactorShare: number;
   averageOrderValue: number;
   revenueByDay: { date: string; revenue: number; orders: number }[];
 }
@@ -134,8 +134,8 @@ export default function AdminSales() {
                   <p className="text-3xl font-bold text-blue-400">{stats.totalNftsSold.toLocaleString()}</p>
                 </div>
                 <div className="bg-gray-900 rounded-lg p-6 border border-purple-800">
-                  <p className="text-gray-400 text-sm">TPS Share (30%)</p>
-                  <p className="text-3xl font-bold text-purple-400">${stats.tpsShare.toLocaleString()}</p>
+                  <p className="text-gray-400 text-sm">Benefactor Share (30%)</p>
+                  <p className="text-3xl font-bold text-purple-400">${stats.benefactorShare.toLocaleString()}</p>
                 </div>
               </div>
 

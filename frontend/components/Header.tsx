@@ -35,14 +35,9 @@ export default function Header() {
             <Link href="/about" className="text-gray-300 hover:text-white transition-colors">
               About
             </Link>
-            <a
-              href="https://planetarysociety.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-300 hover:text-white transition-colors"
-            >
-              TPS Partner
-            </a>
+            <Link href="/impact" className="text-gray-300 hover:text-white transition-colors">
+              Our Impact
+            </Link>
           </nav>
 
           {/* Right Side */}

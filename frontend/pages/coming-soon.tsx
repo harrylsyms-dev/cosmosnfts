@@ -135,7 +135,7 @@ export default function ComingSoon({ title, message, launchDate }: ComingSoonPro
             <div className="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-lg p-6">
               <div className="text-3xl mb-3">🚀</div>
               <h3 className="font-bold text-white mb-2">30% for Space</h3>
-              <p className="text-gray-400 text-sm">A portion of every sale supports The Planetary Society and space exploration initiatives.</p>
+              <p className="text-gray-400 text-sm">30% of proceeds support space exploration initiatives.</p>
             </div>
           </div>
         </div>

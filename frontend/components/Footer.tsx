@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import TotalDonatedBadge from './TotalDonatedBadge';
 
 export default function Footer() {
   return (
@@ -58,14 +59,9 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a
-                  href="https://planetarysociety.org"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
-                  The Planetary Society
-                </a>
+                <Link href="/impact" className="hover:text-white transition-colors">
+                  Our Impact
+                </Link>
               </li>
             </ul>
           </div>
@@ -93,14 +89,19 @@ export default function Footer() {
           </div>
         </div>
 
+        {/* Donation Tracker */}
+        <div className="border-t border-gray-800 mt-8 pt-8">
+          <TotalDonatedBadge variant="footer" className="mb-6" />
+        </div>
+
         {/* Bottom */}
-        <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-gray-500 text-sm">
             &copy; {new Date().getFullYear()} ALPHA AI LTD. All rights reserved.
           </p>
 
           <div className="flex items-center gap-4">
-            <span className="text-gray-500 text-sm">30% funds space exploration</span>
+            <span className="text-gray-500 text-sm">Supporting space exploration</span>
             <a
               href="https://polygonscan.com"
               target="_blank"

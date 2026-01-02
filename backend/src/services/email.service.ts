@@ -86,7 +86,7 @@ export async function sendPurchaseReceipt(email: string, purchase: Purchase) {
         </div>
 
         <div class="section" style="background: #1e3a5f;">
-          <p style="margin: 0;">30% of your purchase funds The Planetary Society's space exploration mission.</p>
+          <p style="margin: 0;">30% of your purchase supports space exploration initiatives.</p>
         </div>
 
         <div class="footer">
@@ -349,6 +349,434 @@ export async function sendAuctionWonNotification(
   await sendEmail(email, `Congratulations! You won ${nftName}!`, html);
 }
 
+// ==================== MARKETPLACE NOTIFICATIONS ====================
+
+export async function sendOfferMadeNotification(
+  email: string,
+  nftName: string,
+  tokenId: number,
+  offerAmountCents: number,
+  offererAddress: string
+) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background: #0a0a0a; color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; padding: 30px; border-radius: 10px; }
+        .header { border-bottom: 2px solid #9b59b6; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #9b59b6; margin: 0; }
+        .section { margin: 20px 0; padding: 15px; background: #16213e; border-radius: 8px; }
+        .price { color: #00ff88; font-size: 24px; font-weight: bold; }
+        .address { font-family: monospace; color: #a0a0a0; }
+        .button { display: inline-block; background: #9b59b6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 15px; }
+        .footer { color: #666; font-size: 12px; margin-top: 30px; text-align: center; }
+        a { color: #0066ff; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>New Offer Received!</h1>
+        </div>
+        <div class="section">
+          <p>You received an offer on your NFT:</p>
+          <p style="font-size: 20px; font-weight: bold; color: white;">${nftName}</p>
+          <p class="price">Offer: $${(offerAmountCents / 100).toFixed(2)}</p>
+          <p>From: <span class="address">${offererAddress.slice(0, 8)}...${offererAddress.slice(-6)}</span></p>
+        </div>
+        <div class="section">
+          <p>You can accept, counter, or reject this offer from your account.</p>
+          <a href="${process.env.FRONTEND_URL}/marketplace/my-offers" class="button">View Offers</a>
+        </div>
+        <div class="footer">
+          <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
+          <p>ALPHA AI LTD. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail(email, `New Offer on ${nftName} - $${(offerAmountCents / 100).toFixed(2)}`, html);
+}
+
+export async function sendOfferAcceptedNotification(
+  email: string,
+  nftName: string,
+  tokenId: number,
+  priceCents: number,
+  transactionHash: string
+) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background: #0a0a0a; color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; padding: 30px; border-radius: 10px; }
+        .header { border-bottom: 2px solid #00ff88; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #00ff88; margin: 0; }
+        .section { margin: 20px 0; padding: 15px; background: #16213e; border-radius: 8px; }
+        .price { color: #00ff88; font-size: 24px; font-weight: bold; }
+        .hash { background: #0f0f0f; padding: 10px; font-family: monospace; word-break: break-all; border-radius: 4px; font-size: 12px; }
+        .footer { color: #666; font-size: 12px; margin-top: 30px; text-align: center; }
+        a { color: #0066ff; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Offer Accepted!</h1>
+        </div>
+        <div class="section">
+          <p>Your offer on <strong>${nftName}</strong> has been accepted!</p>
+          <p class="price">$${(priceCents / 100).toFixed(2)}</p>
+          <p>The NFT is now in your wallet.</p>
+        </div>
+        <div class="section">
+          <p style="color: #a0a0a0;">Transaction Hash:</p>
+          <div class="hash">${transactionHash}</div>
+          <p><a href="https://polygonscan.com/tx/${transactionHash}">View on PolygonScan</a></p>
+        </div>
+        <div class="footer">
+          <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
+          <p>ALPHA AI LTD. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail(email, `Offer Accepted - ${nftName} is Now Yours!`, html);
+}
+
+export async function sendOfferCounteredNotification(
+  email: string,
+  nftName: string,
+  tokenId: number,
+  originalOfferCents: number,
+  counterOfferCents: number
+) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background: #0a0a0a; color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; padding: 30px; border-radius: 10px; }
+        .header { border-bottom: 2px solid #f1c40f; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #f1c40f; margin: 0; }
+        .section { margin: 20px 0; padding: 15px; background: #16213e; border-radius: 8px; }
+        .price { font-size: 20px; font-weight: bold; }
+        .old-price { color: #666; text-decoration: line-through; }
+        .new-price { color: #f1c40f; }
+        .button { display: inline-block; background: #f1c40f; color: black; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 15px; }
+        .footer { color: #666; font-size: 12px; margin-top: 30px; text-align: center; }
+        a { color: #0066ff; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Counter Offer Received</h1>
+        </div>
+        <div class="section">
+          <p>The seller has countered your offer on <strong>${nftName}</strong>:</p>
+          <p class="price old-price">Your offer: $${(originalOfferCents / 100).toFixed(2)}</p>
+          <p class="price new-price">Counter offer: $${(counterOfferCents / 100).toFixed(2)}</p>
+        </div>
+        <div class="section">
+          <p>You can accept the counter offer or make a new offer.</p>
+          <a href="${process.env.FRONTEND_URL}/marketplace/${tokenId}" class="button">View Listing</a>
+        </div>
+        <div class="footer">
+          <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
+          <p>ALPHA AI LTD. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail(email, `Counter Offer on ${nftName}`, html);
+}
+
+export async function sendOfferRejectedNotification(
+  email: string,
+  nftName: string,
+  tokenId: number,
+  offerAmountCents: number
+) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background: #0a0a0a; color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; padding: 30px; border-radius: 10px; }
+        .header { border-bottom: 2px solid #e74c3c; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #e74c3c; margin: 0; }
+        .section { margin: 20px 0; padding: 15px; background: #16213e; border-radius: 8px; }
+        .button { display: inline-block; background: #0066ff; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 15px; }
+        .footer { color: #666; font-size: 12px; margin-top: 30px; text-align: center; }
+        a { color: #0066ff; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Offer Declined</h1>
+        </div>
+        <div class="section">
+          <p>Your offer of <strong>$${(offerAmountCents / 100).toFixed(2)}</strong> on <strong>${nftName}</strong> was declined.</p>
+          <p>You can make a new offer or browse other listings.</p>
+        </div>
+        <div class="section">
+          <a href="${process.env.FRONTEND_URL}/marketplace" class="button">Browse Marketplace</a>
+        </div>
+        <div class="footer">
+          <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
+          <p>ALPHA AI LTD. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail(email, `Offer Declined - ${nftName}`, html);
+}
+
+export async function sendListingSoldNotification(
+  email: string,
+  nftName: string,
+  tokenId: number,
+  salePriceCents: number,
+  royaltyCents: number,
+  proceedsCents: number,
+  transactionHash: string
+) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background: #0a0a0a; color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; padding: 30px; border-radius: 10px; }
+        .header { border-bottom: 2px solid #00ff88; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #00ff88; margin: 0; }
+        .section { margin: 20px 0; padding: 15px; background: #16213e; border-radius: 8px; }
+        .price { color: #00ff88; font-size: 24px; font-weight: bold; }
+        .breakdown { margin: 15px 0; }
+        .breakdown-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #2a2a4e; }
+        .hash { background: #0f0f0f; padding: 10px; font-family: monospace; word-break: break-all; border-radius: 4px; font-size: 12px; }
+        .footer { color: #666; font-size: 12px; margin-top: 30px; text-align: center; }
+        a { color: #0066ff; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Your NFT Sold!</h1>
+        </div>
+        <div class="section">
+          <p><strong>${nftName}</strong> has been sold!</p>
+          <p class="price">$${(salePriceCents / 100).toFixed(2)}</p>
+        </div>
+        <div class="section">
+          <p style="color: #a0a0a0;">Payment Breakdown:</p>
+          <div class="breakdown">
+            <div class="breakdown-item">
+              <span>Sale Price</span>
+              <span>$${(salePriceCents / 100).toFixed(2)}</span>
+            </div>
+            <div class="breakdown-item">
+              <span>Creator Royalty (20%)</span>
+              <span style="color: #e74c3c;">-$${(royaltyCents / 100).toFixed(2)}</span>
+            </div>
+            <div class="breakdown-item" style="border-bottom: none; font-weight: bold;">
+              <span>Your Proceeds</span>
+              <span style="color: #00ff88;">$${(proceedsCents / 100).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <p style="color: #a0a0a0;">Transaction Hash:</p>
+          <div class="hash">${transactionHash}</div>
+          <p><a href="https://polygonscan.com/tx/${transactionHash}">View on PolygonScan</a></p>
+        </div>
+        <div class="footer">
+          <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
+          <p>ALPHA AI LTD. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail(email, `Your NFT Sold - ${nftName}`, html);
+}
+
+export async function sendPriceAlertNotification(
+  email: string,
+  nftName: string,
+  tokenId: number,
+  currentPriceCents: number,
+  targetPriceCents: number,
+  alertType: 'BELOW' | 'ABOVE'
+) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background: #0a0a0a; color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; padding: 30px; border-radius: 10px; }
+        .header { border-bottom: 2px solid #3498db; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #3498db; margin: 0; }
+        .section { margin: 20px 0; padding: 15px; background: #16213e; border-radius: 8px; }
+        .price { color: #00ff88; font-size: 24px; font-weight: bold; }
+        .button { display: inline-block; background: #3498db; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 15px; }
+        .footer { color: #666; font-size: 12px; margin-top: 30px; text-align: center; }
+        a { color: #0066ff; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Price Alert!</h1>
+        </div>
+        <div class="section">
+          <p><strong>${nftName}</strong> has reached your target price!</p>
+          <p>Current Price: <span class="price">$${(currentPriceCents / 100).toFixed(2)}</span></p>
+          <p style="color: #a0a0a0;">Your alert: ${alertType === 'BELOW' ? 'Below' : 'Above'} $${(targetPriceCents / 100).toFixed(2)}</p>
+        </div>
+        <div class="section">
+          <a href="${process.env.FRONTEND_URL}/marketplace/${tokenId}" class="button">View Listing</a>
+        </div>
+        <div class="footer">
+          <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
+          <p>ALPHA AI LTD. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail(email, `Price Alert - ${nftName}`, html);
+}
+
+// Benefactor Payment Reminder
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+export async function sendBenefactorPaymentReminder(data: {
+  to: string;
+  month: number;
+  year: number;
+  totalOwedCents: number;
+  primarySalesCents: number;
+  auctionSalesCents: number;
+  daysOverdue: number;
+  reminderType: string;
+}) {
+  const { to, month, year, totalOwedCents, primarySalesCents, auctionSalesCents, daysOverdue, reminderType } = data;
+
+  const monthName = MONTH_NAMES[month - 1];
+  const isOverdue = daysOverdue > 0;
+
+  let subject = `Benefactor Payment Due - ${monthName} ${year}`;
+  let headerColor = '#f1c40f'; // Yellow for due today
+  let headerText = 'Payment Due Today';
+
+  if (isOverdue) {
+    subject = `OVERDUE: Benefactor Payment - ${monthName} ${year} (${daysOverdue} days)`;
+    headerColor = '#e74c3c'; // Red for overdue
+    headerText = `Payment Overdue by ${daysOverdue} Days`;
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background: #0a0a0a; color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; padding: 30px; border-radius: 10px; }
+        .header { border-bottom: 2px solid ${headerColor}; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: ${headerColor}; margin: 0; }
+        .section { margin: 20px 0; padding: 15px; background: #16213e; border-radius: 8px; }
+        .total { color: ${isOverdue ? '#e74c3c' : '#f1c40f'}; font-size: 36px; font-weight: bold; text-align: center; }
+        .breakdown-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2a2a4e; }
+        .breakdown-item:last-child { border-bottom: none; }
+        .label { color: #a0a0a0; }
+        .value { color: #ffffff; font-weight: bold; }
+        .alert { background: ${isOverdue ? '#5c1a1a' : '#5c4a1a'}; border: 1px solid ${headerColor}; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; }
+        .button { display: inline-block; background: #0066ff; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; }
+        .footer { color: #666; font-size: 12px; margin-top: 30px; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>${headerText}</h1>
+          <p style="color: #a0a0a0; margin: 10px 0 0 0;">${monthName} ${year} Benefactor Payment</p>
+        </div>
+
+        <div class="alert">
+          <p style="margin: 0; color: ${headerColor}; font-weight: bold;">
+            ${isOverdue
+              ? `This payment is ${daysOverdue} days overdue. Please process immediately.`
+              : 'Payment is due today. Please process before end of day.'}
+          </p>
+        </div>
+
+        <div class="section">
+          <p class="total">$${(totalOwedCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+          <p style="text-align: center; color: #a0a0a0;">Total Amount Owed (30%)</p>
+        </div>
+
+        <div class="section">
+          <h3 style="margin-top: 0; color: #ffffff;">Breakdown</h3>
+          <div class="breakdown-item">
+            <span class="label">Primary Sales (Stripe)</span>
+            <span class="value">$${(primarySalesCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="label">Auction Sales (USD)</span>
+            <span class="value">$${(auctionSalesCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div class="breakdown-item" style="border-top: 2px solid #3a3a5e; padding-top: 15px; margin-top: 10px;">
+            <span class="label">Total Owed</span>
+            <span class="value" style="color: ${headerColor};">$${(totalOwedCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+
+        <div class="section" style="background: #1e3a5f;">
+          <p style="margin: 0; font-size: 14px;">
+            <strong>Note:</strong> Crypto auction sales and creator royalties are NOT included above -
+            they are automatically paid to the benefactor wallet via smart contract.
+          </p>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/admin/benefactor" class="button">Mark as Paid</a>
+        </div>
+
+        <div class="footer">
+          <p>This is an automated reminder from CosmoNFT.</p>
+          <p>ALPHA AI LTD. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail(to, subject, html);
+}
+
 // Export as service object for compatibility
 export const emailService = {
   sendPurchaseReceipt,
@@ -356,4 +784,11 @@ export const emailService = {
   sendFailureEmail,
   sendOutbidNotification,
   sendAuctionWonNotification,
+  sendOfferMadeNotification,
+  sendOfferAcceptedNotification,
+  sendOfferCounteredNotification,
+  sendOfferRejectedNotification,
+  sendListingSoldNotification,
+  sendPriceAlertNotification,
+  sendBenefactorPaymentReminder,
 };

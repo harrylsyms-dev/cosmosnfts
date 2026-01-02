@@ -15,11 +15,15 @@ import imageRoutes from './routes/images';
 import adminRoutes from './routes/admin';
 import settingsRoutes from './routes/settings';
 import authRoutes from './routes/auth';
+import marketplaceRoutes from './routes/marketplace';
+import analyticsRoutes from './routes/analytics';
+import benefactorRoutes from './routes/benefactor';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiting';
 import { startTierAdvancementJob } from './jobs/tierAdvance.job';
 import { startCartExpiryJob } from './jobs/cartExpiry.job';
 import { startAuctionDeploymentJob } from './jobs/auctionDeploy.job';
+import { startBenefactorReminderJob } from './jobs/benefactorReminder.job';
 import { logger } from './utils/logger';
 
 dotenv.config();
@@ -81,6 +85,9 @@ app.use('/api/images', imageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/benefactor', benefactorRoutes);
 
 // Error handling
 app.use(errorHandler);
@@ -89,6 +96,7 @@ app.use(errorHandler);
 startTierAdvancementJob();
 startCartExpiryJob();
 startAuctionDeploymentJob();
+startBenefactorReminderJob();
 
 app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info(`Server running on port ${PORT}`);

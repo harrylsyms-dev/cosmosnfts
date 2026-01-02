@@ -8,6 +8,11 @@ interface SiteSettings {
   launchDate: Date | null;
   comingSoonTitle: string | null;
   comingSoonMessage: string | null;
+  // Phase timer controls
+  phasePaused: boolean;
+  pausedAt: Date | null;
+  pauseDurationMs: number;
+  contractPaused: boolean;
 }
 
 class SiteSettingsService {
@@ -40,6 +45,10 @@ class SiteSettingsService {
       launchDate: settings.launchDate,
       comingSoonTitle: settings.comingSoonTitle,
       comingSoonMessage: settings.comingSoonMessage,
+      phasePaused: settings.phasePaused,
+      pausedAt: settings.pausedAt,
+      pauseDurationMs: settings.pauseDurationMs,
+      contractPaused: settings.contractPaused,
     };
   }
 
@@ -82,6 +91,10 @@ class SiteSettingsService {
       launchDate: settings.launchDate,
       comingSoonTitle: settings.comingSoonTitle,
       comingSoonMessage: settings.comingSoonMessage,
+      phasePaused: settings.phasePaused,
+      pausedAt: settings.pausedAt,
+      pauseDurationMs: settings.pauseDurationMs,
+      contractPaused: settings.contractPaused,
     };
   }
 

@@ -10,14 +10,14 @@ async function main() {
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log('Account balance:', ethers.formatEther(balance), 'MATIC');
 
-  // TPS (The Planetary Society) address for royalties
-  // Replace with actual TPS wallet address
-  const tpsAddress = process.env.TPS_ADDRESS || deployer.address;
-  console.log('TPS royalty address:', tpsAddress);
+  // Benefactor wallet address for royalties (30% of proceeds)
+  // Replace with actual benefactor wallet address
+  const benefactorAddress = process.env.BENEFACTOR_ADDRESS || deployer.address;
+  console.log('Benefactor royalty address:', benefactorAddress);
 
   // Deploy contract
   const CosmoNFT = await ethers.getContractFactory('CosmoNFT');
-  const cosmoNFT = await CosmoNFT.deploy(tpsAddress);
+  const cosmoNFT = await CosmoNFT.deploy(benefactorAddress);
 
   await cosmoNFT.waitForDeployment();
 
@@ -49,7 +49,7 @@ async function main() {
 
   // Verification command
   console.log('To verify on PolygonScan:');
-  console.log(`npx hardhat verify --network polygon ${contractAddress} ${tpsAddress}`);
+  console.log(`npx hardhat verify --network polygon ${contractAddress} ${benefactorAddress}`);
 }
 
 main()

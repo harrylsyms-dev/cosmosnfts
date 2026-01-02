@@ -47,7 +47,9 @@ export function getBadgeForScore(score: number): string {
 
 export async function createNFT(input: NFTCreateInput) {
   const cosmicScore = calculateCosmicScore(input);
-  const basePrice = cosmicScore; // $1 per point
+  // Price = Base ($0.10) × Score × Phase Multiplier
+  // For new NFTs, use Phase 1 multiplier (1.0)
+  const currentPrice = 0.10 * cosmicScore * 1.0;
 
   const nft = await prisma.nFT.create({
     data: {
@@ -62,33 +64,34 @@ export async function createNFT(input: NFTCreateInput) {
       culturalImpact: input.culturalImpact,
       cosmicScore,
       totalScore: cosmicScore,
-      currentPrice: basePrice,
-      basePriceCents: Math.round(basePrice * 100),
+      currentPrice,
+      basePriceCents: Math.round(currentPrice * 100),
       status: 'AVAILABLE',
       discoveryYear: input.discoveryYear,
       objectType: input.objectType,
     },
   });
 
-  logger.info(`NFT created: ${nft.id} - ${nft.name} (Score: ${cosmicScore})`);
+  logger.info(`NFT created: ${nft.id} - ${nft.name} (Score: ${cosmicScore}, Price: $${currentPrice.toFixed(2)})`);
   return nft;
 }
 
 export async function updateNFTPrices(phaseMultiplier: number) {
   // Update all available NFT prices based on new phase multiplier
+  // Formula: Price = Base ($0.10) × Score × Phase Multiplier
   const nfts = await prisma.nFT.findMany({
     where: { status: 'AVAILABLE' },
   });
 
   for (const nft of nfts) {
-    const newPrice = nft.cosmicScore * phaseMultiplier;
+    const newPrice = 0.10 * nft.cosmicScore * phaseMultiplier;
     await prisma.nFT.update({
       where: { id: nft.id },
       data: { currentPrice: newPrice },
     });
   }
 
-  logger.info(`Updated prices for ${nfts.length} NFTs with multiplier ${phaseMultiplier}`);
+  logger.info(`Updated prices for ${nfts.length} NFTs with multiplier ${phaseMultiplier.toFixed(4)}`);
 }
 
 export async function getAvailableNFTsByBadge(badge: string, limit: number = 20) {

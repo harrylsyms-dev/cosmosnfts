@@ -121,29 +121,35 @@ router.get('/projection/:nftId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    // Get current tier to determine base price
+    // Get current tier
     const activeTier = await prisma.tier.findFirst({
       where: { active: true },
     });
 
-    const basePrice = activeTier?.price || 0.10; // $0.10 base price
+    const currentPhase = activeTier?.phase || 1;
+    const score = nft.cosmicScore;
 
     // Calculate prices for phases 1, 2, 5, 10, 20, 30, 50, 81
+    // Formula: Price = Base ($0.10) × Score × Phase Multiplier
     const projections = [1, 2, 5, 10, 20, 30, 50, 81].map((phase) => {
       const multiplier = Math.pow(1.075, phase - 1);
-      const price = 0.10 * multiplier; // Always calculate from base $0.10
+      const price = 0.10 * score * multiplier;
       return {
         phase,
-        price: price < 1 ? price.toFixed(4) : price.toFixed(2),
+        price: price.toFixed(2),
         multiplier: multiplier.toFixed(4),
+        formula: `$0.10 × ${score} × ${multiplier.toFixed(4)}`,
       };
     });
 
     res.json({
       nftId: nft.id,
       name: nft.name,
-      cosmicScore: nft.cosmicScore,
-      currentPrice: basePrice,
+      cosmicScore: score,
+      currentPhase,
+      currentPrice: nft.currentPrice,
+      displayPrice: `$${nft.currentPrice.toFixed(2)}`,
+      priceFormula: `$0.10 × ${score} (score) × phase multiplier`,
       projections,
     });
   } catch (error) {

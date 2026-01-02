@@ -5,7 +5,7 @@
 ### 1. Smart Contract Deployment
 
 - [ ] Fund deployer wallet with MATIC (recommended: 10 MATIC)
-- [ ] Set TPS wallet address in environment
+- [ ] Set benefactor wallet address in environment
 - [ ] Deploy to Polygon mainnet:
   ```bash
   cd backend
@@ -13,7 +13,7 @@
   ```
 - [ ] Verify contract on PolygonScan:
   ```bash
-  npx hardhat verify --network polygon <CONTRACT_ADDRESS> <TPS_ADDRESS>
+  npx hardhat verify --network polygon <CONTRACT_ADDRESS> <BENEFACTOR_ADDRESS>
   ```
 - [ ] Update CONTRACT_ADDRESS in .env files
 
@@ -135,7 +135,7 @@ If critical issues occur:
 - [ ] Monitor chargebacks
 - [ ] Track Phase 1 sales progress
 - [ ] Prepare Phase 2 marketing
-- [ ] TPS donation tracking
+- [ ] Benefactor donation tracking
 - [ ] Community engagement
 
 ---

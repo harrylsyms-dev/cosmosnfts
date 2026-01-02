@@ -321,7 +321,7 @@ class AuctionService {
     // Record royalty split (70/30)
     const totalAmount = auction.currentBidCents;
     const creatorShare = Math.floor(totalAmount * 0.7);
-    const tpsShare = totalAmount - creatorShare;
+    const benefactorShare = totalAmount - creatorShare;
 
     await prisma.royaltySplit.create({
       data: {
@@ -329,7 +329,7 @@ class AuctionService {
         transactionType: 'AUCTION',
         totalAmountCents: totalAmount,
         creatorShareCents: creatorShare,
-        planetarySocietyShareCents: tpsShare,
+        benefactorShareCents: benefactorShare,
       },
     });
 

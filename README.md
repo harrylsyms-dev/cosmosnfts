@@ -13,7 +13,7 @@ CosmoNFT is a full-stack NFT marketplace that lets users purchase scientifically
 - **Credit Card Payments** - Stripe with 3D Secure protection
 - **MetaMask Integration** - NFTs minted directly to user wallets on Polygon
 - **AI-Generated Art** - Leonardo.AI creates unique celestial artwork
-- **30% to Space Exploration** - Partnership with The Planetary Society
+- **30% to Space Exploration** - Supporting space exploration initiatives
 
 ## Tech Stack
 
@@ -111,7 +111,7 @@ npx hardhat compile
 npx hardhat run scripts/deploy.ts --network mumbai
 
 # Verify on PolygonScan
-npx hardhat verify --network mumbai <CONTRACT_ADDRESS> <TPS_ADDRESS>
+npx hardhat verify --network mumbai <CONTRACT_ADDRESS> <BENEFACTOR_ADDRESS>
 ```
 
 ## API Endpoints
@@ -212,7 +212,7 @@ Images are generated automatically via GitHub Actions:
 cd backend
 npx hardhat compile
 npx hardhat run scripts/deploy.ts --network polygon
-npx hardhat verify --network polygon <CONTRACT_ADDRESS> <TPS_ADDRESS>
+npx hardhat verify --network polygon <CONTRACT_ADDRESS> <BENEFACTOR_ADDRESS>
 ```
 
 ## Security Features

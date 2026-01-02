@@ -257,6 +257,318 @@ router.post('/settings/maintenance', requireAdmin, async (req, res) => {
   }
 });
 
+// ==================== PHASE TIMER CONTROLS ====================
+
+/**
+ * GET /api/admin/phases
+ * Get current phase info and all phases
+ */
+router.get('/phases', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    const [activeTier, allTiers, settings] = await Promise.all([
+      prisma.tier.findFirst({ where: { active: true } }),
+      prisma.tier.findMany({ orderBy: { phase: 'asc' } }),
+      siteSettingsService.getSettings(),
+    ]);
+
+    if (!activeTier) {
+      return res.status(500).json({ error: 'No active tier found' });
+    }
+
+    // Calculate time remaining (accounting for pause)
+    let timeRemaining = 0;
+    const tierEndTime = new Date(activeTier.startTime.getTime() + activeTier.duration * 1000);
+
+    if (settings.phasePaused && settings.pausedAt) {
+      // Paused: show time remaining at pause point
+      const pauseTime = new Date(settings.pausedAt);
+      timeRemaining = Math.max(0, Math.floor((tierEndTime.getTime() - pauseTime.getTime()) / 1000));
+    } else {
+      // Not paused: calculate normally with pause duration offset
+      const adjustedEndTime = new Date(tierEndTime.getTime() + (settings.pauseDurationMs || 0));
+      timeRemaining = Math.max(0, Math.floor((adjustedEndTime.getTime() - Date.now()) / 1000));
+    }
+
+    res.json({
+      success: true,
+      currentPhase: {
+        phase: activeTier.phase,
+        price: activeTier.price,
+        displayPrice: `$${activeTier.price.toFixed(4)}`,
+        quantityAvailable: activeTier.quantityAvailable,
+        quantitySold: activeTier.quantitySold,
+        startTime: activeTier.startTime,
+        duration: activeTier.duration,
+        timeRemaining,
+        isPaused: settings.phasePaused,
+        pausedAt: settings.pausedAt,
+      },
+      phases: allTiers.map(t => ({
+        phase: t.phase,
+        price: t.price,
+        displayPrice: `$${t.price.toFixed(4)}`,
+        multiplier: Math.pow(1.075, t.phase - 1).toFixed(4),
+        quantityAvailable: t.quantityAvailable,
+        quantitySold: t.quantitySold,
+        startTime: t.startTime,
+        active: t.active,
+      })),
+    });
+  } catch (error) {
+    logger.error('Error fetching phases:', error);
+    res.status(500).json({ error: 'Failed to fetch phases' });
+  }
+});
+
+/**
+ * POST /api/admin/phases/pause
+ * Pause the phase timer
+ */
+router.post('/phases/pause', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    const settings = await siteSettingsService.getSettings();
+
+    if (settings.phasePaused) {
+      return res.status(400).json({ error: 'Phase timer is already paused' });
+    }
+
+    await prisma.siteSettings.update({
+      where: { id: 'main' },
+      data: {
+        phasePaused: true,
+        pausedAt: new Date(),
+      },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_PAUSE',
+        details: JSON.stringify({ pausedAt: new Date().toISOString() }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase timer paused by admin: ${req.admin!.email}`);
+    res.json({ success: true, message: 'Phase timer paused' });
+  } catch (error) {
+    logger.error('Error pausing phase timer:', error);
+    res.status(500).json({ error: 'Failed to pause phase timer' });
+  }
+});
+
+/**
+ * POST /api/admin/phases/resume
+ * Resume the phase timer
+ */
+router.post('/phases/resume', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    const settings = await siteSettingsService.getSettings();
+
+    if (!settings.phasePaused) {
+      return res.status(400).json({ error: 'Phase timer is not paused' });
+    }
+
+    // Calculate how long we were paused
+    const pausedAt = settings.pausedAt ? new Date(settings.pausedAt) : new Date();
+    const pauseDuration = Date.now() - pausedAt.getTime();
+    const newPauseDurationMs = (settings.pauseDurationMs || 0) + pauseDuration;
+
+    await prisma.siteSettings.update({
+      where: { id: 'main' },
+      data: {
+        phasePaused: false,
+        pausedAt: null,
+        pauseDurationMs: newPauseDurationMs,
+      },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_RESUME',
+        details: JSON.stringify({
+          pauseDuration: pauseDuration,
+          totalPauseDuration: newPauseDurationMs,
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase timer resumed by admin: ${req.admin!.email}`);
+    res.json({
+      success: true,
+      message: 'Phase timer resumed',
+      pauseDurationMs: pauseDuration,
+    });
+  } catch (error) {
+    logger.error('Error resuming phase timer:', error);
+    res.status(500).json({ error: 'Failed to resume phase timer' });
+  }
+});
+
+/**
+ * POST /api/admin/phases/advance
+ * Manually advance to the next phase
+ */
+router.post('/phases/advance', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { updateNFTPrices } = await import('../services/nft.service');
+
+    // Get current active tier
+    const activeTier = await prisma.tier.findFirst({
+      where: { active: true },
+    });
+
+    if (!activeTier) {
+      return res.status(400).json({ error: 'No active tier found' });
+    }
+
+    // Get next tier
+    const nextTier = await prisma.tier.findFirst({
+      where: { phase: activeTier.phase + 1 },
+    });
+
+    if (!nextTier) {
+      return res.status(400).json({ error: 'Already at the last phase' });
+    }
+
+    // Deactivate current tier and activate next
+    await prisma.$transaction([
+      prisma.tier.update({
+        where: { id: activeTier.id },
+        data: { active: false },
+      }),
+      prisma.tier.update({
+        where: { id: nextTier.id },
+        data: {
+          active: true,
+          startTime: new Date(),
+        },
+      }),
+    ]);
+
+    // Reset pause duration
+    await prisma.siteSettings.update({
+      where: { id: 'main' },
+      data: {
+        phasePaused: false,
+        pausedAt: null,
+        pauseDurationMs: 0,
+      },
+    });
+
+    // Update NFT prices with new multiplier
+    const newMultiplier = Math.pow(1.075, nextTier.phase - 1);
+    await updateNFTPrices(newMultiplier);
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_ADVANCE',
+        details: JSON.stringify({
+          fromPhase: activeTier.phase,
+          toPhase: nextTier.phase,
+          newMultiplier,
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase advanced from ${activeTier.phase} to ${nextTier.phase} by admin: ${req.admin!.email}`);
+    res.json({
+      success: true,
+      message: `Advanced to Phase ${nextTier.phase}`,
+      newPhase: {
+        phase: nextTier.phase,
+        price: nextTier.price,
+        multiplier: newMultiplier,
+      },
+    });
+  } catch (error) {
+    logger.error('Error advancing phase:', error);
+    res.status(500).json({ error: 'Failed to advance phase' });
+  }
+});
+
+/**
+ * PUT /api/admin/phases/:phase/end-time
+ * Update the end time for a specific phase
+ */
+router.put('/phases/:phase/end-time', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { phase } = req.params;
+    const { endTime } = req.body;
+
+    const phaseNum = parseInt(phase);
+    if (isNaN(phaseNum)) {
+      return res.status(400).json({ error: 'Invalid phase number' });
+    }
+
+    const tier = await prisma.tier.findFirst({
+      where: { phase: phaseNum },
+    });
+
+    if (!tier) {
+      return res.status(404).json({ error: 'Phase not found' });
+    }
+
+    // Calculate new duration from start time to new end time
+    const newEndTime = new Date(endTime);
+    const newDuration = Math.floor((newEndTime.getTime() - tier.startTime.getTime()) / 1000);
+
+    if (newDuration <= 0) {
+      return res.status(400).json({ error: 'End time must be after start time' });
+    }
+
+    await prisma.tier.update({
+      where: { id: tier.id },
+      data: { duration: newDuration },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_END_TIME_UPDATE',
+        details: JSON.stringify({
+          phase: phaseNum,
+          oldDuration: tier.duration,
+          newDuration,
+          newEndTime: newEndTime.toISOString(),
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase ${phaseNum} end time updated by admin: ${req.admin!.email}`);
+    res.json({
+      success: true,
+      message: `Phase ${phaseNum} end time updated`,
+      newDuration,
+      newEndTime,
+    });
+  } catch (error) {
+    logger.error('Error updating phase end time:', error);
+    res.status(500).json({ error: 'Failed to update phase end time' });
+  }
+});
+
 // ==================== SALES & ORDERS ====================
 
 /**
@@ -321,8 +633,8 @@ router.get('/sales/stats', requireAdmin, async (req, res) => {
       });
     }
 
-    // TPS share (30%)
-    const tpsShare = totalRevenue * 0.3;
+    // Benefactor share (30%)
+    const benefactorShare = totalRevenue * 0.3;
 
     res.json({
       success: true,
@@ -336,7 +648,7 @@ router.get('/sales/stats', requireAdmin, async (req, res) => {
         weekOrders: weekPurchases.length,
         monthRevenue,
         monthOrders: monthPurchases.length,
-        tpsShare,
+        benefactorShare,
         averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
         revenueByDay,
       },
@@ -454,6 +766,396 @@ router.get('/orders/:id', requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Error fetching order:', error);
     res.status(500).json({ error: 'Failed to fetch order' });
+  }
+});
+
+// ==================== WHITELIST ROUTES ====================
+
+/**
+ * GET /api/admin/whitelist
+ * Get all whitelisted addresses
+ */
+router.get('/whitelist', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const addresses = await prisma.whitelistAddress.findMany({
+      orderBy: { addedAt: 'desc' },
+    });
+
+    // Map to frontend expected format
+    const mapped = addresses.map((a) => ({
+      id: a.id,
+      walletAddress: a.walletAddress,
+      email: null,
+      note: a.note,
+      createdAt: a.addedAt,
+    }));
+
+    res.json({ addresses: mapped });
+  } catch (error) {
+    logger.error('Error fetching whitelist:', error);
+    res.status(500).json({ error: 'Failed to fetch whitelist' });
+  }
+});
+
+/**
+ * POST /api/admin/whitelist
+ * Add address to whitelist
+ */
+router.post('/whitelist', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { walletAddress, note } = req.body;
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'Wallet address required' });
+    }
+
+    const address = await prisma.whitelistAddress.create({
+      data: {
+        walletAddress,
+        note: note || null,
+        addedBy: req.admin!.email,
+      },
+    });
+
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'WHITELIST_ADD',
+        details: walletAddress,
+        ipAddress: req.ip,
+      },
+    });
+
+    res.status(201).json({ address });
+  } catch (error) {
+    logger.error('Error adding to whitelist:', error);
+    res.status(500).json({ error: 'Failed to add to whitelist' });
+  }
+});
+
+/**
+ * DELETE /api/admin/whitelist/:id
+ * Remove address from whitelist
+ */
+router.delete('/whitelist/:id', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { id } = req.params;
+
+    const address = await prisma.whitelistAddress.delete({
+      where: { id },
+    });
+
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'WHITELIST_REMOVE',
+        details: address.walletAddress,
+        ipAddress: req.ip,
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error removing from whitelist:', error);
+    res.status(500).json({ error: 'Failed to remove from whitelist' });
+  }
+});
+
+// ==================== BANNED ADDRESSES ROUTES ====================
+
+/**
+ * GET /api/admin/banned-addresses
+ * Get all banned addresses
+ */
+router.get('/banned-addresses', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const addresses = await prisma.bannedAddress.findMany({
+      orderBy: { bannedAt: 'desc' },
+    });
+
+    res.json({ addresses });
+  } catch (error) {
+    logger.error('Error fetching banned addresses:', error);
+    res.status(500).json({ error: 'Failed to fetch banned addresses' });
+  }
+});
+
+/**
+ * POST /api/admin/banned-addresses
+ * Ban an address
+ */
+router.post('/banned-addresses', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { walletAddress, reason } = req.body;
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'Wallet address required' });
+    }
+
+    const banned = await prisma.bannedAddress.create({
+      data: {
+        walletAddress,
+        reason: reason || null,
+        bannedBy: req.admin!.email,
+      },
+    });
+
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'ADDRESS_BAN',
+        details: `${walletAddress} - ${reason || 'No reason'}`,
+        ipAddress: req.ip,
+      },
+    });
+
+    res.status(201).json({ banned });
+  } catch (error) {
+    logger.error('Error banning address:', error);
+    res.status(500).json({ error: 'Failed to ban address' });
+  }
+});
+
+/**
+ * DELETE /api/admin/banned-addresses/:id
+ * Unban an address
+ */
+router.delete('/banned-addresses/:id', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { id } = req.params;
+
+    const banned = await prisma.bannedAddress.delete({
+      where: { id },
+    });
+
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'ADDRESS_UNBAN',
+        details: banned.walletAddress,
+        ipAddress: req.ip,
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error unbanning address:', error);
+    res.status(500).json({ error: 'Failed to unban address' });
+  }
+});
+
+// ==================== USER MANAGEMENT ROUTES ====================
+
+/**
+ * GET /api/admin/users
+ * Get all users with stats
+ */
+router.get('/users', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Enrich with purchase stats
+    const enrichedUsers = await Promise.all(
+      users.map(async (user) => {
+        const purchases = await prisma.purchase.findMany({
+          where: { walletAddress: user.walletAddress, status: 'COMPLETED' },
+        });
+
+        const nftCount = await prisma.nFT.count({
+          where: { ownerAddress: user.walletAddress },
+        });
+
+        const totalSpentCents = purchases.reduce((sum, p) => sum + p.totalAmountCents, 0);
+
+        return {
+          id: user.id,
+          walletAddress: user.walletAddress,
+          email: user.email,
+          createdAt: user.createdAt,
+          totalPurchases: purchases.length,
+          totalSpentCents,
+          nftCount,
+        };
+      })
+    );
+
+    res.json({ users: enrichedUsers });
+  } catch (error) {
+    logger.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+/**
+ * GET /api/admin/users/export
+ * Export users as CSV
+ */
+router.get('/users/export', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Create CSV
+    const headers = ['Wallet Address', 'Email', 'Created At'];
+    const rows = users.map((u) => [u.walletAddress, u.email || '', u.createdAt.toISOString()]);
+
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=users.csv');
+    res.send(csv);
+  } catch (error) {
+    logger.error('Error exporting users:', error);
+    res.status(500).json({ error: 'Failed to export users' });
+  }
+});
+
+// ==================== AUDIT LOG ROUTES ====================
+
+/**
+ * GET /api/admin/audit-logs
+ * Get audit logs
+ */
+router.get('/audit-logs', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const limit = parseInt(req.query.limit as string) || 100;
+
+    const logs = await prisma.adminAuditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    res.json({ logs });
+  } catch (error) {
+    logger.error('Error fetching audit logs:', error);
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
+// ==================== PASSWORD CHANGE ROUTE ====================
+
+/**
+ * POST /api/admin/change-password
+ * Change admin password
+ */
+router.post('/change-password', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const bcrypt = await import('bcryptjs');
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // Verify current password
+    const admin = await prisma.adminUser.findUnique({
+      where: { id: req.admin!.id },
+    });
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin not found' });
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, admin.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash and update new password
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await prisma.adminUser.update({
+      where: { id: req.admin!.id },
+      data: { passwordHash: newHash },
+    });
+
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PASSWORD_CHANGE',
+        ipAddress: req.ip,
+      },
+    });
+
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    logger.error('Error changing password:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// ==================== EMAIL BROADCAST ROUTE ====================
+
+/**
+ * POST /api/admin/broadcast
+ * Send email broadcast to all users
+ */
+router.post('/broadcast', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { subject, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Subject and message required' });
+    }
+
+    // Get all users with email
+    const users = await prisma.user.findMany({
+      where: { email: { not: null } },
+    });
+
+    // Create broadcast record
+    await prisma.emailBroadcast.create({
+      data: {
+        subject,
+        body: message,
+        recipientType: 'ALL',
+        sentBy: req.admin!.email,
+        sentCount: users.length,
+      },
+    });
+
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'EMAIL_BROADCAST',
+        details: `Subject: ${subject}, Recipients: ${users.length}`,
+        ipAddress: req.ip,
+      },
+    });
+
+    // TODO: Actually send emails via SendGrid
+    // For now, just log it
+    logger.info(`Email broadcast: ${subject} to ${users.length} users`);
+
+    res.json({ success: true, sentCount: users.length });
+  } catch (error) {
+    logger.error('Error sending broadcast:', error);
+    res.status(500).json({ error: 'Failed to send broadcast' });
   }
 });
 

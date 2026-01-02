@@ -28,9 +28,9 @@ contract CosmoNFT is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     uint256 public totalNFTsMinted = 0;
     uint256 public constant MAX_SUPPLY = 20000;
 
-    // Royalty: 25% to creators/TPS
+    // Royalty: 25% to creators/benefactor
     uint256 public constant ROYALTY_PERCENTAGE = 2500;
-    address public tpsAddress;
+    address public benefactorAddress;
 
     // 7.5% price increase per phase
     uint256 public constant PRICE_INCREASE_BPS = 750; // basis points
@@ -65,9 +65,9 @@ contract CosmoNFT is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     event BidPlaced(uint256 indexed tokenId, address indexed bidder, uint256 bidAmount);
     event AuctionFinalized(uint256 indexed tokenId, address indexed winner, uint256 finalPrice);
 
-    constructor(address _tpsAddress) ERC721("CosmoNFT", "COSMO") Ownable(msg.sender) {
-        require(_tpsAddress != address(0), "Invalid TPS address");
-        tpsAddress = _tpsAddress;
+    constructor(address _benefactorAddress) ERC721("CosmoNFT", "COSMO") Ownable(msg.sender) {
+        require(_benefactorAddress != address(0), "Invalid benefactor address");
+        benefactorAddress = _benefactorAddress;
 
         // Initialize pricing tiers
         initializeTiers();
@@ -252,20 +252,20 @@ contract CosmoNFT is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
     }
 
     /**
-     * @dev Withdraw royalties (70% owner, 30% TPS)
+     * @dev Withdraw royalties (70% owner, 30% benefactor)
      */
     function withdrawRoyalties() external {
         uint256 balance = address(this).balance;
         require(balance > 0, "No royalties");
 
         uint256 ownerShare = (balance * 70) / 100;
-        uint256 tpsShare = balance - ownerShare;
+        uint256 benefactorShareAmount = balance - ownerShare;
 
         (bool success1, ) = owner().call{value: ownerShare}("");
         require(success1, "Owner withdrawal failed");
 
-        (bool success2, ) = tpsAddress.call{value: tpsShare}("");
-        require(success2, "TPS withdrawal failed");
+        (bool success2, ) = benefactorAddress.call{value: benefactorShareAmount}("");
+        require(success2, "Benefactor withdrawal failed");
 
         emit RoyaltiesWithdrawn(owner(), ownerShare);
     }

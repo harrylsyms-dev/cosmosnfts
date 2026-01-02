@@ -81,6 +81,9 @@ async function main() {
     // Generate placeholder IPFS hash (will be updated with real images)
     const ipfsHash = `Qm${Buffer.from(obj.name).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 44)}`;
 
+    // Calculate price: Base ($0.10) × Score × Phase Multiplier (1.0 for Phase 1)
+    const nftPrice = basePrice * cosmicScore * 1.0; // Phase 1 multiplier = 1.0
+
     return {
       tokenId: index + 1, // Token IDs start at 1
       name: obj.name,
@@ -92,7 +95,7 @@ async function main() {
       discoveryRecency: obj.discoveryRecency,
       culturalImpact: obj.culturalImpact,
       cosmicScore,
-      currentPrice: basePrice, // All NFTs start at $0.10
+      currentPrice: nftPrice, // Price = $0.10 × Score × Phase Multiplier
       status: 'AVAILABLE',
       discoveryYear: obj.discoveryYear,
       objectType: obj.objectType,
@@ -150,10 +153,22 @@ async function main() {
     console.log(`   ${type.objectType}: ${type._count}`);
   }
 
+  // Calculate price range examples
+  const minScore = stats._min.cosmicScore || 350;
+  const maxScore = stats._max.cosmicScore || 485;
+  const phase1MinPrice = basePrice * minScore * 1.0;
+  const phase1MaxPrice = basePrice * maxScore * 1.0;
+  const phase81Multiplier = Math.pow(1.075, 80);
+
+  console.log('\n💰 PRICING MODEL:');
+  console.log('   Formula: $0.10 × Score × Phase Multiplier');
+  console.log(`   Phase 1 Price Range: $${phase1MinPrice.toFixed(2)} - $${phase1MaxPrice.toFixed(2)}`);
+  console.log(`   Phase 81 Price Range: $${(phase1MinPrice * phase81Multiplier).toFixed(2)} - $${(phase1MaxPrice * phase81Multiplier).toFixed(2)}`);
+
   console.log('\n═══════════════════════════════════════════════');
   console.log('✅ Database seeding complete!');
   console.log(`📅 Launch: ${launchDate.toDateString()}`);
-  console.log(`💰 Starting Price: $${basePrice.toFixed(2)} (Phase 1)`);
+  console.log(`💰 Base Price: $${basePrice.toFixed(2)} per point`);
   console.log(`📈 Weekly Increase: 7.5%`);
   console.log(`🎯 Phase 1 NFTs: 1000`);
   console.log('═══════════════════════════════════════════════\n');
