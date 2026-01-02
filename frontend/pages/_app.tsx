@@ -25,6 +25,16 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <>
+      {/* Always-visible test - bright red bar at top */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '5px',
+        backgroundColor: 'red',
+        zIndex: 9999
+      }} />
       {showCosmic && <CosmicBackground />}
       <Elements stripe={stripePromise}>
         <Component {...pageProps} />
