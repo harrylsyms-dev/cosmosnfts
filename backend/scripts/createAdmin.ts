@@ -4,9 +4,20 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.argv[2] || 'admin@cosmonfts.com';
-  const password = process.argv[3] || 'admin123456';
+  const email = process.argv[2];
+  const password = process.argv[3];
   const name = process.argv[4] || 'Admin';
+
+  if (!email || !password) {
+    console.error('Usage: npx ts-node scripts/createAdmin.ts <email> <password> [name]');
+    console.error('Example: npx ts-node scripts/createAdmin.ts admin@cosmonfts.com MySecurePass123 "Admin Name"');
+    process.exit(1);
+  }
+
+  if (password.length < 8) {
+    console.error('Error: Password must be at least 8 characters');
+    process.exit(1);
+  }
 
   console.log('Creating admin user...');
   console.log(`Email: ${email}`);

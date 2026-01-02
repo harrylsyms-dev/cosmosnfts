@@ -1,11 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
 
-const SITE_PASSWORD = process.env.SITE_PASSWORD || 'cosmonfts2024';
-
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const SITE_PASSWORD = process.env.SITE_PASSWORD;
+
+  // If no password is configured, site protection is disabled
+  if (!SITE_PASSWORD) {
+    return res.status(400).json({ error: 'Site password not configured' });
   }
 
   const { password } = req.body;
