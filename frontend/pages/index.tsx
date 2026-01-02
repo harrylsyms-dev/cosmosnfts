@@ -8,6 +8,7 @@ import Layout from '../components/Layout';
 import NFTCard from '../components/NFTCard';
 import CountdownTimer from '../components/CountdownTimer';
 import PricingDisplay from '../components/PricingDisplay';
+import CosmicBackground from '../components/CosmicBackground';
 
 interface NFT {
   id: number;
@@ -51,46 +52,74 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      {/* Hero Section */}
-      <section className="relative py-20 px-4 text-center overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-900/20 via-transparent to-transparent" />
+      {/* Hero Section with Cosmic Background */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Animated Cosmic Background */}
+        <CosmicBackground />
 
-        <div className="relative z-10 max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6">
-            <span className="gradient-text">Own a Piece</span>
+        {/* Gradient overlays for depth */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-gray-950 z-[1]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent z-[1]" />
+
+        {/* Content */}
+        <div className="relative z-10 max-w-5xl mx-auto px-4 text-center py-20">
+          {/* Floating badge */}
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-8 animate-pulse">
+            <span className="w-2 h-2 bg-green-400 rounded-full" />
+            <span className="text-sm text-gray-300">Phase 1 Now Live</span>
+          </div>
+
+          <h1 className="text-6xl md:text-8xl font-bold mb-6 leading-tight">
+            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Own a Piece
+            </span>
             <br />
-            of the Universe
+            <span className="text-white">of the Universe</span>
           </h1>
 
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl md:text-2xl text-gray-300 mb-10 max-w-3xl mx-auto leading-relaxed">
             Celestial objects immortalized as NFTs. Scientifically scored.
-            Dynamically priced. 30% funds space exploration.
+            <br className="hidden md:block" />
+            Dynamically priced. <span className="text-purple-400 font-semibold">30% funds space exploration.</span>
           </p>
 
           {/* Pricing Display */}
-          <div className="max-w-md mx-auto mb-8">
+          <div className="max-w-md mx-auto mb-10">
             <PricingDisplay pricing={pricing} isLoading={pricingLoading} />
           </div>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="#nfts" className="btn-primary text-lg px-8 py-4">
-              Browse NFTs
+            <Link
+              href="#nfts"
+              className="group relative inline-flex items-center justify-center px-10 py-4 text-lg font-bold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_40px_rgba(124,58,237,0.5)]"
+            >
+              <span className="relative z-10">Browse NFTs</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
             </Link>
 
             {!isConnected ? (
-              <button onClick={connect} className="btn-secondary text-lg px-8 py-4">
+              <button
+                onClick={connect}
+                className="inline-flex items-center justify-center px-10 py-4 text-lg font-bold text-white border-2 border-white/30 rounded-xl backdrop-blur-sm hover:bg-white/10 hover:border-white/50 transition-all"
+              >
                 Connect MetaMask
               </button>
             ) : (
-              <div className="flex items-center gap-2 bg-green-900/50 px-6 py-4 rounded-lg">
+              <div className="inline-flex items-center gap-3 bg-green-900/30 backdrop-blur-sm border border-green-500/30 px-6 py-4 rounded-xl">
                 <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-green-300">
+                <span className="text-green-300 font-medium">
                   {address?.slice(0, 6)}...{address?.slice(-4)}
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Scroll indicator */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
           </div>
         </div>
       </section>
