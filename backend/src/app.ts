@@ -63,9 +63,9 @@ app.use('/api/settings', settingsRoutes);
 // Error handling
 app.use(errorHandler);
 
-// Start cron jobs
-startTierAdvancementJob();
-startCartExpiryJob();
+// Cron jobs disabled temporarily for debugging
+// startTierAdvancementJob();
+// startCartExpiryJob();
 
 app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info(`Server running on port ${PORT}`);
