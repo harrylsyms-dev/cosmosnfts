@@ -10,7 +10,7 @@
 }
 
 html {
-  background-color: var(--cosmic-dark);
+  background-color: #030014;
 }
 
 body {
@@ -28,7 +28,6 @@ body {
 #__next {
   background-color: transparent;
   position: relative;
-  z-index: 1;
 }
 
 a {

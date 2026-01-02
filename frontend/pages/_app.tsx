@@ -23,9 +23,11 @@ export default function App({ Component, pageProps }: AppProps) {
   const showCosmic = router.pathname === '/';
 
   return (
-    <Elements stripe={stripePromise}>
+    <>
       {showCosmic && <CosmicBackground />}
-      <Component {...pageProps} />
-    </Elements>
+      <Elements stripe={stripePromise}>
+        <Component {...pageProps} />
+      </Elements>
+    </>
   );
 }
