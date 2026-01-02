@@ -27,6 +27,8 @@ interface UseCartReturn {
   refreshCart: () => Promise<void>;
 }
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
 // Get user ID from localStorage or generate new one
 function getUserId(): string {
   if (typeof window === 'undefined') return '';
@@ -57,7 +59,7 @@ export function useCart(): UseCartReturn {
 
     try {
       setIsLoading(true);
-      const res = await fetch(`/api/cart?userId=${encodeURIComponent(userId)}`);
+      const res = await fetch(`${apiUrl}/api/cart?userId=${encodeURIComponent(userId)}`);
       const data = await res.json();
 
       setCart({
@@ -81,7 +83,7 @@ export function useCart(): UseCartReturn {
 
       try {
         setError(null);
-        const res = await fetch('/api/cart/add', {
+        const res = await fetch(`${apiUrl}/api/cart/add`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nftId, userId }),
@@ -114,7 +116,7 @@ export function useCart(): UseCartReturn {
 
       try {
         setError(null);
-        const res = await fetch('/api/cart/remove', {
+        const res = await fetch(`${apiUrl}/api/cart/remove`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nftId, userId }),
@@ -140,7 +142,7 @@ export function useCart(): UseCartReturn {
 
     try {
       setError(null);
-      const res = await fetch('/api/cart/clear', {
+      const res = await fetch(`${apiUrl}/api/cart/clear`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),

@@ -63,7 +63,8 @@ export default function Browse() {
         params.append('search', filter.search);
       }
 
-      const res = await fetch(`/api/nfts/available?${params}`);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/nfts/available?${params}`);
       const data = await res.json();
       setNfts(data.items || []);
       setTotalPages(Math.ceil((data.total || 0) / limit));

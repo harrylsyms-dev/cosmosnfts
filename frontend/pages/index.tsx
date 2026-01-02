@@ -32,7 +32,8 @@ export default function Home() {
 
   async function fetchNfts() {
     try {
-      const res = await fetch('/api/nfts/available?limit=12');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/nfts/available?limit=12`);
       const data = await res.json();
       setNfts(data.items || []);
     } catch (error) {

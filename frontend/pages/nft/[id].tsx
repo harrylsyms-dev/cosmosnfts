@@ -41,7 +41,8 @@ export default function NFTDetail() {
 
   async function fetchNFT(nftId: string) {
     try {
-      const res = await fetch(`/api/nft/${nftId}`);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/nft/${nftId}`);
       if (!res.ok) throw new Error('NFT not found');
       const data = await res.json();
       setNft(data);
