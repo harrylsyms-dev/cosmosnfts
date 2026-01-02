@@ -30,12 +30,22 @@ export default function PricingDisplay({ pricing, isLoading }: PricingDisplayPro
     );
   }
 
+  // Calculate example prices for different scores
+  const basePrice = parseFloat(pricing.displayPrice);
+  const exampleScore = 400;
+  const examplePrice = basePrice * exampleScore;
+
   return (
     <div className="bg-gray-900 rounded-xl p-8 border border-gray-800">
-      {/* Current Price */}
+      {/* Current Phase Pricing Formula */}
       <div className="mb-6">
-        <div className="text-gray-400 text-sm mb-1">{pricing.phaseName} Price</div>
-        <div className="text-5xl font-bold text-white">${pricing.displayPrice}</div>
+        <div className="text-gray-400 text-sm mb-1">{pricing.phaseName} Base Rate</div>
+        <div className="text-4xl font-bold text-white">
+          ${pricing.displayPrice} <span className="text-xl text-gray-400">× Score</span>
+        </div>
+        <div className="text-gray-500 text-sm mt-2">
+          Example: Score {exampleScore} = <span className="text-green-400 font-semibold">${examplePrice.toFixed(2)}</span>
+        </div>
       </div>
 
       {/* Countdown */}
@@ -55,7 +65,7 @@ export default function PricingDisplay({ pricing, isLoading }: PricingDisplayPro
 
       {/* Next Price Preview */}
       <div className="mt-4 pt-4 border-t border-gray-800 text-sm text-gray-400">
-        Next phase: ${(parseFloat(pricing.displayPrice) * 1.075).toFixed(2)} (+7.5%)
+        Next phase: ${(basePrice * 1.075).toFixed(2)} × Score (+7.5%)
       </div>
     </div>
   );

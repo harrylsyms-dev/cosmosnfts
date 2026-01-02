@@ -128,9 +128,9 @@ export default function Home() {
           </div>
           <div>
             <div className="text-4xl font-bold text-green-400">
-              {pricing ? `$${pricing.displayPrice}` : '$350'}
+              {pricing ? `$${pricing.displayPrice}` : '$0.10'}
             </div>
-            <div className="text-gray-400">Current Price</div>
+            <div className="text-gray-400">Base Rate × Score</div>
           </div>
           <div>
             <div className="text-4xl font-bold text-purple-400">7.5%</div>

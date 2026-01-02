@@ -313,6 +313,7 @@ router.get('/phases', requireAdmin, async (req, res) => {
         quantityAvailable: t.quantityAvailable,
         quantitySold: t.quantitySold,
         startTime: t.startTime,
+        duration: t.duration,
         active: t.active,
       })),
     });

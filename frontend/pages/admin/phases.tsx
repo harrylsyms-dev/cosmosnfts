@@ -17,12 +17,9 @@ interface Phase {
 }
 
 interface PhaseData {
-  currentPhase: Phase | null;
-  allPhases: Phase[];
-  isPaused: boolean;
-  pausedAt: string | null;
-  timeRemaining: number;
-  adjustedTimeRemaining: number;
+  success?: boolean;
+  currentPhase: (Phase & { isPaused?: boolean; pausedAt?: string | null; timeRemaining?: number }) | null;
+  phases: Phase[];
 }
 
 export default function AdminPhases() {
@@ -39,11 +36,14 @@ export default function AdminPhases() {
   }, []);
 
   useEffect(() => {
-    if (!phaseData?.currentPhase || phaseData.isPaused) return;
+    if (!phaseData?.currentPhase || phaseData.currentPhase.isPaused) return;
+
+    const startTime = Date.now();
+    const initialRemaining = phaseData.currentPhase.timeRemaining || 0;
 
     const interval = setInterval(() => {
-      const remaining = phaseData.adjustedTimeRemaining -
-        Math.floor((Date.now() - new Date().getTime()) / 1000);
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = initialRemaining - elapsed;
 
       if (remaining <= 0) {
         setCountdown('Phase ended');
@@ -106,7 +106,7 @@ export default function AdminPhases() {
   }
 
   async function handlePauseResume() {
-    const action = phaseData?.isPaused ? 'resume' : 'pause';
+    const action = phaseData?.currentPhase?.isPaused ? 'resume' : 'pause';
     setActionLoading(action);
 
     try {
@@ -274,12 +274,12 @@ export default function AdminPhases() {
 
                 <div className="bg-gray-800 rounded-lg p-4">
                   <div className="text-gray-400 text-sm mb-1">Time Remaining</div>
-                  <div className={`text-3xl font-bold ${phaseData?.isPaused ? 'text-yellow-400' : 'text-orange-400'}`}>
-                    {phaseData?.isPaused ? 'PAUSED' : countdown || 'Calculating...'}
+                  <div className={`text-3xl font-bold ${phaseData?.currentPhase?.isPaused ? 'text-yellow-400' : 'text-orange-400'}`}>
+                    {phaseData?.currentPhase?.isPaused ? 'PAUSED' : countdown || 'Calculating...'}
                   </div>
-                  {phaseData?.isPaused && phaseData.pausedAt && (
+                  {phaseData?.currentPhase?.isPaused && phaseData.currentPhase.pausedAt && (
                     <div className="text-sm text-gray-500">
-                      Paused at {formatDate(phaseData.pausedAt)}
+                      Paused at {formatDate(phaseData.currentPhase.pausedAt)}
                     </div>
                   )}
                 </div>
@@ -294,14 +294,14 @@ export default function AdminPhases() {
                 onClick={handlePauseResume}
                 disabled={!!actionLoading}
                 className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                  phaseData?.isPaused
+                  phaseData?.currentPhase?.isPaused
                     ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-yellow-600 hover:bg-yellow-700 text-white'
                 } disabled:opacity-50`}
               >
                 {actionLoading === 'pause' || actionLoading === 'resume'
                   ? 'Processing...'
-                  : phaseData?.isPaused
+                  : phaseData?.currentPhase?.isPaused
                   ? 'Resume Timer'
                   : 'Pause Timer'}
               </button>
@@ -362,7 +362,7 @@ export default function AdminPhases() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                  {phaseData?.allPhases.map((phase) => {
+                  {phaseData?.phases?.map((phase) => {
                     const multiplier = Math.pow(1.075, phase.phase - 1);
                     const samplePrice = 0.10 * 400 * multiplier;
                     const endTime = getPhaseEndTime(phase);
