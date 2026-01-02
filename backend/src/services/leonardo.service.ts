@@ -35,39 +35,98 @@ class LeonardoImageService {
   }
 
   /**
-   * Generate premium prompt for Leonardo AI
+   * Generate artistic prompt for Leonardo AI
+   * Uses vibrant, stylized aesthetic that tested better for NFT appeal
    */
   private generatePrompt(nft: NFTData): string {
-    const isIconic = nft.fameScore > 85;
     const isPremium = nft.totalScore > 400;
+    const isElite = nft.totalScore > 425;
 
-    const aestheticStyle = nft.totalScore > 450
-      ? 'cinematic, award-winning digital art, museum quality, 8K, masterpiece'
-      : nft.totalScore > 400
-      ? 'professional digital art, gallery quality, high-end illustration, 4K'
-      : 'detailed digital art, high quality illustration';
+    // Create poetic description from scientific one
+    const poeticDescription = this.makePoetic(nft.description, nft.objectType);
+
+    // Dynamic features based on object type
+    const typeFeatures = this.getTypeFeatures(nft.objectType);
 
     return `
-Scientifically accurate representation of ${nft.name}, a ${nft.objectType || 'celestial object'}.
+Stunning artistic interpretation of ${nft.name} as a cosmic masterpiece.
 
-${nft.description}
+${poeticDescription}
 
-Visual Style: ${aestheticStyle}
-- Detailed surface features and textures
-- Cosmic rays, stellar radiation, volumetric lighting
-- Surrounding nebulae and cosmic dust particles
-- Deep space background with distant stars and galaxies
-- ${isIconic ? 'Iconic and universally recognizable' : 'Detailed and intricate'}
-${isPremium ? '- Premium quality, gallery-ready composition' : ''}
+Visual Style: Bold digital art, vibrant colors, stylized but detailed, cosmic art with ethereal glow
+${typeFeatures}
+- Nebulae in vivid purples, blues, golds, oranges, and reds
+- Stars twinkling with magical light effects
+- Surreal cosmic landscape
+- Dreamlike, fantastical yet scientifically inspired
+${isElite ? '- Ultra premium, museum-worthy composition with breathtaking detail' : ''}
+${isPremium ? '- Premium quality with exceptional luminosity' : ''}
 
-Composition: Balanced, professional, centered
-Quality: ${isPremium ? 'Museum-grade, masterpiece' : 'High quality, professional'}
-Medium: Digital illustration, 3D render
-Color: Vibrant, scientifically inspired, saturated cosmic palette
-Lighting: Dramatic cosmic lighting with realistic physics
+Composition: Eye-catching, dramatic, energetic
+Quality: Professional digital art, vibrant, gallery-quality illustration
+Medium: Digital painting, concept art, stylized 3D render
+Color: Vibrant, saturated, cosmic palette with glow effects and deep space blacks
+Lighting: Magical cosmic glow, ethereal light effects, volumetric rays
 
---no text, watermarks, signatures, logos
+Fame: ${nft.fameScore} | Significance: ${nft.significanceScore} | Rarity: ${nft.rarityScore} | Age: ${nft.discoveryRecencyScore} | Cultural Impact: ${nft.culturalImpactScore}
+
+--no text, watermarks, signatures, logos, words, letters
 `.trim();
+  }
+
+  /**
+   * Transform scientific description into poetic, evocative language
+   */
+  private makePoetic(description: string, objectType?: string): string {
+    // Add poetic flourishes based on object type
+    const poeticPrefixes: Record<string, string> = {
+      'Star': 'A celestial beacon burning with ancient fire,',
+      'Galaxy': 'A cosmic island of billions of stars swirling in eternal dance,',
+      'Nebula': 'A stellar nursery painted across the void in luminous clouds,',
+      'Black Hole': 'A mysterious void where light itself surrenders,',
+      'Pulsar': 'A cosmic lighthouse spinning through the darkness,',
+      'Quasar': 'A blazing heart of creation at the edge of the universe,',
+      'Asteroid': 'A wandering remnant from the birth of our solar system,',
+      'Comet': 'A celestial traveler trailing stardust across the heavens,',
+      'Star Cluster': 'A glittering congregation of stellar siblings,',
+      'Globular Cluster': 'An ancient spherical city of a million suns,',
+      'White Dwarf': 'The glowing ember of a star that once blazed bright,',
+      'Brown Dwarf': 'A cosmic wanderer caught between star and planet,',
+      'Star System': 'A celestial family bound by invisible threads of gravity,',
+    };
+
+    const prefix = poeticPrefixes[objectType || ''] || 'A magnificent cosmic wonder,';
+
+    // Transform the description to be more evocative
+    let poetic = description
+      .replace(/approximately/gi, 'roughly')
+      .replace(/located/gi, 'dwelling')
+      .replace(/discovered/gi, 'revealed to humanity')
+      .replace(/contains/gi, 'harbors')
+      .replace(/light-years/gi, 'light-years of cosmic distance')
+      .replace(/visible/gi, 'visible to those who gaze skyward');
+
+    return `${prefix} ${poetic}`;
+  }
+
+  /**
+   * Get dynamic visual features based on object type
+   */
+  private getTypeFeatures(objectType?: string): string {
+    const features: Record<string, string> = {
+      'Star': '- Radiant corona with dancing solar flares\n- Glowing surface with swirling plasma storms\n- Brilliant light rays piercing the cosmic darkness',
+      'Galaxy': '- Glowing spiral arms with dynamic swirling energy\n- Billions of tiny stars creating luminous patterns\n- Majestic rotation captured in cosmic time',
+      'Nebula': '- Billowing clouds of cosmic gas in ethereal formations\n- Newborn stars emerging from glowing cocoons\n- Pillars of creation reaching toward infinity',
+      'Black Hole': '- Mesmerizing accretion disk of superheated matter\n- Light bending around the event horizon\n- Jets of energy erupting into the void',
+      'Pulsar': '- Spinning beams of light cutting through space\n- Intense magnetic field lines visualized\n- Rhythmic pulses of cosmic energy',
+      'Quasar': '- Blindingly brilliant core outshining galaxies\n- Enormous jets of plasma spanning light-years\n- The most luminous objects in existence',
+      'Asteroid': '- Rugged, cratered surface catching starlight\n- Tumbling through the asteroid belt\n- Ancient minerals glinting in the darkness',
+      'Comet': '- Glorious tail streaming across the stars\n- Icy nucleus glowing with reflected sunlight\n- Dust and gas creating ethereal aurora',
+      'Star Cluster': '- Dozens of brilliant stars in close embrace\n- Colorful stellar variety from blue to gold\n- Gravitational dance of cosmic siblings',
+      'Globular Cluster': '- Dense sphere of ancient stars\n- Millions of suns in gravitational harmony\n- The oldest structures in the galaxy',
+    };
+
+    return features[objectType || ''] || '- Mysterious cosmic energy emanating from within\n- Ethereal glow against the infinite darkness\n- Captivating celestial presence';
   }
 
   /**
