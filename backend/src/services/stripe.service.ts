@@ -97,7 +97,7 @@ export async function submitDisputeEvidence(
     productDescription: string;
     customerEmail: string;
     transactionHash: string;
-    openSeaUrl: string;
+    contractAddress: string;
   }
 ) {
   const dispute = await stripe.disputes.update(disputeId, {
@@ -109,7 +109,8 @@ export async function submitDisputeEvidence(
         that were successfully minted on the Polygon blockchain.
 
         Blockchain Transaction: ${evidence.transactionHash}
-        OpenSea Collection: ${evidence.openSeaUrl}
+        Contract Address: ${evidence.contractAddress}
+        PolygonScan: https://polygonscan.com/tx/${evidence.transactionHash}
 
         The NFTs are permanently recorded on the blockchain and cannot be reversed.
         The customer received email confirmation with blockchain proof.

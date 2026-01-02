@@ -116,9 +116,6 @@ router.get('/:transactionId', async (req: Request, res: Response) => {
         name: nft.name,
         contractAddress: process.env.CONTRACT_ADDRESS,
         transactionHash: nft.transactionHash,
-        openSeaUrl: nft.tokenId
-          ? `https://opensea.io/assets/polygon/${process.env.CONTRACT_ADDRESS}/${nft.tokenId}`
-          : null,
       })),
       mintedAt: purchase.mintedAt?.getTime() || null,
       createdAt: purchase.createdAt.getTime(),

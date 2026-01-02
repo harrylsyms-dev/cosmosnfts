@@ -202,7 +202,7 @@ export default function Home() {
               <h3 className="text-xl font-semibold mb-2">Receive Your NFT</h3>
               <p className="text-gray-400">
                 NFT mints automatically to your wallet on Polygon.
-                View and trade on OpenSea within minutes.
+                View and trade on our marketplace within minutes.
               </p>
             </div>
           </div>

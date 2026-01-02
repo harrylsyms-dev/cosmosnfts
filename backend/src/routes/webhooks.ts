@@ -194,7 +194,8 @@ async function handleDispute(dispute: Stripe.Dispute) {
         email: charge.receipt_email,
         description: charge.description,
         blockchainHash: purchase.transactionHash,
-        openSeaUrl: `https://opensea.io/assets/polygon/${process.env.CONTRACT_ADDRESS}`,
+        contractAddress: process.env.CONTRACT_ADDRESS,
+        polygonscanUrl: `https://polygonscan.com/tx/${purchase.transactionHash}`,
         orderTime: charge.created,
         nftIds: purchase.nftIds, // Already a JSON string
       }),
