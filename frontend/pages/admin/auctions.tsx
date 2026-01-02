@@ -526,6 +526,10 @@ export default function AdminAuctions() {
                             <span>{selectedAuction.nft.scores.rarity}/100</span>
                           </div>
                           <div className="flex justify-between">
+                            <span className="text-gray-400">Discovery Recency</span>
+                            <span>{selectedAuction.nft.scores.discoveryRecency}/100</span>
+                          </div>
+                          <div className="flex justify-between">
                             <span className="text-gray-400">Cultural Impact</span>
                             <span>{selectedAuction.nft.scores.culturalImpact}/100</span>
                           </div>
