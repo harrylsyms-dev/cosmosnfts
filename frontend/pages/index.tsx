@@ -52,14 +52,13 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      {/* Hero Section with Cosmic Background */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Animated Cosmic Background */}
-        <CosmicBackground />
+      {/* Global Cosmic Background */}
+      <CosmicBackground />
 
-        {/* Gradient overlays for depth */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-gray-950 z-[1]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent z-[1]" />
+      {/* Hero Section */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Gradient overlay at bottom for transition */}
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-gray-950 to-transparent z-[1]" />
 
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-4 text-center py-20">
@@ -125,7 +124,7 @@ export default function Home() {
       </section>
 
       {/* Stats Section */}
-      <section className="py-12 px-4 border-y border-gray-800">
+      <section className="relative py-12 px-4 border-y border-gray-800 bg-gray-950">
         <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div>
             <div className="text-4xl font-bold text-blue-400">20,000</div>
@@ -149,7 +148,7 @@ export default function Home() {
       </section>
 
       {/* NFT Grid Section */}
-      <section id="nfts" className="py-16 px-4">
+      <section id="nfts" className="relative py-16 px-4 bg-gray-950">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-3xl font-bold">Available Now</h2>
@@ -179,7 +178,7 @@ export default function Home() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-16 px-4 bg-gray-900/50">
+      <section className="relative py-16 px-4 bg-gray-900">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
 
@@ -215,7 +214,7 @@ export default function Home() {
       </section>
 
       {/* Badge Explanation */}
-      <section className="py-16 px-4">
+      <section className="relative py-16 px-4 bg-gray-950">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Badge Tiers</h2>
 
@@ -268,7 +267,7 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-blue-900/30 via-purple-900/30 to-blue-900/30">
+      <section className="relative py-20 px-4 bg-gradient-to-r from-blue-900/50 via-purple-900/50 to-blue-900/50">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-bold mb-6">
             Prices Go Up Every Phase
