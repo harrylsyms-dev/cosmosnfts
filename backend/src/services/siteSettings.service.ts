@@ -13,6 +13,8 @@ interface SiteSettings {
   pausedAt: Date | null;
   pauseDurationMs: number;
   contractPaused: boolean;
+  // Phase pricing configuration
+  phaseIncreasePercent: number;
   // Wallet & Revenue Configuration
   ownerWalletAddress: string | null;
   benefactorWalletAddress: string | null;
@@ -55,6 +57,7 @@ class SiteSettingsService {
       pausedAt: settings.pausedAt,
       pauseDurationMs: settings.pauseDurationMs,
       contractPaused: settings.contractPaused,
+      phaseIncreasePercent: settings.phaseIncreasePercent,
       ownerWalletAddress: settings.ownerWalletAddress,
       benefactorWalletAddress: settings.benefactorWalletAddress,
       benefactorName: settings.benefactorName,
@@ -106,6 +109,7 @@ class SiteSettingsService {
       pausedAt: settings.pausedAt,
       pauseDurationMs: settings.pauseDurationMs,
       contractPaused: settings.contractPaused,
+      phaseIncreasePercent: settings.phaseIncreasePercent,
       ownerWalletAddress: settings.ownerWalletAddress,
       benefactorWalletAddress: settings.benefactorWalletAddress,
       benefactorName: settings.benefactorName,
