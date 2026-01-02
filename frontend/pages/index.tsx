@@ -8,7 +8,6 @@ import Layout from '../components/Layout';
 import NFTCard from '../components/NFTCard';
 import CountdownTimer from '../components/CountdownTimer';
 import PricingDisplay from '../components/PricingDisplay';
-import CosmicBackground from '../components/CosmicBackground';
 
 interface NFT {
   id: number;
@@ -51,9 +50,6 @@ export default function Home() {
         <meta name="description" content="Celestial objects immortalized as NFTs. Scientifically scored. Dynamically priced." />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-
-      {/* Global Cosmic Background */}
-      <CosmicBackground />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">

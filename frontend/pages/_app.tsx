@@ -3,8 +3,15 @@ import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import dynamic from 'next/dynamic';
 import ComingSoon from './coming-soon';
 import '../styles/globals.css';
+
+// Dynamic import to avoid SSR issues with canvas
+const CosmicBackground = dynamic(
+  () => import('../components/CosmicBackground'),
+  { ssr: false }
+);
 
 // Load Stripe
 const stripePromise = loadStripe(
@@ -90,8 +97,12 @@ export default function App({ Component, pageProps }: AppProps) {
     );
   }
 
+  // Show cosmic background on homepage
+  const showCosmic = router.pathname === '/';
+
   return (
     <Elements stripe={stripePromise}>
+      {showCosmic && <CosmicBackground />}
       <Component {...pageProps} />
     </Elements>
   );
