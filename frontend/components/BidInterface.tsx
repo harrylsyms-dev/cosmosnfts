@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
 interface BidInterfaceProps {
   auctionId: string;
   minimumBid: number;
@@ -48,7 +50,7 @@ export default function BidInterface({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/auctions/${auctionId}/bid`, {
+      const response = await fetch(`${apiUrl}/api/auctions/${auctionId}/bid`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

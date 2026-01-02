@@ -8,6 +8,8 @@ import ScoreBreakdown from '../../components/ScoreBreakdown';
 import BidInterface from '../../components/BidInterface';
 import { useMetaMask } from '../../hooks/useMetaMask';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
 interface AuctionDetail {
   id: string;
   tokenId: number;
@@ -66,7 +68,7 @@ export default function AuctionDetailPage() {
 
   async function fetchAuction() {
     try {
-      const res = await fetch(`/api/auctions/${id}`);
+      const res = await fetch(`${apiUrl}/api/auctions/${id}`);
       const data = await res.json();
 
       if (!data.success) {

@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
 interface Admin {
   id: string;
   email: string;
@@ -43,7 +45,7 @@ export default function AdminSettings() {
   async function checkAuth() {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch('/api/admin/me', {
+      const res = await fetch(`${apiUrl}/api/admin/me`, {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -67,7 +69,7 @@ export default function AdminSettings() {
   async function fetchSettings() {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch('/api/admin/settings', {
+      const res = await fetch(`${apiUrl}/api/admin/settings`, {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -99,7 +101,7 @@ export default function AdminSettings() {
     setActionLoading('password');
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch('/api/admin/change-password', {
+      const res = await fetch(`${apiUrl}/api/admin/change-password`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -139,7 +141,7 @@ export default function AdminSettings() {
     setActionLoading('go-live');
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch('/api/admin/settings/go-live', {
+      const res = await fetch(`${apiUrl}/api/admin/settings/go-live`, {
         method: 'POST',
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -164,7 +166,7 @@ export default function AdminSettings() {
     setActionLoading('coming-soon');
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch('/api/admin/settings/coming-soon', {
+      const res = await fetch(`${apiUrl}/api/admin/settings/coming-soon`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -197,7 +199,7 @@ export default function AdminSettings() {
     setActionLoading('maintenance');
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch('/api/admin/settings/maintenance', {
+      const res = await fetch(`${apiUrl}/api/admin/settings/maintenance`, {
         method: 'POST',
         credentials: 'include',
         headers: {

@@ -6,6 +6,8 @@ import Layout from '../components/Layout';
 import { useCart } from '../hooks/useCart';
 import { useMetaMask } from '../hooks/useMetaMask';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
 export default function Checkout() {
   const router = useRouter();
   const stripe = useStripe();
@@ -33,7 +35,7 @@ export default function Checkout() {
 
     try {
       // Create payment intent
-      const response = await fetch('/api/purchase/checkout', {
+      const response = await fetch(`${apiUrl}/api/purchase/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

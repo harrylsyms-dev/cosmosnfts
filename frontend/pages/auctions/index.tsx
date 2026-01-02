@@ -5,6 +5,8 @@ import Layout from '../../components/Layout';
 import AuctionCard from '../../components/AuctionCard';
 import CountdownTimer from '../../components/CountdownTimer';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
 interface Auction {
   id: string;
   tokenId: number;
@@ -34,8 +36,8 @@ export default function AuctionsPage() {
   async function fetchAuctions() {
     try {
       const [activeRes, historyRes] = await Promise.all([
-        fetch('/api/auctions/active'),
-        fetch('/api/auctions/history'),
+        fetch(`${apiUrl}/api/auctions/active`),
+        fetch(`${apiUrl}/api/auctions/history`),
       ]);
 
       const activeData = await activeRes.json();

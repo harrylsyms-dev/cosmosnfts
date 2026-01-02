@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
 interface PurchaseData {
   transactionId: string;
   status: string;
@@ -46,7 +48,7 @@ export default function Success() {
 
   async function fetchPurchase(purchaseId: string) {
     try {
-      const res = await fetch(`/api/purchase/${purchaseId}`);
+      const res = await fetch(`${apiUrl}/api/purchase/${purchaseId}`);
       if (!res.ok) throw new Error('Purchase not found');
       const data = await res.json();
       setPurchase(data);
