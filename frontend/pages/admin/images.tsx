@@ -262,7 +262,7 @@ export default function AdminImages() {
               <div className="flex items-end">
                 <button
                   type="submit"
-                  disabled={isGenerating || !apiStatus?.configured.leonardo || !apiStatus?.configured.pinata}
+                  disabled={isGenerating || (apiStatus && (!apiStatus.configured.leonardo || !apiStatus.configured.pinata))}
                   className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGenerating ? 'Starting...' : `Generate Phase ${selectedPhase}`}
@@ -270,19 +270,19 @@ export default function AdminImages() {
               </div>
             </form>
 
-            {(!apiStatus?.configured.leonardo || !apiStatus?.configured.pinata) && (
+            {apiStatus && (!apiStatus.configured.leonardo || !apiStatus.configured.pinata) && (
               <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
                 <p className="text-yellow-200 text-sm">
                   <strong>Required Environment Variables (add to Render):</strong>
                 </p>
                 <ul className="text-yellow-200 text-sm mt-2 list-disc list-inside">
-                  <li className={apiStatus?.configured.leonardo ? 'line-through opacity-50' : ''}>
+                  <li className={apiStatus.configured.leonardo ? 'line-through opacity-50' : ''}>
                     LEONARDO_AI_API_KEY - Your Leonardo AI API key
                   </li>
-                  <li className={apiStatus?.configured.pinata ? 'line-through opacity-50' : ''}>
+                  <li className={apiStatus.configured.pinata ? 'line-through opacity-50' : ''}>
                     PINATA_API_KEY - Pinata IPFS API key
                   </li>
-                  <li className={apiStatus?.configured.pinata ? 'line-through opacity-50' : ''}>
+                  <li className={apiStatus.configured.pinata ? 'line-through opacity-50' : ''}>
                     PINATA_API_SECRET - Pinata IPFS secret
                   </li>
                 </ul>
