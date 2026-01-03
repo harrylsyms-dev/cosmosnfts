@@ -260,6 +260,7 @@ router.get('/admin/scheduled', requireAdmin, async (req, res) => {
           ? 'READY'
           : 'SCHEDULED',
         existingAuctionId: existingAuction?.id || null,
+        finalPriceCents: existingAuction?.status === 'FINALIZED' ? existingAuction.currentBidCents : null,
         nft: nft
           ? {
               id: nft.id,

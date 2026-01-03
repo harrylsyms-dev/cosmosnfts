@@ -29,7 +29,7 @@ export default function AdminPhases() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editingPhase, setEditingPhase] = useState<number | null>(null);
-  const [newEndTime, setNewEndTime] = useState('');
+  const [newDuration, setNewDuration] = useState('');
   const [countdown, setCountdown] = useState<string>('');
   const [increasePercent, setIncreasePercent] = useState<string>('7.5');
   const [isEditingPercent, setIsEditingPercent] = useState(false);
@@ -238,9 +238,10 @@ export default function AdminPhases() {
     }
   }
 
-  async function handleUpdateEndTime(phase: number) {
-    if (!newEndTime) {
-      alert('Please select a new end time');
+  async function handleUpdateDuration(phase: number) {
+    const days = parseFloat(newDuration);
+    if (!newDuration || isNaN(days) || days <= 0) {
+      alert('Please enter a valid duration in days');
       return;
     }
 
@@ -248,28 +249,28 @@ export default function AdminPhases() {
 
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/phases/${phase}/end-time`, {
+      const res = await fetch(`${apiUrl}/api/admin/phases/${phase}/duration`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ endTime: new Date(newEndTime).toISOString() }),
+        body: JSON.stringify({ durationDays: days }),
       });
 
       if (res.ok) {
         await fetchPhases();
         setEditingPhase(null);
-        setNewEndTime('');
-        alert('Phase end time updated!');
+        setNewDuration('');
+        alert(`Phase ${phase} duration updated to ${days} days!`);
       } else {
         const data = await res.json();
-        alert(data.error || 'Failed to update phase end time');
+        alert(data.error || 'Failed to update phase duration');
       }
     } catch (error) {
-      console.error('Failed to update end time:', error);
-      alert('Failed to update phase end time');
+      console.error('Failed to update duration:', error);
+      alert('Failed to update phase duration');
     } finally {
       setActionLoading(null);
     }
@@ -498,7 +499,7 @@ export default function AdminPhases() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Sample Price (Score 400)</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">NFTs</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Start Time</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">End Time</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Duration</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Actions</th>
                   </tr>
@@ -545,13 +546,17 @@ export default function AdminPhases() {
                           {editingPhase === phase.phase ? (
                             <div className="flex items-center gap-2">
                               <input
-                                type="datetime-local"
-                                value={newEndTime}
-                                onChange={(e) => setNewEndTime(e.target.value)}
-                                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-sm"
+                                type="number"
+                                step="0.5"
+                                min="0.5"
+                                value={newDuration}
+                                onChange={(e) => setNewDuration(e.target.value)}
+                                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-sm w-20"
+                                placeholder="Days"
                               />
+                              <span className="text-gray-500">days</span>
                               <button
-                                onClick={() => handleUpdateEndTime(phase.phase)}
+                                onClick={() => handleUpdateDuration(phase.phase)}
                                 disabled={!!actionLoading}
                                 className="px-2 py-1 bg-green-600 text-white rounded text-sm"
                               >
@@ -560,7 +565,7 @@ export default function AdminPhases() {
                               <button
                                 onClick={() => {
                                   setEditingPhase(null);
-                                  setNewEndTime('');
+                                  setNewDuration('');
                                 }}
                                 className="px-2 py-1 bg-gray-600 text-white rounded text-sm"
                               >
@@ -568,7 +573,12 @@ export default function AdminPhases() {
                               </button>
                             </div>
                           ) : (
-                            formatDate(endTime.toISOString())
+                            <span>
+                              {(phase.duration / 86400).toFixed(1)} days
+                              <span className="text-gray-600 ml-2">
+                                (ends {formatDate(endTime.toISOString())})
+                              </span>
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -591,11 +601,11 @@ export default function AdminPhases() {
                             <button
                               onClick={() => {
                                 setEditingPhase(phase.phase);
-                                setNewEndTime(endTime.toISOString().slice(0, 16));
+                                setNewDuration((phase.duration / 86400).toString());
                               }}
                               className="text-blue-400 hover:text-blue-300 text-sm"
                             >
-                              Edit End Time
+                              Edit Duration
                             </button>
                           )}
                         </td>

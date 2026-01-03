@@ -9,13 +9,16 @@ interface AdminUser {
   id: string;
   email: string;
   role: string;
+  privileges: string | null;
   lastLoginAt: string | null;
   createdAt: string;
+  isDisabled?: boolean;
 }
 
 interface AuditLogEntry {
   id: string;
   adminId: string;
+  adminEmail: string;
   action: string;
   details: string | null;
   ipAddress: string | null;
@@ -28,17 +31,32 @@ interface SiteSettings {
   maintenanceMode: boolean;
 }
 
+interface ContractInfo {
+  address: string | null;
+  network: string;
+  explorerUrl: string;
+}
+
 export default function AdminSecurity() {
   const router = useRouter();
   const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(null);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+  const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'audit' | 'password'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'contract' | 'admins' | 'audit' | 'password'>('overview');
+
+  // Password form
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // New admin form
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState<'admin' | 'super_admin'>('admin');
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -60,7 +78,12 @@ export default function AdminSecurity() {
       const data = await res.json();
       setCurrentAdmin(data.admin);
 
-      await Promise.all([fetchAuditLogs(), fetchSiteSettings()]);
+      await Promise.all([
+        fetchAuditLogs(),
+        fetchSiteSettings(),
+        fetchAdminUsers(),
+        fetchContractInfo(),
+      ]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
@@ -99,6 +122,52 @@ export default function AdminSecurity() {
       }
     } catch (error) {
       console.error('Failed to fetch site settings:', error);
+    }
+  }
+
+  async function fetchAdminUsers() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/admin-users`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAdminUsers(data.admins || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch admin users:', error);
+    }
+  }
+
+  async function fetchContractInfo() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/contract-info`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setContractInfo(data.contract);
+      } else {
+        // Set defaults if endpoint doesn't exist yet
+        setContractInfo({
+          address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || null,
+          network: 'Polygon Amoy',
+          explorerUrl: 'https://amoy.polygonscan.com',
+        });
+      }
+    } catch (error) {
+      // Set defaults on error
+      setContractInfo({
+        address: null,
+        network: 'Polygon Amoy',
+        explorerUrl: 'https://amoy.polygonscan.com',
+      });
     }
   }
 
@@ -179,11 +248,115 @@ export default function AdminSecurity() {
     }
   }
 
+  async function createAdmin() {
+    if (!newAdminEmail || !newAdminPassword) {
+      alert('Email and password are required');
+      return;
+    }
+
+    if (newAdminPassword.length < 8) {
+      alert('Password must be at least 8 characters');
+      return;
+    }
+
+    setActionLoading('create-admin');
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/admin-users`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          email: newAdminEmail,
+          password: newAdminPassword,
+          role: newAdminRole,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchAdminUsers();
+        setNewAdminEmail('');
+        setNewAdminPassword('');
+        setNewAdminRole('admin');
+        alert('Admin user created successfully');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to create admin');
+      }
+    } catch (error) {
+      console.error('Failed to create admin:', error);
+      alert('Failed to create admin');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function toggleAdminDisabled(adminId: string, currentlyDisabled: boolean) {
+    if (!confirm(currentlyDisabled ? 'Enable this admin?' : 'Disable this admin?')) return;
+
+    setActionLoading(`toggle-${adminId}`);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/admin-users/${adminId}/toggle`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ disabled: !currentlyDisabled }),
+      });
+
+      if (res.ok) {
+        await fetchAdminUsers();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to update admin');
+      }
+    } catch (error) {
+      console.error('Failed to toggle admin:', error);
+      alert('Failed to update admin');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function deleteAdmin(adminId: string) {
+    if (!confirm('Are you sure you want to delete this admin? This cannot be undone.')) return;
+
+    setActionLoading(`delete-${adminId}`);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/admin-users/${adminId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        await fetchAdminUsers();
+        alert('Admin deleted successfully');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete admin');
+      }
+    } catch (error) {
+      console.error('Failed to delete admin:', error);
+      alert('Failed to delete admin');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   function getActionColor(action: string): string {
-    if (action.includes('login')) return 'text-green-400';
-    if (action.includes('delete') || action.includes('ban')) return 'text-red-400';
-    if (action.includes('update') || action.includes('edit')) return 'text-yellow-400';
-    if (action.includes('create') || action.includes('add')) return 'text-blue-400';
+    if (action.includes('LOGIN') || action.includes('login')) return 'text-green-400';
+    if (action.includes('DELETE') || action.includes('BAN') || action.includes('delete') || action.includes('ban')) return 'text-red-400';
+    if (action.includes('UPDATE') || action.includes('EDIT') || action.includes('update') || action.includes('edit')) return 'text-yellow-400';
+    if (action.includes('CREATE') || action.includes('ADD') || action.includes('create') || action.includes('add')) return 'text-blue-400';
+    if (action.includes('PAUSE')) return 'text-orange-400';
     return 'text-gray-400';
   }
 
@@ -194,6 +367,8 @@ export default function AdminSecurity() {
       </div>
     );
   }
+
+  const isSuperAdmin = currentAdmin?.role === 'super_admin';
 
   return (
     <>
@@ -230,7 +405,9 @@ export default function AdminSecurity() {
               </div>
               <div>
                 <div className="text-gray-400 text-sm">Role</div>
-                <div className="text-purple-400 font-semibold">{currentAdmin?.role}</div>
+                <div className="text-purple-400 font-semibold capitalize">
+                  {currentAdmin?.role?.replace('_', ' ')}
+                </div>
               </div>
               <div>
                 <div className="text-gray-400 text-sm">Last Login</div>
@@ -252,7 +429,7 @@ export default function AdminSecurity() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-4 mb-6">
+          <div className="flex flex-wrap gap-2 mb-6">
             <button
               onClick={() => setActiveTab('overview')}
               className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
@@ -263,6 +440,28 @@ export default function AdminSecurity() {
             >
               Overview
             </button>
+            <button
+              onClick={() => setActiveTab('contract')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                activeTab === 'contract'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              Smart Contract
+            </button>
+            {isSuperAdmin && (
+              <button
+                onClick={() => setActiveTab('admins')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  activeTab === 'admins'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                }`}
+              >
+                Admin Users ({adminUsers.length})
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('audit')}
               className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
@@ -398,6 +597,216 @@ export default function AdminSecurity() {
             </div>
           )}
 
+          {/* Smart Contract Tab */}
+          {activeTab === 'contract' && (
+            <div className="space-y-6">
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+                <h3 className="text-lg font-bold text-white mb-6">NFT Contract</h3>
+
+                <div className="space-y-6">
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <div className="text-gray-400 text-sm mb-1">Network</div>
+                    <div className="text-white font-semibold">{contractInfo?.network || 'Polygon Amoy'}</div>
+                  </div>
+
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <div className="text-gray-400 text-sm mb-1">Contract Address</div>
+                    {contractInfo?.address ? (
+                      <div className="flex items-center gap-3">
+                        <code className="text-purple-400 font-mono text-sm break-all">
+                          {contractInfo.address}
+                        </code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(contractInfo.address!);
+                            alert('Address copied to clipboard');
+                          }}
+                          className="text-gray-400 hover:text-white text-sm"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500">Not deployed yet</div>
+                    )}
+                  </div>
+
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <div className="text-gray-400 text-sm mb-2">Contract Status</div>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-3 h-3 rounded-full ${
+                          siteSettings?.contractPaused ? 'bg-red-500' : 'bg-green-500'
+                        }`}
+                      />
+                      <span className={siteSettings?.contractPaused ? 'text-red-400' : 'text-green-400'}>
+                        {siteSettings?.contractPaused ? 'Paused' : 'Active'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      onClick={toggleEmergencyPause}
+                      disabled={!!actionLoading}
+                      className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                        siteSettings?.contractPaused
+                          ? 'bg-green-600 hover:bg-green-700 text-white'
+                          : 'bg-red-600 hover:bg-red-700 text-white'
+                      }`}
+                    >
+                      {actionLoading === 'emergency'
+                        ? 'Processing...'
+                        : siteSettings?.contractPaused
+                        ? 'Unpause Contract'
+                        : 'Pause Contract'}
+                    </button>
+
+                    {contractInfo?.address && (
+                      <a
+                        href={`${contractInfo.explorerUrl}/address/${contractInfo.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+                      >
+                        View on Polygonscan
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Users Tab */}
+          {activeTab === 'admins' && isSuperAdmin && (
+            <div className="space-y-6">
+              {/* Create Admin Form */}
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+                <h3 className="text-lg font-bold text-white mb-4">Create Admin User</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={newAdminEmail}
+                    onChange={(e) => setNewAdminEmail(e.target.value)}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={newAdminPassword}
+                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                  <select
+                    value={newAdminRole}
+                    onChange={(e) => setNewAdminRole(e.target.value as 'admin' | 'super_admin')}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="super_admin">Super Admin</option>
+                  </select>
+                  <button
+                    onClick={createAdmin}
+                    disabled={!!actionLoading}
+                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {actionLoading === 'create-admin' ? 'Creating...' : 'Create Admin'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Admin Users List */}
+              <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+                <div className="p-6 border-b border-gray-800">
+                  <h2 className="text-xl font-bold text-white">Admin Users</h2>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-800">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Role</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Last Login</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Created</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800">
+                      {adminUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                            No admin users found
+                          </td>
+                        </tr>
+                      ) : (
+                        adminUsers.map((admin) => (
+                          <tr key={admin.id} className={admin.isDisabled ? 'opacity-50' : ''}>
+                            <td className="px-4 py-3 text-white">
+                              {admin.email}
+                              {admin.id === currentAdmin?.id && (
+                                <span className="ml-2 text-purple-400 text-xs">(You)</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-purple-400 capitalize">
+                              {admin.role?.replace('_', ' ')}
+                            </td>
+                            <td className="px-4 py-3 text-gray-400 text-sm">
+                              {admin.lastLoginAt
+                                ? new Date(admin.lastLoginAt).toLocaleString()
+                                : 'Never'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-400 text-sm">
+                              {new Date(admin.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`px-2 py-1 rounded text-xs font-semibold ${
+                                  admin.isDisabled
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : 'bg-green-500/20 text-green-400'
+                                }`}
+                              >
+                                {admin.isDisabled ? 'Disabled' : 'Active'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 space-x-2">
+                              {admin.id !== currentAdmin?.id && (
+                                <>
+                                  <button
+                                    onClick={() => toggleAdminDisabled(admin.id, !!admin.isDisabled)}
+                                    disabled={!!actionLoading}
+                                    className={`text-sm ${
+                                      admin.isDisabled
+                                        ? 'text-green-400 hover:text-green-300'
+                                        : 'text-yellow-400 hover:text-yellow-300'
+                                    }`}
+                                  >
+                                    {admin.isDisabled ? 'Enable' : 'Disable'}
+                                  </button>
+                                  <button
+                                    onClick={() => deleteAdmin(admin.id)}
+                                    disabled={!!actionLoading}
+                                    className="text-red-400 hover:text-red-300 text-sm"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Audit Log Tab */}
           {activeTab === 'audit' && (
             <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
@@ -413,6 +822,7 @@ export default function AdminSecurity() {
                   <thead className="bg-gray-800 sticky top-0">
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Time</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Admin</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Action</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Details</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">IP</th>
@@ -421,7 +831,7 @@ export default function AdminSecurity() {
                   <tbody className="divide-y divide-gray-800">
                     {auditLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                        <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                           No audit logs found
                         </td>
                       </tr>
@@ -430,6 +840,9 @@ export default function AdminSecurity() {
                         <tr key={log.id}>
                           <td className="px-4 py-3 text-gray-400 text-sm whitespace-nowrap">
                             {new Date(log.createdAt).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-gray-300 text-sm">
+                            {log.adminEmail}
                           </td>
                           <td className={`px-4 py-3 font-semibold ${getActionColor(log.action)}`}>
                             {log.action}

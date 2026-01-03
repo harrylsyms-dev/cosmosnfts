@@ -76,6 +76,8 @@ router.get('/', async (req: Request, res: Response) => {
       tierIndex: activeTier.phase - 1,
       phaseName: `Phase ${activeTier.phase}`,
       phaseIncreasePercent,
+      isPaused: siteSettings?.phasePaused || false,
+      pausedAt: siteSettings?.pausedAt || null,
       tier: {
         price: (activeTier.price * 1e18).toString(),
         quantityAvailable: activeTier.quantityAvailable,

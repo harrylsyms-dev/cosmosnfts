@@ -8,6 +8,12 @@ interface SiteSettings {
   launchDate: Date | null;
   comingSoonTitle: string | null;
   comingSoonMessage: string | null;
+  // HTML content for pages
+  comingSoonHtml: string | null;
+  comingSoonPassword: string | null;
+  maintenanceHtml: string | null;
+  // Leonardo AI
+  leonardoPrompt: string | null;
   // Phase timer controls
   phasePaused: boolean;
   pausedAt: Date | null;
@@ -53,6 +59,10 @@ class SiteSettingsService {
       launchDate: settings.launchDate,
       comingSoonTitle: settings.comingSoonTitle,
       comingSoonMessage: settings.comingSoonMessage,
+      comingSoonHtml: settings.comingSoonHtml,
+      comingSoonPassword: settings.comingSoonPassword,
+      maintenanceHtml: settings.maintenanceHtml,
+      leonardoPrompt: settings.leonardoPrompt,
       phasePaused: settings.phasePaused,
       pausedAt: settings.pausedAt,
       pauseDurationMs: settings.pauseDurationMs,
@@ -105,6 +115,10 @@ class SiteSettingsService {
       launchDate: settings.launchDate,
       comingSoonTitle: settings.comingSoonTitle,
       comingSoonMessage: settings.comingSoonMessage,
+      comingSoonHtml: settings.comingSoonHtml,
+      comingSoonPassword: settings.comingSoonPassword,
+      maintenanceHtml: settings.maintenanceHtml,
+      leonardoPrompt: settings.leonardoPrompt,
       phasePaused: settings.phasePaused,
       pausedAt: settings.pausedAt,
       pauseDurationMs: settings.pauseDurationMs,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -12,36 +12,44 @@ interface SiteSettings {
   launchDate: string | null;
   comingSoonTitle: string | null;
   comingSoonMessage: string | null;
+  comingSoonHtml: string | null;
+  comingSoonPassword: string | null;
+  maintenanceHtml: string | null;
+  leonardoPrompt: string | null;
   phasePaused: boolean;
+  pausedAt: string | null;
+  contractPaused: boolean;
 }
 
-interface MarketplaceSettings {
-  tradingEnabled: boolean;
-  listingsEnabled: boolean;
-  offersEnabled: boolean;
-  creatorRoyaltyPercent: number;
-}
-
-interface WhitelistEntry {
-  id: string;
-  walletAddress: string;
-  email: string | null;
-  note: string | null;
-  createdAt: string;
+interface SystemStatus {
+  database: 'online' | 'offline' | 'error';
+  stripe: 'online' | 'offline' | 'error';
+  ipfs: 'online' | 'offline' | 'error';
+  blockchain: 'online' | 'offline' | 'error';
 }
 
 export default function AdminSiteManagement() {
   const router = useRouter();
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
-  const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings | null>(null);
-  const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [newWhitelistAddress, setNewWhitelistAddress] = useState('');
-  const [newWhitelistEmail, setNewWhitelistEmail] = useState('');
-  const [newWhitelistNote, setNewWhitelistNote] = useState('');
-  const [broadcastSubject, setBroadcastSubject] = useState('');
-  const [broadcastMessage, setBroadcastMessage] = useState('');
+
+  // Coming Soon editor state
+  const [comingSoonHtml, setComingSoonHtml] = useState('');
+  const [comingSoonPassword, setComingSoonPassword] = useState('');
+  const [comingSoonEditorMode, setComingSoonEditorMode] = useState<'html' | 'preview'>('html');
+
+  // Maintenance editor state
+  const [maintenanceHtml, setMaintenanceHtml] = useState('');
+  const [maintenanceEditorMode, setMaintenanceEditorMode] = useState<'html' | 'preview'>('html');
+
+  // System status
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
+    database: 'online',
+    stripe: 'online',
+    ipfs: 'online',
+    blockchain: 'online',
+  });
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -60,7 +68,7 @@ export default function AdminSiteManagement() {
         return;
       }
 
-      await Promise.all([fetchSiteSettings(), fetchMarketplaceSettings(), fetchWhitelist()]);
+      await Promise.all([fetchSiteSettings(), fetchSystemStatus()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
@@ -79,44 +87,58 @@ export default function AdminSiteManagement() {
       if (res.ok) {
         const data = await res.json();
         setSiteSettings(data.settings);
+        setComingSoonHtml(data.settings.comingSoonHtml || getDefaultComingSoonHtml());
+        setComingSoonPassword(data.settings.comingSoonPassword || '');
+        setMaintenanceHtml(data.settings.maintenanceHtml || getDefaultMaintenanceHtml());
       }
     } catch (error) {
       console.error('Failed to fetch site settings:', error);
     }
   }
 
-  async function fetchMarketplaceSettings() {
+  async function fetchSystemStatus() {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+      const res = await fetch(`${apiUrl}/api/admin/system-status`, {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (res.ok) {
         const data = await res.json();
-        setMarketplaceSettings(data.settings);
+        setSystemStatus(data.status);
       }
     } catch (error) {
-      console.error('Failed to fetch marketplace settings:', error);
+      // Silently fail - status display will show defaults
+      console.error('Failed to fetch system status:', error);
     }
   }
 
-  async function fetchWhitelist() {
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/whitelist`, {
-        credentials: 'include',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+  function getDefaultComingSoonHtml() {
+    return `<div style="text-align: center; padding: 60px 20px; max-width: 600px; margin: 0 auto;">
+  <h1 style="font-size: 48px; color: #8B5CF6; margin-bottom: 20px;">CosmoNFT</h1>
+  <h2 style="font-size: 32px; color: white; margin-bottom: 30px;">Coming Soon</h2>
+  <p style="font-size: 18px; color: #9CA3AF; line-height: 1.6;">
+    Own a piece of the universe. Celestial objects immortalized as NFTs.
+    Scientifically scored. Dynamically priced. 30% supports space exploration.
+  </p>
+  <div style="margin-top: 40px;">
+    <p style="color: #6B7280; font-size: 14px;">Sign up for early access</p>
+  </div>
+</div>`;
+  }
 
-      if (res.ok) {
-        const data = await res.json();
-        setWhitelist(data.addresses || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch whitelist:', error);
-    }
+  function getDefaultMaintenanceHtml() {
+    return `<div style="text-align: center; padding: 60px 20px; max-width: 600px; margin: 0 auto;">
+  <h1 style="font-size: 48px; color: #EF4444; margin-bottom: 20px;">Under Maintenance</h1>
+  <p style="font-size: 18px; color: #9CA3AF; line-height: 1.6;">
+    We're currently performing scheduled maintenance to improve your experience.
+    Please check back soon.
+  </p>
+  <div style="margin-top: 40px;">
+    <p style="color: #6B7280; font-size: 14px;">Expected duration: 1-2 hours</p>
+  </div>
+</div>`;
   }
 
   async function updateSiteMode(mode: 'live' | 'coming_soon' | 'maintenance') {
@@ -161,143 +183,99 @@ export default function AdminSiteManagement() {
     }
   }
 
-  async function toggleMarketplaceSetting(setting: keyof MarketplaceSettings) {
-    setActionLoading(`marketplace-${setting}`);
+  async function saveComingSoonPage() {
+    setActionLoading('save-coming-soon');
     try {
       const token = localStorage.getItem('adminToken');
-      const updates = {
-        [setting]: !marketplaceSettings?.[setting],
-      };
-
-      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+      const res = await fetch(`${apiUrl}/api/admin/site-settings`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify({
+          comingSoonHtml,
+          comingSoonPassword: comingSoonPassword || null,
+        }),
       });
 
       if (res.ok) {
-        await fetchMarketplaceSettings();
+        await fetchSiteSettings();
+        alert('Coming Soon page saved successfully');
       } else {
         const data = await res.json();
-        alert(data.error || 'Failed to update settings');
+        alert(data.error || 'Failed to save');
       }
     } catch (error) {
-      console.error('Failed to update marketplace setting:', error);
-      alert('Failed to update setting');
+      console.error('Failed to save coming soon page:', error);
+      alert('Failed to save');
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function addToWhitelist() {
-    if (!newWhitelistAddress) {
-      alert('Wallet address is required');
-      return;
-    }
-
-    setActionLoading('add-whitelist');
+  async function saveMaintenancePage() {
+    setActionLoading('save-maintenance');
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/whitelist`, {
-        method: 'POST',
+      const res = await fetch(`${apiUrl}/api/admin/site-settings`, {
+        method: 'PUT',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          walletAddress: newWhitelistAddress,
-          email: newWhitelistEmail || null,
-          note: newWhitelistNote || null,
+          maintenanceHtml,
         }),
       });
 
       if (res.ok) {
-        await fetchWhitelist();
-        setNewWhitelistAddress('');
-        setNewWhitelistEmail('');
-        setNewWhitelistNote('');
+        await fetchSiteSettings();
+        alert('Maintenance page saved successfully');
       } else {
         const data = await res.json();
-        alert(data.error || 'Failed to add to whitelist');
+        alert(data.error || 'Failed to save');
       }
     } catch (error) {
-      console.error('Failed to add to whitelist:', error);
-      alert('Failed to add to whitelist');
+      console.error('Failed to save maintenance page:', error);
+      alert('Failed to save');
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function removeFromWhitelist(id: string) {
-    if (!confirm('Remove this address from the whitelist?')) return;
-
-    setActionLoading(`remove-${id}`);
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/whitelist/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (res.ok) {
-        await fetchWhitelist();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to remove from whitelist');
-      }
-    } catch (error) {
-      console.error('Failed to remove from whitelist:', error);
-      alert('Failed to remove from whitelist');
-    } finally {
-      setActionLoading(null);
+  function getStatusColor(status: 'online' | 'offline' | 'error') {
+    switch (status) {
+      case 'online':
+        return 'bg-green-500';
+      case 'offline':
+        return 'bg-gray-500';
+      case 'error':
+        return 'bg-red-500';
     }
   }
 
-  async function sendBroadcast() {
-    if (!broadcastSubject || !broadcastMessage) {
-      alert('Subject and message are required');
-      return;
+  function getStatusText(status: 'online' | 'offline' | 'error') {
+    switch (status) {
+      case 'online':
+        return 'Online';
+      case 'offline':
+        return 'Offline';
+      case 'error':
+        return 'Error';
     }
+  }
 
-    if (!confirm('Send this email to all registered users?')) return;
-
-    setActionLoading('broadcast');
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/broadcast`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          subject: broadcastSubject,
-          message: broadcastMessage,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        alert(`Broadcast sent to ${data.sentCount} users`);
-        setBroadcastSubject('');
-        setBroadcastMessage('');
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to send broadcast');
-      }
-    } catch (error) {
-      console.error('Failed to send broadcast:', error);
-      alert('Failed to send broadcast');
-    } finally {
-      setActionLoading(null);
+  function getCurrentModeDisplay() {
+    if (siteSettings?.maintenanceMode) {
+      return { label: 'Maintenance', color: 'text-red-400', bg: 'bg-red-500/20' };
     }
+    if (siteSettings?.comingSoonMode && !siteSettings?.isLive) {
+      return { label: 'Coming Soon', color: 'text-yellow-400', bg: 'bg-yellow-500/20' };
+    }
+    return { label: 'Live', color: 'text-green-400', bg: 'bg-green-500/20' };
   }
 
   if (isLoading) {
@@ -307,6 +285,8 @@ export default function AdminSiteManagement() {
       </div>
     );
   }
+
+  const currentMode = getCurrentModeDisplay();
 
   return (
     <>
@@ -326,13 +306,77 @@ export default function AdminSiteManagement() {
             </div>
             <nav className="flex gap-4">
               <Link href="/admin/phases" className="text-gray-400 hover:text-white">Phases</Link>
-              <Link href="/admin/sales" className="text-gray-400 hover:text-white">Sales</Link>
+              <Link href="/admin/users" className="text-gray-400 hover:text-white">Users</Link>
               <Link href="/admin/settings" className="text-gray-400 hover:text-white">Settings</Link>
             </nav>
           </div>
         </header>
 
         <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+          {/* System Status */}
+          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white">System Status</h2>
+              <div className={`px-3 py-1 rounded-full ${currentMode.bg}`}>
+                <span className={`font-semibold ${currentMode.color}`}>{currentMode.label}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-2 h-2 rounded-full ${getStatusColor(systemStatus.database)}`}></div>
+                  <span className="text-gray-400 text-sm">Database</span>
+                </div>
+                <span className="text-white font-semibold">{getStatusText(systemStatus.database)}</span>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-2 h-2 rounded-full ${getStatusColor(systemStatus.stripe)}`}></div>
+                  <span className="text-gray-400 text-sm">Stripe</span>
+                </div>
+                <span className="text-white font-semibold">{getStatusText(systemStatus.stripe)}</span>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-2 h-2 rounded-full ${getStatusColor(systemStatus.ipfs)}`}></div>
+                  <span className="text-gray-400 text-sm">IPFS</span>
+                </div>
+                <span className="text-white font-semibold">{getStatusText(systemStatus.ipfs)}</span>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-2 h-2 rounded-full ${getStatusColor(systemStatus.blockchain)}`}></div>
+                  <span className="text-gray-400 text-sm">Blockchain</span>
+                </div>
+                <span className="text-white font-semibold">{getStatusText(systemStatus.blockchain)}</span>
+              </div>
+            </div>
+
+            {/* Phase Status */}
+            {siteSettings && (
+              <div className="mt-4 pt-4 border-t border-gray-700">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">Phase Timer:</span>
+                    <span className={siteSettings.phasePaused ? 'text-yellow-400' : 'text-green-400'}>
+                      {siteSettings.phasePaused ? 'Paused' : 'Running'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">Contract:</span>
+                    <span className={siteSettings.contractPaused ? 'text-red-400' : 'text-green-400'}>
+                      {siteSettings.contractPaused ? 'Paused' : 'Active'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Site Mode Controls */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
             <h2 className="text-xl font-bold text-white mb-4">Site Mode</h2>
@@ -389,176 +433,139 @@ export default function AdminSiteManagement() {
             </div>
           </div>
 
-          {/* Marketplace Controls */}
+          {/* Coming Soon Page Editor */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-            <h2 className="text-xl font-bold text-white mb-4">Marketplace Controls</h2>
-            <p className="text-gray-400 mb-4">Enable/disable marketplace features</p>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                <div>
-                  <div className="text-white font-semibold">Trading</div>
-                  <div className="text-gray-400 text-sm">Allow NFT purchases on marketplace</div>
-                </div>
-                <button
-                  onClick={() => toggleMarketplaceSetting('tradingEnabled')}
-                  disabled={!!actionLoading}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                    marketplaceSettings?.tradingEnabled
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-300'
-                  }`}
-                >
-                  {marketplaceSettings?.tradingEnabled ? 'Enabled' : 'Disabled'}
-                </button>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Coming Soon Page</h2>
+                <p className="text-gray-400 text-sm mt-1">Customize the coming soon page content</p>
               </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                <div>
-                  <div className="text-white font-semibold">Listings</div>
-                  <div className="text-gray-400 text-sm">Allow users to list NFTs for sale</div>
-                </div>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => toggleMarketplaceSetting('listingsEnabled')}
-                  disabled={!!actionLoading}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                    marketplaceSettings?.listingsEnabled
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-300'
+                  onClick={() => setComingSoonEditorMode('html')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                    comingSoonEditorMode === 'html'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  {marketplaceSettings?.listingsEnabled ? 'Enabled' : 'Disabled'}
+                  HTML
                 </button>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                <div>
-                  <div className="text-white font-semibold">Offers</div>
-                  <div className="text-gray-400 text-sm">Allow users to make offers on NFTs</div>
-                </div>
                 <button
-                  onClick={() => toggleMarketplaceSetting('offersEnabled')}
-                  disabled={!!actionLoading}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                    marketplaceSettings?.offersEnabled
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-300'
+                  onClick={() => setComingSoonEditorMode('preview')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                    comingSoonEditorMode === 'preview'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  {marketplaceSettings?.offersEnabled ? 'Enabled' : 'Disabled'}
+                  Preview
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* Whitelist Management */}
-          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-            <h2 className="text-xl font-bold text-white mb-4">Whitelist Management</h2>
-            <p className="text-gray-400 mb-4">Manage early access addresses</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {/* Password Protection */}
+            <div className="mb-4">
+              <label className="block text-gray-300 text-sm mb-2">Password Protection (optional)</label>
               <input
                 type="text"
-                placeholder="Wallet Address (0x...)"
-                value={newWhitelistAddress}
-                onChange={(e) => setNewWhitelistAddress(e.target.value)}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                placeholder="Leave empty to disable password protection"
+                value={comingSoonPassword}
+                onChange={(e) => setComingSoonPassword(e.target.value)}
+                className="w-full md:w-1/2 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
               />
-              <input
-                type="email"
-                placeholder="Email (optional)"
-                value={newWhitelistEmail}
-                onChange={(e) => setNewWhitelistEmail(e.target.value)}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+              <p className="text-gray-500 text-xs mt-1">Users with this password can bypass the coming soon page</p>
+            </div>
+
+            {comingSoonEditorMode === 'html' ? (
+              <textarea
+                value={comingSoonHtml}
+                onChange={(e) => setComingSoonHtml(e.target.value)}
+                rows={15}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm"
+                placeholder="Enter HTML content..."
               />
-              <input
-                type="text"
-                placeholder="Note (optional)"
-                value={newWhitelistNote}
-                onChange={(e) => setNewWhitelistNote(e.target.value)}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
+            ) : (
+              <div className="bg-gray-950 border border-gray-700 rounded-lg p-6 min-h-[400px]">
+                <div dangerouslySetInnerHTML={{ __html: comingSoonHtml }} />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-4">
               <button
-                onClick={addToWhitelist}
-                disabled={!!actionLoading}
-                className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 font-semibold transition-colors disabled:opacity-50"
+                onClick={() => setComingSoonHtml(getDefaultComingSoonHtml())}
+                className="text-gray-400 hover:text-white text-sm"
               >
-                Add to Whitelist
+                Reset to Default
+              </button>
+              <button
+                onClick={saveComingSoonPage}
+                disabled={!!actionLoading}
+                className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-6 py-2 font-semibold transition-colors disabled:opacity-50"
+              >
+                {actionLoading === 'save-coming-soon' ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Address</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Note</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Added</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {whitelist.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                        No addresses whitelisted yet
-                      </td>
-                    </tr>
-                  ) : (
-                    whitelist.map((entry) => (
-                      <tr key={entry.id}>
-                        <td className="px-4 py-3 font-mono text-sm text-white">
-                          {entry.walletAddress.slice(0, 8)}...{entry.walletAddress.slice(-6)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-300">{entry.email || '-'}</td>
-                        <td className="px-4 py-3 text-gray-400">{entry.note || '-'}</td>
-                        <td className="px-4 py-3 text-gray-400 text-sm">
-                          {new Date(entry.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => removeFromWhitelist(entry.id)}
-                            disabled={!!actionLoading}
-                            className="text-red-400 hover:text-red-300 text-sm"
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
           </div>
 
-          {/* Email Broadcast */}
+          {/* Maintenance Page Editor */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-            <h2 className="text-xl font-bold text-white mb-4">Email Broadcast</h2>
-            <p className="text-gray-400 mb-4">Send an email to all registered users</p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Maintenance Page</h2>
+                <p className="text-gray-400 text-sm mt-1">Customize the maintenance page content</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMaintenanceEditorMode('html')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                    maintenanceEditorMode === 'html'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  HTML
+                </button>
+                <button
+                  onClick={() => setMaintenanceEditorMode('preview')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                    maintenanceEditorMode === 'preview'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
 
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Subject"
-                value={broadcastSubject}
-                onChange={(e) => setBroadcastSubject(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
+            {maintenanceEditorMode === 'html' ? (
               <textarea
-                placeholder="Message (supports basic HTML)"
-                value={broadcastMessage}
-                onChange={(e) => setBroadcastMessage(e.target.value)}
-                rows={6}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                value={maintenanceHtml}
+                onChange={(e) => setMaintenanceHtml(e.target.value)}
+                rows={15}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm"
+                placeholder="Enter HTML content..."
               />
+            ) : (
+              <div className="bg-gray-950 border border-gray-700 rounded-lg p-6 min-h-[400px]">
+                <div dangerouslySetInnerHTML={{ __html: maintenanceHtml }} />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-4">
               <button
-                onClick={sendBroadcast}
-                disabled={!!actionLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-3 font-semibold transition-colors disabled:opacity-50"
+                onClick={() => setMaintenanceHtml(getDefaultMaintenanceHtml())}
+                className="text-gray-400 hover:text-white text-sm"
               >
-                {actionLoading === 'broadcast' ? 'Sending...' : 'Send Broadcast'}
+                Reset to Default
+              </button>
+              <button
+                onClick={saveMaintenancePage}
+                disabled={!!actionLoading}
+                className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-6 py-2 font-semibold transition-colors disabled:opacity-50"
+              >
+                {actionLoading === 'save-maintenance' ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

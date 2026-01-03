@@ -285,10 +285,26 @@ model AdminUser {
   lastLoginAt   DateTime? @map("last_login_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
+  privileges    String?   @default("[]") // JSON: section access privileges
 
   sessions      AdminSession[]
+  dashboardPreference AdminDashboardPreference?
 
   @@map("admin_users")
+}
+
+// Admin Dashboard Preferences
+model AdminDashboardPreference {
+  id              String    @id @default(uuid())
+  adminId         String    @unique @map("admin_id")
+  layout          String    @default("[]") @map("layout") // JSON: widget configs
+  starredWidgets  String    @default("[]") @map("starred_widgets") // JSON: starred widget IDs
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  admin           AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_dashboard_preferences")
 }
 
 // Admin Sessions
@@ -318,6 +334,14 @@ model SiteSettings {
   comingSoonTitle String?   @map("coming_soon_title")
   comingSoonMessage String? @map("coming_soon_message")
   previewPassword String?   @map("preview_password")
+
+  // HTML Content for Coming Soon and Maintenance pages
+  comingSoonHtml      String?   @map("coming_soon_html")
+  comingSoonPassword  String?   @map("coming_soon_password")
+  maintenanceHtml     String?   @map("maintenance_html")
+
+  // Leonardo AI global prompt
+  leonardoPrompt      String?   @map("leonardo_prompt")
 
   // Phase timer controls
   phasePaused       Boolean   @default(false) @map("phase_paused")

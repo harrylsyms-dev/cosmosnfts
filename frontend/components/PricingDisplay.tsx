@@ -7,6 +7,8 @@ interface PricingDisplayProps {
     quantityAvailable: number;
     phaseName: string;
     phaseIncreasePercent?: number;
+    isPaused?: boolean;
+    pausedAt?: string | null;
   } | null;
   isLoading: boolean;
 }
@@ -51,11 +53,22 @@ export default function PricingDisplay({ pricing, isLoading }: PricingDisplayPro
 
       {/* Countdown */}
       <div className="mb-6">
-        <div className="text-gray-400 text-sm mb-2">Price increases in:</div>
-        <CountdownTimer
-          targetTime={Date.now() + pricing.timeUntilNextTier * 1000}
-          onComplete={() => window.location.reload()}
-        />
+        {pricing.isPaused ? (
+          <>
+            <div className="text-yellow-400 text-sm mb-2">Phase Timer Paused</div>
+            <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg px-4 py-2 text-yellow-400 text-center">
+              Timer paused - price will not increase until resumed
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-gray-400 text-sm mb-2">Price increases in:</div>
+            <CountdownTimer
+              targetTime={Date.now() + pricing.timeUntilNextTier * 1000}
+              onComplete={() => window.location.reload()}
+            />
+          </>
+        )}
       </div>
 
       {/* Availability */}
