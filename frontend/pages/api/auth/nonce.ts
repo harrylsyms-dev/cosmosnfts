@@ -1,15 +1,20 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import crypto from 'crypto';
+import { applyAuthSecurity, setCorsMethodsHeader, setCorsAllowedHeaders } from '../../../lib/authSecurity';
 
 function generateNonce(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Apply CORS and rate limiting security
+  setCorsMethodsHeader(res, 'POST, OPTIONS');
+  setCorsAllowedHeaders(res, 'Content-Type');
+
+  if (!applyAuthSecurity(req, res)) {
+    return; // Request was handled (rate limited or CORS rejected)
+  }
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();

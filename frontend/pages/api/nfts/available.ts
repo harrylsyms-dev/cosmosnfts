@@ -113,7 +113,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       phaseMultiplier: phaseMultiplier.toFixed(4),
       items: nfts.map((nft: { id: number; name: string; image: string | null; imageIpfsHash: string | null; totalScore: number | null; cosmicScore: number | null; badgeTier: string | null; objectType: string | null; constellation: string | null; distance: string | null; status: string }) => {
         const score = nft.totalScore || nft.cosmicScore || 0;
-        const price = 0.10 * score * phaseMultiplier;
+        // Calculate price in cents then convert to dollars to avoid floating point issues
+        const priceInCents = Math.round(10 * score * phaseMultiplier);
+        const price = priceInCents / 100;
         return {
           id: nft.id,
           name: nft.name,
@@ -123,7 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           badge: nft.badgeTier || getBadgeForScore(score),
           currentPrice: price,
           displayPrice: `$${price.toFixed(2)}`,
-          priceFormula: `$0.10 × ${score} × ${phaseMultiplier.toFixed(4)}`,
+          priceFormula: currentPhase === 1 ? `$0.10 × ${score}` : `$0.10 × ${score} × ${phaseMultiplier.toFixed(4)}`,
           objectType: nft.objectType,
           constellation: nft.constellation,
           distance: nft.distance,

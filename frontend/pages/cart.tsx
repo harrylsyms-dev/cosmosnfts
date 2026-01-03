@@ -120,7 +120,7 @@ export default function Cart() {
               <div className="flex justify-between items-center mb-4 text-sm">
                 <span className="text-gray-400">Processing fee (2.9% + $0.30)</span>
                 <span className="text-gray-300">
-                  ${(cart.totalPrice * 0.029 + 0.30).toFixed(2)}
+                  ${(Math.round((cart.totalPrice * 0.029 + 0.30) * 100) / 100).toFixed(2)}
                 </span>
               </div>
 
@@ -128,7 +128,7 @@ export default function Cart() {
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-semibold">Total</span>
                   <span className="text-2xl font-bold text-green-400">
-                    ${(cart.totalPrice * 1.029 + 0.30).toFixed(2)}
+                    ${(Math.round((cart.totalPrice + cart.totalPrice * 0.029 + 0.30) * 100) / 100).toFixed(2)}
                   </span>
                 </div>
               </div>

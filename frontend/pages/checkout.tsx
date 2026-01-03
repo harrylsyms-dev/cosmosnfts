@@ -89,8 +89,12 @@ export default function Checkout() {
   }
 
   const subtotal = cart.totalPrice;
-  const processingFee = subtotal * 0.029 + 0.30;
-  const total = subtotal + processingFee;
+  // Calculate in cents to avoid floating point issues
+  const subtotalCents = Math.round(subtotal * 100);
+  const processingFeeCents = Math.round(subtotalCents * 0.029 + 30);
+  const totalCents = subtotalCents + processingFeeCents;
+  const processingFee = processingFeeCents / 100;
+  const total = totalCents / 100;
 
   return (
     <Layout>

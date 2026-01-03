@@ -53,8 +53,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Calculate total (in cents for Stripe)
-    const totalDollars = nfts.reduce((sum: number, nft: { currentPrice: number }) => sum + nft.currentPrice, 0);
-    const totalCents = Math.round(totalDollars * 100);
+    // Sum up individual NFT prices (already calculated with proper rounding)
+    const subtotalDollars = nfts.reduce((sum: number, nft: { currentPrice: number }) => sum + nft.currentPrice, 0);
+    const subtotalCents = Math.round(subtotalDollars * 100);
+
+    // Add processing fee (2.9% + $0.30) to match what's shown on cart/checkout pages
+    const processingFeeCents = Math.round(subtotalCents * 0.029 + 30);
+    const totalCents = subtotalCents + processingFeeCents;
 
     // Create purchase record
     const purchaseId = uuidv4();

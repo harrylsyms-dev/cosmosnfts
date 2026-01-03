@@ -75,8 +75,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
 
     // Calculate price: $0.10 × Score × Phase Multiplier
+    // Use cents to avoid floating point issues, then convert to dollars
     const score = nft.totalScore || nft.cosmicScore || 0;
-    const calculatedPrice = 0.10 * score * phaseMultiplier;
+    const priceInCents = Math.round(10 * score * phaseMultiplier);
+    const calculatedPrice = priceInCents / 100;
 
     // Add to cart and reserve NFT
     await prisma.$transaction([

@@ -9,6 +9,7 @@ interface NFTCardProps {
     badge: string;
     displayPrice: string;
     currentPrice: number;
+    priceFormula?: string;
   };
   onAddToCart?: () => void;
 }
@@ -81,7 +82,7 @@ export default function NFTCard({ nft, onAddToCart }: NFTCardProps) {
           <div>
             <div className="text-xl font-bold text-white">{nft.displayPrice}</div>
             <div className="text-blue-400 text-xs font-mono">
-              $0.10 × {nft.score}
+              {nft.priceFormula || `$0.10 × ${nft.score}`}
             </div>
           </div>
 

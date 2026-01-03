@@ -31,6 +31,55 @@ interface PromptPreview {
   hasImage: boolean;
 }
 
+interface ObjectTypeConfig {
+  description: string;
+  visualFeatures: string;
+  customPrompt?: string;
+}
+
+interface ImagePromptConfig {
+  id: string;
+  basePromptTemplate: string | null;
+  artStyle: string;
+  colorPalette: string;
+  lightingStyle: string;
+  compositionStyle: string;
+  qualityDescriptors: string;
+  mediumDescriptors: string;
+  realismLevel: number;
+  usePhotorealistic: boolean;
+  useScientificAccuracy: boolean;
+  avoidArtisticStylization: boolean;
+  leonardoModelId: string;
+  imageWidth: number;
+  imageHeight: number;
+  promptMagic: boolean;
+  guidanceScale: number;
+  negativePrompt: string;
+  objectTypeConfigs: Record<string, ObjectTypeConfig>;
+  premiumThreshold: number;
+  eliteThreshold: number;
+  legendaryThreshold: number;
+  premiumModifier: string;
+  eliteModifier: string;
+  legendaryModifier: string;
+  includeScoreInPrompt: boolean;
+  includeMetadataInPrompt: boolean;
+  useDescriptionTransform: boolean;
+}
+
+interface LeonardoModel {
+  id: string;
+  name: string;
+  description: string;
+}
+
+const OBJECT_TYPES = [
+  'Star', 'Galaxy', 'Nebula', 'Black Hole', 'Planet', 'Moon', 'Exoplanet',
+  'Pulsar', 'Quasar', 'Supernova', 'Supernova Remnant', 'Asteroid', 'Comet',
+  'Star Cluster', 'Dwarf Planet', 'Magnetar'
+];
+
 export default function AdminImages() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -40,13 +89,18 @@ export default function AdminImages() {
   const [selectedPhase, setSelectedPhase] = useState('1');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [verifyResult, setVerifyResult] = useState<{ verified: number; failed: number[] } | null>(null);
-  const [globalPrompt, setGlobalPrompt] = useState('');
-  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
-  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   const [promptPreviews, setPromptPreviews] = useState<PromptPreview[]>([]);
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
   const [showPreviews, setShowPreviews] = useState(false);
   const [selectedPreview, setSelectedPreview] = useState<PromptPreview | null>(null);
+
+  // Advanced Prompt Editor State
+  const [showAdvancedEditor, setShowAdvancedEditor] = useState(false);
+  const [promptConfig, setPromptConfig] = useState<ImagePromptConfig | null>(null);
+  const [availableModels, setAvailableModels] = useState<LeonardoModel[]>([]);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [activeTab, setActiveTab] = useState<'template' | 'style' | 'realism' | 'leonardo' | 'objects' | 'modifiers'>('template');
+  const [selectedObjectType, setSelectedObjectType] = useState<string>('Star');
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -65,12 +119,78 @@ export default function AdminImages() {
         return;
       }
 
-      await Promise.all([fetchStats(), fetchApiStatus()]);
+      await Promise.all([fetchStats(), fetchApiStatus(), fetchPromptConfig()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function fetchPromptConfig() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/image-prompt-config`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPromptConfig(data.config);
+        setAvailableModels(data.availableModels || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch prompt config:', error);
+    }
+  }
+
+  async function savePromptConfig() {
+    if (!promptConfig) return;
+
+    setIsSavingConfig(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/image-prompt-config`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(promptConfig),
+      });
+
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'Prompt configuration saved successfully!' });
+        // Refresh previews if visible
+        if (showPreviews) {
+          fetchPromptPreviews();
+        }
+      } else {
+        const data = await res.json();
+        setMessage({ type: 'error', text: data.error || 'Failed to save configuration' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save configuration' });
+    } finally {
+      setIsSavingConfig(false);
+    }
+  }
+
+  function updateConfig<K extends keyof ImagePromptConfig>(key: K, value: ImagePromptConfig[K]) {
+    setPromptConfig(prev => prev ? { ...prev, [key]: value } : null);
+  }
+
+  function updateObjectTypeConfig(objectType: string, field: keyof ObjectTypeConfig, value: string) {
+    if (!promptConfig) return;
+    const newConfigs = {
+      ...promptConfig.objectTypeConfigs,
+      [objectType]: {
+        ...promptConfig.objectTypeConfigs[objectType],
+        [field]: value
+      }
+    };
+    updateConfig('objectTypeConfigs', newConfigs);
   }
 
   async function fetchApiStatus() {
@@ -83,57 +203,19 @@ export default function AdminImages() {
       if (res.ok) {
         const data = await res.json();
         setApiStatus(data);
-        setGlobalPrompt(data.globalPrompt || '');
       }
     } catch (error) {
       console.error('Failed to fetch API status:', error);
     }
   }
 
-  async function handleSavePrompt() {
-    setIsSavingPrompt(true);
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/site-settings`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ leonardoPrompt: globalPrompt }),
-      });
-
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'Global prompt saved successfully. Click "Preview Prompts" to see updated previews.' });
-        setIsEditingPrompt(false);
-        // Refresh previews if they were open
-        if (showPreviews) {
-          fetchPromptPreviews();
-        }
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.error || 'Failed to save prompt' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to save prompt' });
-    } finally {
-      setIsSavingPrompt(false);
-    }
-  }
-
-  async function fetchPromptPreviews(testPrompt?: string) {
+  async function fetchPromptPreviews() {
     setIsLoadingPreviews(true);
     try {
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${apiUrl}/api/admin/nfts/preview-prompts`, {
-        method: testPrompt ? 'POST' : 'GET',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        ...(testPrompt ? { body: JSON.stringify({ testPrompt, limit: 20 }) } : {}),
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (res.ok) {
@@ -147,15 +229,6 @@ export default function AdminImages() {
       setMessage({ type: 'error', text: 'Failed to fetch prompt previews' });
     } finally {
       setIsLoadingPreviews(false);
-    }
-  }
-
-  function handlePreviewWithCurrentEdit() {
-    // Preview prompts using the current edit (before saving)
-    if (isEditingPrompt && globalPrompt) {
-      fetchPromptPreviews(globalPrompt);
-    } else {
-      fetchPromptPreviews();
     }
   }
 
@@ -215,7 +288,6 @@ export default function AdminImages() {
   async function handleVerify() {
     try {
       const token = localStorage.getItem('adminToken');
-      // Verify first 100 NFTs as a sample
       const tokenIds = Array.from({ length: 100 }, (_, i) => i + 1);
 
       const res = await fetch(`${apiUrl}/api/images/verify`, {
@@ -264,7 +336,7 @@ export default function AdminImages() {
           </div>
         </header>
 
-        <main className="max-w-4xl mx-auto px-4 py-8">
+        <main className="max-w-6xl mx-auto px-4 py-8">
           {message && (
             <div className={`mb-6 p-4 rounded ${
               message.type === 'success'
@@ -317,106 +389,524 @@ export default function AdminImages() {
                   </span>
                 </div>
               </div>
-              {(!apiStatus.configured.leonardo || !apiStatus.configured.pinata) && (
-                <p className="text-yellow-400 text-sm mt-2">
-                  Add the missing API keys in Settings &gt; API Keys to enable image generation.
-                </p>
-              )}
             </div>
           )}
 
-          {/* Global Prompt */}
-          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
-            <div className="flex items-center justify-between mb-4">
+          {/* Advanced Prompt Editor Toggle */}
+          <div className="bg-gray-900 rounded-lg border border-gray-800 mb-8">
+            <button
+              onClick={() => setShowAdvancedEditor(!showAdvancedEditor)}
+              className="w-full p-6 flex items-center justify-between text-left"
+            >
               <div>
-                <h2 className="text-xl font-bold">Global Image Prompt</h2>
+                <h2 className="text-xl font-bold text-white">Advanced Prompt Editor</h2>
                 <p className="text-gray-400 text-sm mt-1">
-                  This prompt is used as the base for all AI-generated NFT images
+                  Full control over every aspect of image generation prompts
                 </p>
               </div>
-              {!isEditingPrompt ? (
-                <button
-                  onClick={() => setIsEditingPrompt(true)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
-                >
-                  Edit Prompt
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setIsEditingPrompt(false);
-                      setGlobalPrompt(apiStatus?.globalPrompt || '');
-                    }}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
-                    disabled={isSavingPrompt}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSavePrompt}
-                    disabled={isSavingPrompt}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm disabled:opacity-50"
-                  >
-                    {isSavingPrompt ? 'Saving...' : 'Save Prompt'}
-                  </button>
+              <span className="text-2xl text-gray-400">{showAdvancedEditor ? '−' : '+'}</span>
+            </button>
+
+            {showAdvancedEditor && promptConfig && (
+              <div className="border-t border-gray-800">
+                {/* Tab Navigation */}
+                <div className="flex overflow-x-auto border-b border-gray-800">
+                  {[
+                    { id: 'template', label: 'Base Template' },
+                    { id: 'style', label: 'Style & Colors' },
+                    { id: 'realism', label: 'Realism' },
+                    { id: 'leonardo', label: 'Leonardo AI' },
+                    { id: 'objects', label: 'Object Types' },
+                    { id: 'modifiers', label: 'Score Modifiers' },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                        activeTab === tab.id
+                          ? 'text-blue-400 border-b-2 border-blue-400'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
 
-            {isEditingPrompt ? (
-              <textarea
-                value={globalPrompt}
-                onChange={(e) => setGlobalPrompt(e.target.value)}
-                rows={6}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm"
-                placeholder="Enter the global prompt for AI image generation. Use variables: {name}, {description}, {objectType}, {features}, {score}, {badge}"
-              />
-            ) : (
-              <div className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3">
-                {globalPrompt ? (
-                  <p className="text-gray-300 whitespace-pre-wrap font-mono text-sm">{globalPrompt}</p>
-                ) : (
-                  <p className="text-gray-500 italic">No global prompt configured. Using default template. Click &quot;Edit Prompt&quot; to customize.</p>
-                )}
-              </div>
-            )}
+                <div className="p-6">
+                  {/* Base Template Tab */}
+                  {activeTab === 'template' && (
+                    <div className="space-y-6">
+                      <div>
+                        <label className="block text-white font-medium mb-2">Base Prompt Template</label>
+                        <p className="text-gray-400 text-sm mb-3">
+                          The main template used for all image generation. Use placeholders like {'{name}'}, {'{objectType}'}, etc.
+                        </p>
+                        <textarea
+                          value={promptConfig.basePromptTemplate || ''}
+                          onChange={(e) => updateConfig('basePromptTemplate', e.target.value)}
+                          rows={10}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm"
+                          placeholder="Photorealistic astrophotography of {name}, a {objectType}..."
+                        />
+                      </div>
 
-            {/* Preview Prompts Button */}
-            <div className="mt-4 flex items-center gap-4">
-              <button
-                onClick={handlePreviewWithCurrentEdit}
-                disabled={isLoadingPreviews}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm disabled:opacity-50"
-              >
-                {isLoadingPreviews ? 'Loading...' : 'Preview Prompts'}
-              </button>
-              {isEditingPrompt && (
-                <span className="text-yellow-400 text-sm">
-                  Preview will use your unsaved changes
-                </span>
-              )}
-              {showPreviews && (
-                <button
-                  onClick={() => setShowPreviews(false)}
-                  className="text-gray-400 hover:text-white text-sm"
-                >
-                  Hide Previews
-                </button>
-              )}
-            </div>
+                      <div className="bg-gray-800 rounded-lg p-4">
+                        <p className="text-gray-400 text-sm font-semibold mb-3">Available Placeholders:</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                          {[
+                            ['{name}', 'NFT name'],
+                            ['{objectType}', 'Object type'],
+                            ['{description}', 'NFT description'],
+                            ['{features}', 'Visual features'],
+                            ['{score}', 'Cosmic score'],
+                            ['{badge}', 'Badge tier'],
+                            ['{artStyle}', 'Art style setting'],
+                            ['{colorPalette}', 'Color palette'],
+                            ['{lightingStyle}', 'Lighting style'],
+                            ['{qualityDescriptors}', 'Quality text'],
+                            ['{mediumDescriptors}', 'Medium text'],
+                            ['{scoreModifier}', 'Score-based text'],
+                            ['{negativePrompt}', 'Negative prompt'],
+                          ].map(([key, desc]) => (
+                            <div key={key} className="flex items-start gap-2">
+                              <code className="text-blue-400 bg-gray-900 px-2 py-0.5 rounded">{key}</code>
+                              <span className="text-gray-500 text-xs">{desc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
 
-            {/* Prompt Variables Help */}
-            {isEditingPrompt && (
-              <div className="mt-4 p-3 bg-gray-800 border border-gray-700 rounded-lg">
-                <p className="text-gray-400 text-xs font-semibold mb-2">Available Variables:</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                  <code className="text-blue-400">{'{name}'}</code>
-                  <code className="text-blue-400">{'{description}'}</code>
-                  <code className="text-blue-400">{'{objectType}'}</code>
-                  <code className="text-blue-400">{'{features}'}</code>
-                  <code className="text-blue-400">{'{score}'}</code>
-                  <code className="text-blue-400">{'{badge}'}</code>
+                      <div>
+                        <label className="block text-white font-medium mb-2">Negative Prompt</label>
+                        <p className="text-gray-400 text-sm mb-3">
+                          What to exclude from generated images
+                        </p>
+                        <textarea
+                          value={promptConfig.negativePrompt}
+                          onChange={(e) => updateConfig('negativePrompt', e.target.value)}
+                          rows={3}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm"
+                          placeholder="cartoon, anime, illustration, text, watermarks..."
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Style & Colors Tab */}
+                  {activeTab === 'style' && (
+                    <div className="space-y-6">
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-white font-medium mb-2">Art Style</label>
+                          <input
+                            type="text"
+                            value={promptConfig.artStyle}
+                            onChange={(e) => updateConfig('artStyle', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="photorealistic astrophotography"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white font-medium mb-2">Color Palette</label>
+                          <input
+                            type="text"
+                            value={promptConfig.colorPalette}
+                            onChange={(e) => updateConfig('colorPalette', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="Natural space colors, deep blacks..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white font-medium mb-2">Lighting Style</label>
+                          <input
+                            type="text"
+                            value={promptConfig.lightingStyle}
+                            onChange={(e) => updateConfig('lightingStyle', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="Natural starlight, subtle glow..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white font-medium mb-2">Composition Style</label>
+                          <input
+                            type="text"
+                            value={promptConfig.compositionStyle}
+                            onChange={(e) => updateConfig('compositionStyle', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="Scientific, documentary-style"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white font-medium mb-2">Quality Descriptors</label>
+                          <input
+                            type="text"
+                            value={promptConfig.qualityDescriptors}
+                            onChange={(e) => updateConfig('qualityDescriptors', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="8K, ultra high definition, NASA-quality"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white font-medium mb-2">Medium Descriptors</label>
+                          <input
+                            type="text"
+                            value={promptConfig.mediumDescriptors}
+                            onChange={(e) => updateConfig('mediumDescriptors', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="Telescope photography, Hubble-style"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4">
+                        <p className="text-blue-300 text-sm">
+                          <strong>Tip for realistic images:</strong> Use terms like &quot;photorealistic&quot;, &quot;NASA imagery&quot;,
+                          &quot;Hubble telescope&quot;, &quot;scientific photograph&quot;, &quot;actual space photo&quot; in your style descriptors.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Realism Tab */}
+                  {activeTab === 'realism' && (
+                    <div className="space-y-6">
+                      <div>
+                        <label className="block text-white font-medium mb-2">
+                          Realism Level: {promptConfig.realismLevel}%
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={promptConfig.realismLevel}
+                          onChange={(e) => updateConfig('realismLevel', parseInt(e.target.value))}
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>Artistic</span>
+                          <span>Balanced</span>
+                          <span>Photorealistic</span>
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <label className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={promptConfig.usePhotorealistic}
+                            onChange={(e) => updateConfig('usePhotorealistic', e.target.checked)}
+                            className="w-5 h-5 rounded bg-gray-700 border-gray-600"
+                          />
+                          <div>
+                            <p className="text-white font-medium">Photorealistic Mode</p>
+                            <p className="text-gray-400 text-xs">Adds &quot;photorealistic&quot; to prompts</p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={promptConfig.useScientificAccuracy}
+                            onChange={(e) => updateConfig('useScientificAccuracy', e.target.checked)}
+                            className="w-5 h-5 rounded bg-gray-700 border-gray-600"
+                          />
+                          <div>
+                            <p className="text-white font-medium">Scientific Accuracy</p>
+                            <p className="text-gray-400 text-xs">Prioritize accurate depiction</p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={promptConfig.avoidArtisticStylization}
+                            onChange={(e) => updateConfig('avoidArtisticStylization', e.target.checked)}
+                            className="w-5 h-5 rounded bg-gray-700 border-gray-600"
+                          />
+                          <div>
+                            <p className="text-white font-medium">Avoid Stylization</p>
+                            <p className="text-gray-400 text-xs">No artistic filters</p>
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <label className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={promptConfig.includeScoreInPrompt}
+                            onChange={(e) => updateConfig('includeScoreInPrompt', e.target.checked)}
+                            className="w-5 h-5 rounded bg-gray-700 border-gray-600"
+                          />
+                          <div>
+                            <p className="text-white font-medium">Include Score in Prompt</p>
+                            <p className="text-gray-400 text-xs">Add numeric score to prompt</p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={promptConfig.useDescriptionTransform}
+                            onChange={(e) => updateConfig('useDescriptionTransform', e.target.checked)}
+                            className="w-5 h-5 rounded bg-gray-700 border-gray-600"
+                          />
+                          <div>
+                            <p className="text-white font-medium">Poetic Description Transform</p>
+                            <p className="text-gray-400 text-xs">Convert to artistic language</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Leonardo AI Tab */}
+                  {activeTab === 'leonardo' && (
+                    <div className="space-y-6">
+                      <div>
+                        <label className="block text-white font-medium mb-2">Leonardo Model</label>
+                        <select
+                          value={promptConfig.leonardoModelId}
+                          onChange={(e) => updateConfig('leonardoModelId', e.target.value)}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                        >
+                          {availableModels.map(model => (
+                            <option key={model.id} value={model.id}>
+                              {model.name} - {model.description}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-gray-400 text-sm mt-2">
+                          For realistic images, try &quot;Leonardo PhotoReal&quot; or &quot;Leonardo Diffusion XL&quot;
+                        </p>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-white font-medium mb-2">Image Width</label>
+                          <select
+                            value={promptConfig.imageWidth}
+                            onChange={(e) => updateConfig('imageWidth', parseInt(e.target.value))}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                          >
+                            <option value="512">512px</option>
+                            <option value="768">768px</option>
+                            <option value="1024">1024px</option>
+                            <option value="1536">1536px</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-white font-medium mb-2">Image Height</label>
+                          <select
+                            value={promptConfig.imageHeight}
+                            onChange={(e) => updateConfig('imageHeight', parseInt(e.target.value))}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                          >
+                            <option value="512">512px</option>
+                            <option value="768">768px</option>
+                            <option value="1024">1024px</option>
+                            <option value="1536">1536px</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-white font-medium mb-2">
+                          Guidance Scale: {promptConfig.guidanceScale}
+                        </label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="20"
+                          step="0.5"
+                          value={promptConfig.guidanceScale}
+                          onChange={(e) => updateConfig('guidanceScale', parseFloat(e.target.value))}
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>Creative (1)</span>
+                          <span>Balanced (7)</span>
+                          <span>Strict (20)</span>
+                        </div>
+                        <p className="text-gray-400 text-sm mt-2">
+                          Higher values follow the prompt more strictly. Lower values allow more creativity.
+                        </p>
+                      </div>
+
+                      <label className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={promptConfig.promptMagic}
+                          onChange={(e) => updateConfig('promptMagic', e.target.checked)}
+                          className="w-5 h-5 rounded bg-gray-700 border-gray-600"
+                        />
+                        <div>
+                          <p className="text-white font-medium">Prompt Magic</p>
+                          <p className="text-gray-400 text-xs">
+                            Leonardo&apos;s automatic prompt enhancement. Disable for more control over exact prompts.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Object Types Tab */}
+                  {activeTab === 'objects' && (
+                    <div className="space-y-6">
+                      <p className="text-gray-400">
+                        Configure visual descriptions for each celestial object type. These are used as the {'{features}'} placeholder.
+                      </p>
+
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {OBJECT_TYPES.map(type => (
+                          <button
+                            key={type}
+                            onClick={() => setSelectedObjectType(type)}
+                            className={`px-3 py-1.5 rounded-lg text-sm ${
+                              selectedObjectType === type
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-800 text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+
+                      {promptConfig.objectTypeConfigs[selectedObjectType] && (
+                        <div className="space-y-4 p-4 bg-gray-800 rounded-lg">
+                          <h3 className="text-lg font-bold text-white">{selectedObjectType}</h3>
+
+                          <div>
+                            <label className="block text-gray-400 text-sm mb-2">Description</label>
+                            <textarea
+                              value={promptConfig.objectTypeConfigs[selectedObjectType]?.description || ''}
+                              onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'description', e.target.value)}
+                              rows={2}
+                              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                              placeholder="A brief description of this object type..."
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-gray-400 text-sm mb-2">Visual Features</label>
+                            <textarea
+                              value={promptConfig.objectTypeConfigs[selectedObjectType]?.visualFeatures || ''}
+                              onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'visualFeatures', e.target.value)}
+                              rows={3}
+                              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                              placeholder="Visual characteristics to include in prompts..."
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-gray-400 text-sm mb-2">Custom Prompt Override (Optional)</label>
+                            <textarea
+                              value={promptConfig.objectTypeConfigs[selectedObjectType]?.customPrompt || ''}
+                              onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'customPrompt', e.target.value)}
+                              rows={4}
+                              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                              placeholder="Leave empty to use base template. Enter a complete prompt to override for this type only..."
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Score Modifiers Tab */}
+                  {activeTab === 'modifiers' && (
+                    <div className="space-y-6">
+                      <p className="text-gray-400">
+                        Add special text to prompts based on the NFT&apos;s cosmic score. Higher scores get enhanced descriptions.
+                      </p>
+
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div className="p-4 bg-gray-800 rounded-lg">
+                          <label className="block text-gray-400 text-sm mb-2">Premium Threshold</label>
+                          <input
+                            type="number"
+                            value={promptConfig.premiumThreshold}
+                            onChange={(e) => updateConfig('premiumThreshold', parseInt(e.target.value))}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                          />
+                          <p className="text-gray-500 text-xs mt-1">Score &gt; this = Premium</p>
+                        </div>
+                        <div className="p-4 bg-gray-800 rounded-lg">
+                          <label className="block text-gray-400 text-sm mb-2">Elite Threshold</label>
+                          <input
+                            type="number"
+                            value={promptConfig.eliteThreshold}
+                            onChange={(e) => updateConfig('eliteThreshold', parseInt(e.target.value))}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                          />
+                          <p className="text-gray-500 text-xs mt-1">Score &gt; this = Elite</p>
+                        </div>
+                        <div className="p-4 bg-gray-800 rounded-lg">
+                          <label className="block text-gray-400 text-sm mb-2">Legendary Threshold</label>
+                          <input
+                            type="number"
+                            value={promptConfig.legendaryThreshold}
+                            onChange={(e) => updateConfig('legendaryThreshold', parseInt(e.target.value))}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                          />
+                          <p className="text-gray-500 text-xs mt-1">Score &gt; this = Legendary</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-white font-medium mb-2">Premium Modifier Text</label>
+                          <input
+                            type="text"
+                            value={promptConfig.premiumModifier}
+                            onChange={(e) => updateConfig('premiumModifier', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="Exceptional detail and clarity"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white font-medium mb-2">Elite Modifier Text</label>
+                          <input
+                            type="text"
+                            value={promptConfig.eliteModifier}
+                            onChange={(e) => updateConfig('eliteModifier', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="Museum-quality, breathtaking composition"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white font-medium mb-2">Legendary Modifier Text</label>
+                          <input
+                            type="text"
+                            value={promptConfig.legendaryModifier}
+                            onChange={(e) => updateConfig('legendaryModifier', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                            placeholder="Once-in-a-lifetime capture, iconic imagery"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Save Button */}
+                  <div className="mt-8 pt-6 border-t border-gray-800 flex items-center justify-between">
+                    <button
+                      onClick={fetchPromptPreviews}
+                      disabled={isLoadingPreviews}
+                      className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg disabled:opacity-50"
+                    >
+                      {isLoadingPreviews ? 'Loading...' : 'Preview Prompts'}
+                    </button>
+                    <button
+                      onClick={savePromptConfig}
+                      disabled={isSavingConfig}
+                      className="px-8 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg disabled:opacity-50"
+                    >
+                      {isSavingConfig ? 'Saving...' : 'Save Configuration'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -433,11 +923,10 @@ export default function AdminImages() {
                   </p>
                 </div>
                 <button
-                  onClick={() => fetchPromptPreviews(isEditingPrompt ? globalPrompt : undefined)}
-                  disabled={isLoadingPreviews}
-                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm"
+                  onClick={() => setShowPreviews(false)}
+                  className="text-gray-400 hover:text-white"
                 >
-                  Refresh
+                  Hide
                 </button>
               </div>
 
@@ -459,29 +948,14 @@ export default function AdminImages() {
                         <span className="px-2 py-0.5 bg-purple-900/50 text-purple-300 text-xs rounded">
                           {preview.objectType}
                         </span>
-                        <span className={`px-2 py-0.5 text-xs rounded ${
-                          preview.badgeTier === 'LEGENDARY' ? 'bg-yellow-900/50 text-yellow-300' :
-                          preview.badgeTier === 'ELITE' ? 'bg-blue-900/50 text-blue-300' :
-                          'bg-gray-700 text-gray-300'
-                        }`}>
-                          {preview.badgeTier}
-                        </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {preview.hasImage ? (
-                          <span className="text-green-400 text-xs">Has Image</span>
-                        ) : (
-                          <span className="text-yellow-400 text-xs">No Image</span>
-                        )}
-                        <span className="text-gray-500 text-sm">
-                          {selectedPreview?.id === preview.id ? '▼' : '▶'}
-                        </span>
-                      </div>
+                      <span className="text-gray-500 text-sm">
+                        {selectedPreview?.id === preview.id ? '▼' : '▶'}
+                      </span>
                     </div>
 
                     {selectedPreview?.id === preview.id && (
                       <div className="mt-3 pt-3 border-t border-gray-700">
-                        <p className="text-gray-400 text-xs mb-2">Generated Prompt:</p>
                         <pre className="text-gray-300 text-xs whitespace-pre-wrap font-mono bg-gray-900 p-3 rounded max-h-48 overflow-y-auto">
                           {preview.prompt}
                         </pre>
@@ -495,9 +969,9 @@ export default function AdminImages() {
 
           {/* Generate Form */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
-            <h2 className="text-xl font-bold mb-4">Generate Images with Leonardo AI</h2>
+            <h2 className="text-xl font-bold mb-4">Generate Images</h2>
             <p className="text-gray-400 mb-4">
-              Generate AI images for NFTs by phase. Images are uploaded to Pinata IPFS automatically.
+              Generate AI images for NFTs by phase. Images are uploaded to Pinata IPFS.
             </p>
 
             <form onSubmit={handleGeneratePhase} className="grid md:grid-cols-2 gap-4">
@@ -526,34 +1000,11 @@ export default function AdminImages() {
                 </button>
               </div>
             </form>
-
-            {apiStatus && (!apiStatus.configured.leonardo || !apiStatus.configured.pinata) && (
-              <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
-                <p className="text-yellow-200 text-sm">
-                  <strong>Required API Keys (add in Settings &gt; API Keys):</strong>
-                </p>
-                <ul className="text-yellow-200 text-sm mt-2 list-disc list-inside">
-                  <li className={apiStatus.configured.leonardo ? 'line-through opacity-50' : ''}>
-                    Leonardo AI Key - Your Leonardo AI API key
-                  </li>
-                  <li className={apiStatus.configured.pinata ? 'line-through opacity-50' : ''}>
-                    Pinata API Key - Pinata IPFS API key
-                  </li>
-                  <li className={apiStatus.configured.pinata ? 'line-through opacity-50' : ''}>
-                    Pinata Secret Key - Pinata IPFS secret
-                  </li>
-                </ul>
-              </div>
-            )}
           </div>
 
           {/* Verify Images */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
             <h2 className="text-xl font-bold mb-4">Verify Images on IPFS</h2>
-            <p className="text-gray-400 mb-4">
-              Check if generated images are accessible on IPFS (samples first 100 NFTs).
-            </p>
-
             <button
               onClick={handleVerify}
               className="bg-green-600 hover:bg-green-500 text-white font-bold px-6 py-2 rounded-lg"
@@ -565,25 +1016,10 @@ export default function AdminImages() {
               <div className="mt-4 p-4 bg-gray-800 rounded-lg">
                 <p className="text-green-400">Verified: {verifyResult.verified}</p>
                 {verifyResult.failed.length > 0 && (
-                  <p className="text-red-400">Failed: {verifyResult.failed.length} ({verifyResult.failed.slice(0, 10).join(', ')}...)</p>
+                  <p className="text-red-400">Failed: {verifyResult.failed.length}</p>
                 )}
               </div>
             )}
-          </div>
-
-          {/* How It Works */}
-          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-            <h2 className="text-xl font-bold mb-4">How Image Generation Works</h2>
-            <div className="space-y-3 text-gray-400">
-              <p><strong className="text-white">1.</strong> Select a phase to generate images for</p>
-              <p><strong className="text-white">2.</strong> Leonardo AI generates cosmic artwork based on NFT data</p>
-              <p><strong className="text-white">3.</strong> Images are uploaded to Pinata IPFS</p>
-              <p><strong className="text-white">4.</strong> Metadata JSON is created with IPFS links</p>
-              <p><strong className="text-white">5.</strong> Database is updated with IPFS hashes</p>
-            </div>
-            <p className="text-gray-500 text-sm mt-4">
-              Phase 1 (1,000 images) takes approximately 2-3 hours. Other phases (250 images) take ~45 minutes.
-            </p>
           </div>
 
           <div className="mt-8">
