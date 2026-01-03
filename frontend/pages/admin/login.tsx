@@ -15,11 +15,10 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const res = await fetch(`${apiUrl}/api/admin/login`, {
+      // Use relative URL - API is on same domain
+      const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -30,15 +29,16 @@ export default function AdminLogin() {
         return;
       }
 
-      // Store token in localStorage as backup
+      // Store token in localStorage
       if (data.token) {
         localStorage.setItem('adminToken', data.token);
       }
 
       // Redirect to admin dashboard
       router.push('/admin');
-    } catch (err) {
-      setError('Failed to connect to server');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(`Failed to connect: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
