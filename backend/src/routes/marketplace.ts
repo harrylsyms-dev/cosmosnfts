@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { marketplaceService } from '../services/marketplace.service';
 import { requireAdmin } from '../middleware/adminAuth';
+import { verifyWalletOwnership } from '../middleware/walletAuth';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -122,13 +123,13 @@ router.get('/settings', async (req: Request, res: Response) => {
 });
 
 // ==================== AUTHENTICATED ROUTES ====================
-// These require wallet authentication (to be implemented)
+// These require wallet authentication via session token or signature
 
 /**
  * POST /api/marketplace/listings
  * Create a new listing
  */
-router.post('/listings', async (req: Request, res: Response) => {
+router.post('/listings', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
     const { tokenId, sellerAddress, priceCents, expiresAt } = req.body;
 
@@ -136,11 +137,12 @@ router.post('/listings', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // TODO: Verify wallet signature for authentication
+    // Use verified wallet address from middleware
+    const verifiedSeller = req.verifiedWallet!;
 
     const listing = await marketplaceService.createListing({
       tokenId,
-      sellerAddress,
+      sellerAddress: verifiedSeller,
       priceCents,
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
     });
@@ -156,7 +158,7 @@ router.post('/listings', async (req: Request, res: Response) => {
  * DELETE /api/marketplace/listings/:id
  * Cancel a listing
  */
-router.delete('/listings/:id', async (req: Request, res: Response) => {
+router.delete('/listings/:id', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
     const { sellerAddress } = req.body;
 
@@ -164,9 +166,10 @@ router.delete('/listings/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Seller address required' });
     }
 
-    // TODO: Verify wallet signature for authentication
+    // Use verified wallet from middleware
+    const verifiedSeller = req.verifiedWallet!;
 
-    const listing = await marketplaceService.cancelListing(req.params.id, sellerAddress);
+    const listing = await marketplaceService.cancelListing(req.params.id, verifiedSeller);
     res.json({ listing });
   } catch (error: any) {
     logger.error('Error cancelling listing:', error);
@@ -178,7 +181,7 @@ router.delete('/listings/:id', async (req: Request, res: Response) => {
  * POST /api/marketplace/buy/:listingId
  * Buy now
  */
-router.post('/buy/:listingId', async (req: Request, res: Response) => {
+router.post('/buy/:listingId', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
     const { buyerAddress, transactionHash } = req.body;
 
@@ -186,11 +189,14 @@ router.post('/buy/:listingId', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Buyer address and transaction hash required' });
     }
 
-    // TODO: Verify wallet signature and transaction on blockchain
+    // Use verified wallet from middleware
+    const verifiedBuyer = req.verifiedWallet!;
+
+    // TODO: Also verify transaction on blockchain matches the buyer
 
     const result = await marketplaceService.buyNow(
       req.params.listingId,
-      buyerAddress,
+      verifiedBuyer,
       transactionHash
     );
 
@@ -205,7 +211,7 @@ router.post('/buy/:listingId', async (req: Request, res: Response) => {
  * POST /api/marketplace/offers
  * Make an offer
  */
-router.post('/offers', async (req: Request, res: Response) => {
+router.post('/offers', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
     const { tokenId, offererAddress, offererEmail, offerAmountCents, expiryDays } = req.body;
 
@@ -213,11 +219,12 @@ router.post('/offers', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // TODO: Verify wallet signature for authentication
+    // Use verified wallet from middleware
+    const verifiedOfferer = req.verifiedWallet!;
 
     const offer = await marketplaceService.makeOffer({
       tokenId,
-      offererAddress,
+      offererAddress: verifiedOfferer,
       offererEmail,
       offerAmountCents,
       expiryDays,
@@ -234,7 +241,7 @@ router.post('/offers', async (req: Request, res: Response) => {
  * POST /api/marketplace/offers/:id/accept
  * Accept an offer
  */
-router.post('/offers/:id/accept', async (req: Request, res: Response) => {
+router.post('/offers/:id/accept', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
     const { sellerAddress, transactionHash } = req.body;
 
@@ -242,11 +249,14 @@ router.post('/offers/:id/accept', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Seller address and transaction hash required' });
     }
 
-    // TODO: Verify wallet signature and transaction on blockchain
+    // Use verified wallet from middleware
+    const verifiedSeller = req.verifiedWallet!;
+
+    // TODO: Also verify transaction on blockchain matches the seller
 
     const result = await marketplaceService.acceptOffer(
       req.params.id,
-      sellerAddress,
+      verifiedSeller,
       transactionHash
     );
 
@@ -261,7 +271,7 @@ router.post('/offers/:id/accept', async (req: Request, res: Response) => {
  * POST /api/marketplace/offers/:id/counter
  * Counter an offer
  */
-router.post('/offers/:id/counter', async (req: Request, res: Response) => {
+router.post('/offers/:id/counter', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
     const { sellerAddress, counterAmountCents } = req.body;
 
@@ -269,11 +279,12 @@ router.post('/offers/:id/counter', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Seller address and counter amount required' });
     }
 
-    // TODO: Verify wallet signature for authentication
+    // Use verified wallet from middleware
+    const verifiedSeller = req.verifiedWallet!;
 
     const offer = await marketplaceService.counterOffer(
       req.params.id,
-      sellerAddress,
+      verifiedSeller,
       counterAmountCents
     );
 
@@ -288,7 +299,7 @@ router.post('/offers/:id/counter', async (req: Request, res: Response) => {
  * POST /api/marketplace/offers/:id/reject
  * Reject an offer
  */
-router.post('/offers/:id/reject', async (req: Request, res: Response) => {
+router.post('/offers/:id/reject', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
     const { sellerAddress } = req.body;
 
@@ -296,9 +307,10 @@ router.post('/offers/:id/reject', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Seller address required' });
     }
 
-    // TODO: Verify wallet signature for authentication
+    // Use verified wallet from middleware
+    const verifiedSeller = req.verifiedWallet!;
 
-    const offer = await marketplaceService.rejectOffer(req.params.id, sellerAddress);
+    const offer = await marketplaceService.rejectOffer(req.params.id, verifiedSeller);
     res.json({ offer });
   } catch (error: any) {
     logger.error('Error rejecting offer:', error);

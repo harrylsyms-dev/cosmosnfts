@@ -20,6 +20,7 @@ import analyticsRoutes from './routes/analytics';
 import benefactorRoutes from './routes/benefactor';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiting';
+import { csrfTokenMiddleware, csrfProtection, getCsrfToken } from './middleware/csrf';
 import { startTierAdvancementJob } from './jobs/tierAdvance.job';
 import { startCartExpiryJob } from './jobs/cartExpiry.job';
 import { startAuctionDeploymentJob } from './jobs/auctionDeploy.job';
@@ -56,7 +57,13 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow all for now
+      // Reject requests from unknown origins in production
+      if (process.env.NODE_ENV === 'production') {
+        callback(new Error('Not allowed by CORS'));
+      } else {
+        // Allow in development for easier testing
+        callback(null, true);
+      }
     }
   },
   credentials: true,
@@ -71,6 +78,13 @@ app.use(express.json());
 
 // Rate limiting
 app.use(rateLimiter);
+
+// CSRF Protection
+app.use(csrfTokenMiddleware);
+app.use(csrfProtection);
+
+// CSRF Token endpoint
+app.get('/api/csrf-token', getCsrfToken);
 
 // Routes
 app.use('/api/health', healthRoutes);
