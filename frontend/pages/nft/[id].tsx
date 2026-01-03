@@ -241,8 +241,8 @@ export default function NFTDetail() {
               )}
             </div>
 
-            {/* Scientific Data */}
-            {nft.scientificData && (
+            {/* Scientific Data - only show if any data exists */}
+            {nft.scientificData && Object.values(nft.scientificData).some(v => v != null) && (
               <div className="bg-gray-900 rounded-xl p-6 mb-6">
                 <h3 className="text-xl font-semibold mb-4">Scientific Properties</h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -314,8 +314,8 @@ export default function NFTDetail() {
               </div>
             )}
 
-            {/* Score Breakdown */}
-            {nft.scoreBreakdown && (
+            {/* Score Breakdown - only show if any scores exist */}
+            {nft.scoreBreakdown && Object.values(nft.scoreBreakdown).some(v => v != null) ? (
               <div className="bg-gray-900 rounded-xl p-6 mb-6">
                 <h3 className="text-xl font-semibold mb-4">Score Breakdown</h3>
                 <div className="space-y-3">
@@ -345,6 +345,22 @@ export default function NFTDetail() {
                       </div>
                     ))}
                 </div>
+              </div>
+            ) : (
+              <div className="bg-gray-900 rounded-xl p-6 mb-6">
+                <h3 className="text-xl font-semibold mb-2">Cosmic Score</h3>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 bg-gray-800 rounded-full h-4 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-600 to-pink-500 rounded-full transition-all"
+                      style={{ width: `${(nft.score / 500) * 100}%` }}
+                    />
+                  </div>
+                  <div className="text-2xl font-bold text-white">{nft.score}/500</div>
+                </div>
+                <p className="text-gray-500 text-sm mt-3">
+                  Detailed score breakdown will be available once scientific data is populated.
+                </p>
               </div>
             )}
 
