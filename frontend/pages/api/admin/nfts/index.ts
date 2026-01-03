@@ -67,6 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const search = req.query.search as string;
     const status = req.query.status as string;
     const badge = req.query.badge as string;
+    const objectType = req.query.objectType as string;
 
     // Build where clause
     const where: any = {};
@@ -81,6 +82,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (badge && badge !== 'all') {
       where.badgeTier = badge;
+    }
+
+    if (objectType && objectType !== 'all') {
+      where.objectType = objectType;
     }
 
     // Get total count

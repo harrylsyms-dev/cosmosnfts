@@ -79,6 +79,7 @@ export default function AdminNFTs() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterBadge, setFilterBadge] = useState('all');
+  const [filterObjectType, setFilterObjectType] = useState('all');
   const [selectedNft, setSelectedNft] = useState<NFTDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -110,7 +111,7 @@ export default function AdminNFTs() {
     if (!isLoading) {
       fetchNFTs();
     }
-  }, [page, filterStatus, filterBadge]);
+  }, [page, filterStatus, filterBadge, filterObjectType]);
 
   async function checkAuthAndFetch() {
     try {
@@ -210,6 +211,7 @@ export default function AdminNFTs() {
       if (search) params.append('search', search);
       if (filterStatus !== 'all') params.append('status', filterStatus);
       if (filterBadge !== 'all') params.append('badge', filterBadge);
+      if (filterObjectType !== 'all') params.append('objectType', filterObjectType);
 
       const res = await fetch(`${apiUrl}/api/admin/nfts?${params}`, {
         credentials: 'include',
@@ -482,7 +484,7 @@ export default function AdminNFTs() {
 
           {/* Filters */}
           <div className="bg-gray-900 rounded-lg p-4 mb-6">
-            <form onSubmit={handleSearch} className="grid md:grid-cols-4 gap-4">
+            <form onSubmit={handleSearch} className="grid md:grid-cols-5 gap-4">
               <input
                 type="text"
                 value={search}
@@ -490,6 +492,16 @@ export default function AdminNFTs() {
                 placeholder="Search by name..."
                 className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
               />
+              <select
+                value={filterObjectType}
+                onChange={(e) => { setFilterObjectType(e.target.value); setPage(1); }}
+                className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+              >
+                <option value="all">All Types</option>
+                {OBJECT_TYPES.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
               <select
                 value={filterStatus}
                 onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
