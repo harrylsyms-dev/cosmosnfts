@@ -14,7 +14,56 @@ interface NFTData {
   culturalImpactScore: number;
   totalScore: number;
   objectType?: string;
+  badgeTier?: string;
 }
+
+interface ImagePromptConfig {
+  basePromptTemplate: string | null;
+  artStyle: string;
+  colorPalette: string;
+  lightingStyle: string;
+  compositionStyle: string;
+  qualityDescriptors: string;
+  mediumDescriptors: string;
+  realismLevel: number;
+  usePhotorealistic: boolean;
+  useScientificAccuracy: boolean;
+  avoidArtisticStylization: boolean;
+  leonardoModelId: string;
+  imageWidth: number;
+  imageHeight: number;
+  promptMagic: boolean;
+  guidanceScale: number;
+  negativePrompt: string;
+  objectTypeConfigs: string;
+  premiumThreshold: number;
+  eliteThreshold: number;
+  legendaryThreshold: number;
+  premiumModifier: string;
+  eliteModifier: string;
+  legendaryModifier: string;
+  includeScoreInPrompt: boolean;
+  useDescriptionTransform: boolean;
+}
+
+// Default object type configurations
+const defaultObjectTypeConfigs: Record<string, { description: string; visualFeatures: string }> = {
+  'Star': { description: 'A stellar body producing light and heat', visualFeatures: 'Radiant corona, solar flares, glowing plasma surface' },
+  'Galaxy': { description: 'A massive collection of stars, gas, and dust', visualFeatures: 'Spiral arms, central bulge, billions of stars' },
+  'Nebula': { description: 'An interstellar cloud of gas and dust', visualFeatures: 'Colorful gas clouds, dust pillars, stellar nurseries' },
+  'Black Hole': { description: 'A region where gravity is so intense nothing escapes', visualFeatures: 'Accretion disk, event horizon, gravitational lensing' },
+  'Planet': { description: 'A celestial body orbiting a star', visualFeatures: 'Atmospheric bands, surface features, possible rings' },
+  'Moon': { description: 'A natural satellite orbiting a planet', visualFeatures: 'Crater impacts, surface texture, reflected light' },
+  'Exoplanet': { description: 'A planet orbiting a star outside our solar system', visualFeatures: 'Alien atmospheres, exotic surface, parent star glow' },
+  'Pulsar': { description: 'A rotating neutron star emitting radiation', visualFeatures: 'Rotating beams of light, magnetic field lines' },
+  'Quasar': { description: 'An extremely luminous active galactic nucleus', visualFeatures: 'Brilliant central point, powerful jets, host galaxy' },
+  'Supernova': { description: 'A powerful stellar explosion', visualFeatures: 'Expanding shock wave, debris cloud, colorful remnants' },
+  'Asteroid': { description: 'A rocky body orbiting the Sun', visualFeatures: 'Irregular shape, cratered surface, rocky texture' },
+  'Comet': { description: 'An icy body releasing gas near the Sun', visualFeatures: 'Bright coma, dust tail, ion tail, nucleus' },
+  'Star Cluster': { description: 'A group of stars gravitationally bound', visualFeatures: 'Dense stellar concentration, varied star colors' },
+  'Dwarf Planet': { description: 'A planetary-mass object not dominant in orbit', visualFeatures: 'Small spherical body, unique surface features' },
+  'Magnetar': { description: 'A neutron star with powerful magnetic field', visualFeatures: 'Intense magnetic field lines, X-ray emissions' },
+};
 
 interface GenerationResult {
   tokenId: number;
@@ -27,6 +76,7 @@ class LeonardoImageService {
   private cachedLeonardoKey: string | null = null;
   private cachedPinataApiKey: string | null = null;
   private cachedPinataSecretKey: string | null = null;
+  private cachedPromptConfig: ImagePromptConfig | null = null;
 
   /**
    * Get Leonardo API key from database or env var
@@ -52,6 +102,63 @@ class LeonardoImageService {
   }
 
   /**
+   * Get Image Prompt Configuration from database
+   */
+  private async getPromptConfig(): Promise<ImagePromptConfig> {
+    if (this.cachedPromptConfig) return this.cachedPromptConfig;
+
+    try {
+      const config = await prisma.imagePromptConfig.findUnique({
+        where: { id: 'main' }
+      });
+
+      if (config) {
+        this.cachedPromptConfig = config as ImagePromptConfig;
+        return this.cachedPromptConfig;
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch ImagePromptConfig, using defaults:', error);
+    }
+
+    // Return default config
+    return {
+      basePromptTemplate: null,
+      artStyle: 'photorealistic astrophotography',
+      colorPalette: 'Natural space colors, deep blacks, subtle nebula hues',
+      lightingStyle: 'Natural starlight, subtle glow effects',
+      compositionStyle: 'Scientific, documentary-style',
+      qualityDescriptors: '8K, ultra high definition, NASA-quality',
+      mediumDescriptors: 'Telescope photography, Hubble-style imagery',
+      realismLevel: 80,
+      usePhotorealistic: true,
+      useScientificAccuracy: true,
+      avoidArtisticStylization: true,
+      leonardoModelId: 'b24e16ff-06e3-43eb-8d33-4416c2d75876',
+      imageWidth: 1024,
+      imageHeight: 1024,
+      promptMagic: false,
+      guidanceScale: 7,
+      negativePrompt: 'cartoon, anime, illustration, painting, artistic, stylized, fantasy, magical, glowing effects, text, watermarks',
+      objectTypeConfigs: '{}',
+      premiumThreshold: 400,
+      eliteThreshold: 425,
+      legendaryThreshold: 450,
+      premiumModifier: 'Exceptional detail and clarity',
+      eliteModifier: 'Museum-quality, breathtaking composition',
+      legendaryModifier: 'Once-in-a-lifetime capture, iconic imagery',
+      includeScoreInPrompt: false,
+      useDescriptionTransform: false,
+    };
+  }
+
+  /**
+   * Clear cached config (call when config is updated)
+   */
+  public clearConfigCache(): void {
+    this.cachedPromptConfig = null;
+  }
+
+  /**
    * Check if service is properly configured
    */
   async isConfigured(): Promise<{ leonardo: boolean; pinata: boolean }> {
@@ -64,102 +171,103 @@ class LeonardoImageService {
   }
 
   /**
-   * Generate artistic prompt for Leonardo AI
-   * Uses vibrant, stylized aesthetic that tested better for NFT appeal
+   * Generate prompt using Advanced Prompt Editor configuration
+   * Uses the NFT's actual description - no transformation
    */
-  private generatePrompt(nft: NFTData): string {
-    const isPremium = nft.totalScore > 400;
-    const isElite = nft.totalScore > 425;
+  private async generatePrompt(nft: NFTData): Promise<string> {
+    const config = await this.getPromptConfig();
 
-    // Create poetic description from scientific one
-    const poeticDescription = this.makePoetic(nft.description, nft.objectType);
+    // Parse object type configs from database
+    let objectTypeConfigs: Record<string, { description: string; visualFeatures: string; customPrompt?: string }> = defaultObjectTypeConfigs;
+    try {
+      const parsed = JSON.parse(config.objectTypeConfigs);
+      if (Object.keys(parsed).length > 0) {
+        objectTypeConfigs = { ...defaultObjectTypeConfigs, ...parsed };
+      }
+    } catch {
+      // Use defaults
+    }
 
-    // Dynamic features based on object type
-    const typeFeatures = this.getTypeFeatures(nft.objectType);
+    // Get object type specific config
+    const typeConfig = objectTypeConfigs[nft.objectType || ''] || { description: '', visualFeatures: '' };
 
-    return `
-Stunning artistic interpretation of ${nft.name} as a cosmic masterpiece.
+    // Check for custom prompt override for this type
+    if (typeConfig.customPrompt && typeConfig.customPrompt.trim()) {
+      return typeConfig.customPrompt
+        .replace(/\{name\}/g, nft.name || 'Unknown')
+        .replace(/\{description\}/g, nft.description || typeConfig.description)
+        .replace(/\{objectType\}/g, nft.objectType || 'Cosmic Object')
+        .replace(/\{features\}/g, typeConfig.visualFeatures || '')
+        .replace(/\{score\}/g, String(nft.totalScore || 0))
+        .replace(/\{badge\}/g, nft.badgeTier || 'STANDARD');
+    }
 
-${poeticDescription}
+    // Use the NFT's ACTUAL description (not transformed)
+    const description = nft.description || typeConfig.description || `A ${nft.objectType || 'cosmic object'}`;
+    const features = typeConfig.visualFeatures || '';
+    const totalScore = nft.totalScore || 0;
 
-Visual Style: Bold digital art, vibrant colors, stylized but detailed, cosmic art with ethereal glow
-${typeFeatures}
-- Nebulae in vivid purples, blues, golds, oranges, and reds
-- Stars twinkling with magical light effects
-- Surreal cosmic landscape
-- Dreamlike, fantastical yet scientifically inspired
-${isElite ? '- Ultra premium, museum-worthy composition with breathtaking detail' : ''}
-${isPremium ? '- Premium quality with exceptional luminosity' : ''}
+    // Determine score modifier based on thresholds
+    let scoreModifier = '';
+    if (totalScore >= config.legendaryThreshold) {
+      scoreModifier = config.legendaryModifier;
+    } else if (totalScore >= config.eliteThreshold) {
+      scoreModifier = config.eliteModifier;
+    } else if (totalScore >= config.premiumThreshold) {
+      scoreModifier = config.premiumModifier;
+    }
 
-Composition: Eye-catching, dramatic, energetic
-Quality: Professional digital art, vibrant, gallery-quality illustration
-Medium: Digital painting, concept art, stylized 3D render
-Color: Vibrant, saturated, cosmic palette with glow effects and deep space blacks
-Lighting: Magical cosmic glow, ethereal light effects, volumetric rays
+    // Build realism prefix if enabled
+    let realismPrefix = '';
+    if (config.usePhotorealistic) {
+      realismPrefix = 'Photorealistic, ';
+    }
+    if (config.useScientificAccuracy) {
+      realismPrefix += 'scientifically accurate, ';
+    }
 
-Fame: ${nft.fameScore} | Significance: ${nft.significanceScore} | Rarity: ${nft.rarityScore} | Age: ${nft.discoveryRecencyScore} | Cultural Impact: ${nft.culturalImpactScore}
+    // If base template is configured in Advanced Prompt Editor, use it
+    if (config.basePromptTemplate && config.basePromptTemplate.trim()) {
+      return config.basePromptTemplate
+        .replace(/\{name\}/g, nft.name || 'Unknown')
+        .replace(/\{description\}/g, description)
+        .replace(/\{objectType\}/g, nft.objectType || 'Cosmic Object')
+        .replace(/\{features\}/g, features)
+        .replace(/\{score\}/g, String(totalScore))
+        .replace(/\{badge\}/g, nft.badgeTier || 'STANDARD')
+        .replace(/\{artStyle\}/g, config.artStyle)
+        .replace(/\{colorPalette\}/g, config.colorPalette)
+        .replace(/\{lightingStyle\}/g, config.lightingStyle)
+        .replace(/\{compositionStyle\}/g, config.compositionStyle)
+        .replace(/\{qualityDescriptors\}/g, config.qualityDescriptors)
+        .replace(/\{mediumDescriptors\}/g, config.mediumDescriptors)
+        .replace(/\{scoreModifier\}/g, scoreModifier)
+        .replace(/\{negativePrompt\}/g, config.negativePrompt);
+    }
 
---no text, watermarks, signatures, logos, words, letters
-`.trim();
-  }
+    // Default template using configured styles from Advanced Prompt Editor
+    return `${realismPrefix}${config.artStyle} of ${nft.name}, a ${nft.objectType || 'cosmic object'}.
 
-  /**
-   * Transform scientific description into poetic, evocative language
-   */
-  private makePoetic(description: string, objectType?: string): string {
-    // Add poetic flourishes based on object type
-    const poeticPrefixes: Record<string, string> = {
-      'Star': 'A celestial beacon burning with ancient fire,',
-      'Galaxy': 'A cosmic island of billions of stars swirling in eternal dance,',
-      'Nebula': 'A stellar nursery painted across the void in luminous clouds,',
-      'Black Hole': 'A mysterious void where light itself surrenders,',
-      'Pulsar': 'A cosmic lighthouse spinning through the darkness,',
-      'Quasar': 'A blazing heart of creation at the edge of the universe,',
-      'Asteroid': 'A wandering remnant from the birth of our solar system,',
-      'Comet': 'A celestial traveler trailing stardust across the heavens,',
-      'Star Cluster': 'A glittering congregation of stellar siblings,',
-      'Globular Cluster': 'An ancient spherical city of a million suns,',
-      'White Dwarf': 'The glowing ember of a star that once blazed bright,',
-      'Brown Dwarf': 'A cosmic wanderer caught between star and planet,',
-      'Star System': 'A celestial family bound by invisible threads of gravity,',
-    };
+${description}
 
-    const prefix = poeticPrefixes[objectType || ''] || 'A magnificent cosmic wonder,';
+Visual characteristics: ${features}
 
-    // Transform the description to be more evocative
-    let poetic = description
-      .replace(/approximately/gi, 'roughly')
-      .replace(/located/gi, 'dwelling')
-      .replace(/discovered/gi, 'revealed to humanity')
-      .replace(/contains/gi, 'harbors')
-      .replace(/light-years/gi, 'light-years of cosmic distance')
-      .replace(/visible/gi, 'visible to those who gaze skyward');
+Style: ${config.artStyle}
+Colors: ${config.colorPalette}
+Lighting: ${config.lightingStyle}
+Composition: ${config.compositionStyle}
+Quality: ${config.qualityDescriptors}
+Medium: ${config.mediumDescriptors}
 
-    return `${prefix} ${poetic}`;
-  }
+${scoreModifier ? `Quality tier: ${scoreModifier}` : ''}
+${config.includeScoreInPrompt ? `Cosmic Score: ${totalScore}/500` : ''}
 
-  /**
-   * Get dynamic visual features based on object type
-   */
-  private getTypeFeatures(objectType?: string): string {
-    const features: Record<string, string> = {
-      'Star': '- Radiant corona with dancing solar flares\n- Glowing surface with swirling plasma storms\n- Brilliant light rays piercing the cosmic darkness',
-      'Galaxy': '- Glowing spiral arms with dynamic swirling energy\n- Billions of tiny stars creating luminous patterns\n- Majestic rotation captured in cosmic time',
-      'Nebula': '- Billowing clouds of cosmic gas in ethereal formations\n- Newborn stars emerging from glowing cocoons\n- Pillars of creation reaching toward infinity',
-      'Black Hole': '- Mesmerizing accretion disk of superheated matter\n- Light bending around the event horizon\n- Jets of energy erupting into the void',
-      'Pulsar': '- Spinning beams of light cutting through space\n- Intense magnetic field lines visualized\n- Rhythmic pulses of cosmic energy',
-      'Quasar': '- Blindingly brilliant core outshining galaxies\n- Enormous jets of plasma spanning light-years\n- The most luminous objects in existence',
-      'Asteroid': '- Rugged, cratered surface catching starlight\n- Tumbling through the asteroid belt\n- Ancient minerals glinting in the darkness',
-      'Comet': '- Glorious tail streaming across the stars\n- Icy nucleus glowing with reflected sunlight\n- Dust and gas creating ethereal aurora',
-      'Star Cluster': '- Dozens of brilliant stars in close embrace\n- Colorful stellar variety from blue to gold\n- Gravitational dance of cosmic siblings',
-      'Globular Cluster': '- Dense sphere of ancient stars\n- Millions of suns in gravitational harmony\n- The oldest structures in the galaxy',
-    };
-
-    return features[objectType || ''] || '- Mysterious cosmic energy emanating from within\n- Ethereal glow against the infinite darkness\n- Captivating celestial presence';
+--no ${config.negativePrompt}`.trim();
   }
 
   /**
    * Generate single image using Leonardo AI
+   * Uses parameters from Advanced Prompt Editor configuration
    */
   async generateImage(nft: NFTData): Promise<string> {
     try {
@@ -170,18 +278,22 @@ Fame: ${nft.fameScore} | Significance: ${nft.significanceScore} | Rarity: ${nft.
         throw new Error('Leonardo AI API key not configured');
       }
 
-      const prompt = this.generatePrompt(nft);
+      // Get config for Leonardo AI parameters
+      const config = await this.getPromptConfig();
+      const prompt = await this.generatePrompt(nft);
 
-      // Create generation request
+      logger.info(`Using prompt config - Model: ${config.leonardoModelId}, Size: ${config.imageWidth}x${config.imageHeight}, PromptMagic: ${config.promptMagic}`);
+
+      // Create generation request with configured parameters
       const response = await axios.post(
         `${this.apiUrl}/generations`,
         {
           prompt,
-          modelId: 'b24e16ff-06e3-43eb-8d33-4416c2d75876', // Leonardo Diffusion XL
-          width: 1024,
-          height: 1024,
+          modelId: config.leonardoModelId,
+          width: config.imageWidth,
+          height: config.imageHeight,
           num_images: 1,
-          promptMagic: true,
+          promptMagic: config.promptMagic,
           public: false,
         },
         {

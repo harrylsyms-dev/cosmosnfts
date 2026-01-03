@@ -370,6 +370,59 @@ model SiteSettings {
   @@map("site_settings")
 }
 
+// Comprehensive Image Prompt Configuration
+model ImagePromptConfig {
+  id                    String    @id @default("main")
+
+  // === BASE PROMPT TEMPLATE ===
+  basePromptTemplate    String?   @map("base_prompt_template") @db.Text
+
+  // === STYLE PARAMETERS ===
+  artStyle              String    @default("photorealistic astrophotography") @map("art_style")
+  colorPalette          String    @default("Natural space colors, deep blacks, subtle nebula hues") @map("color_palette")
+  lightingStyle         String    @default("Natural starlight, subtle glow effects") @map("lighting_style")
+  compositionStyle      String    @default("Scientific, documentary-style") @map("composition_style")
+  qualityDescriptors    String    @default("8K, ultra high definition, NASA-quality") @map("quality_descriptors")
+  mediumDescriptors     String    @default("Telescope photography, Hubble-style imagery") @map("medium_descriptors")
+
+  // === REALISM CONTROLS ===
+  realismLevel          Int       @default(80) @map("realism_level")
+  usePhotorealistic     Boolean   @default(true) @map("use_photorealistic")
+  useScientificAccuracy Boolean   @default(true) @map("use_scientific_accuracy")
+  avoidArtisticStylization Boolean @default(true) @map("avoid_artistic_stylization")
+
+  // === LEONARDO AI PARAMETERS ===
+  leonardoModelId       String    @default("b24e16ff-06e3-43eb-8d33-4416c2d75876") @map("leonardo_model_id")
+  imageWidth            Int       @default(1024) @map("image_width")
+  imageHeight           Int       @default(1024) @map("image_height")
+  promptMagic           Boolean   @default(false) @map("prompt_magic")
+  guidanceScale         Float     @default(7) @map("guidance_scale")
+
+  // === NEGATIVE PROMPT ===
+  negativePrompt        String    @default("cartoon, anime, illustration, painting, artistic, stylized, fantasy, magical, glowing effects, text, watermarks, signatures, logos, words, letters, blur, low quality") @map("negative_prompt") @db.Text
+
+  // === OBJECT TYPE CONFIGURATIONS (JSON) ===
+  objectTypeConfigs     String    @default("{}") @map("object_type_configs") @db.Text
+
+  // === SCORE-BASED MODIFIERS ===
+  premiumThreshold      Int       @default(400) @map("premium_threshold")
+  eliteThreshold        Int       @default(425) @map("elite_threshold")
+  legendaryThreshold    Int       @default(450) @map("legendary_threshold")
+  premiumModifier       String    @default("Exceptional detail and clarity") @map("premium_modifier")
+  eliteModifier         String    @default("Museum-quality, breathtaking composition") @map("elite_modifier")
+  legendaryModifier     String    @default("Once-in-a-lifetime capture, iconic imagery") @map("legendary_modifier")
+
+  // === ADVANCED OPTIONS ===
+  includeScoreInPrompt  Boolean   @default(false) @map("include_score_in_prompt")
+  includeMetadataInPrompt Boolean @default(true) @map("include_metadata_in_prompt")
+  useDescriptionTransform Boolean @default(false) @map("use_description_transform")
+
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("image_prompt_config")
+}
+
 // Encrypted API Keys Storage
 model ApiKey {
   id            String    @id @default(uuid())
