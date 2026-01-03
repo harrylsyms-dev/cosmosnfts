@@ -210,6 +210,33 @@ router.put('/settings', requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/admin/site-settings
+ * Get site settings (alias for /settings)
+ */
+router.get('/site-settings', requireAdmin, async (req, res) => {
+  try {
+    const settings = await siteSettingsService.getSettings();
+    res.json({ success: true, settings });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+/**
+ * PUT /api/admin/site-settings
+ * Update site settings (alias for /settings)
+ */
+router.put('/site-settings', requireAdmin, async (req, res) => {
+  try {
+    const updates = req.body;
+    const settings = await siteSettingsService.updateSettings(updates);
+    res.json({ success: true, settings });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+/**
  * POST /api/admin/settings/go-live
  * Take site live (disable coming soon)
  */
@@ -291,8 +318,12 @@ router.get('/phases', requireAdmin, async (req, res) => {
       timeRemaining = Math.max(0, Math.floor((adjustedEndTime.getTime() - Date.now()) / 1000));
     }
 
+    const increasePercent = settings.phaseIncreasePercent || 7.5;
+    const multiplierBase = 1 + (increasePercent / 100);
+
     res.json({
       success: true,
+      phaseIncreasePercent: increasePercent,
       currentPhase: {
         phase: activeTier.phase,
         price: activeTier.price,
@@ -309,10 +340,11 @@ router.get('/phases', requireAdmin, async (req, res) => {
         phase: t.phase,
         price: t.price,
         displayPrice: `$${t.price.toFixed(4)}`,
-        multiplier: Math.pow(1.075, t.phase - 1).toFixed(4),
+        multiplier: Math.pow(multiplierBase, t.phase - 1).toFixed(4),
         quantityAvailable: t.quantityAvailable,
         quantitySold: t.quantitySold,
         startTime: t.startTime,
+        duration: t.duration,
         active: t.active,
       })),
     });
@@ -470,7 +502,9 @@ router.post('/phases/advance', requireAdmin, async (req, res) => {
     });
 
     // Update NFT prices with new multiplier
-    const newMultiplier = Math.pow(1.075, nextTier.phase - 1);
+    const settings = await siteSettingsService.getSettings();
+    const increasePercent = settings.phaseIncreasePercent || 7.5;
+    const newMultiplier = Math.pow(1 + (increasePercent / 100), nextTier.phase - 1);
     await updateNFTPrices(newMultiplier);
 
     // Log audit
@@ -501,6 +535,111 @@ router.post('/phases/advance', requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Error advancing phase:', error);
     res.status(500).json({ error: 'Failed to advance phase' });
+  }
+});
+
+/**
+ * POST /api/admin/phases/reset
+ * Reset the current phase timer (start fresh)
+ */
+router.post('/phases/reset', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    // Get current active tier
+    const activeTier = await prisma.tier.findFirst({
+      where: { active: true },
+    });
+
+    if (!activeTier) {
+      return res.status(400).json({ error: 'No active tier found' });
+    }
+
+    // Reset the timer - set startTime to now and clear any pause
+    await prisma.$transaction([
+      prisma.tier.update({
+        where: { id: activeTier.id },
+        data: { startTime: new Date() },
+      }),
+      prisma.siteSettings.update({
+        where: { id: 'main' },
+        data: {
+          phasePaused: false,
+          pausedAt: null,
+          pauseDurationMs: 0,
+        },
+      }),
+    ]);
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_RESET',
+        details: JSON.stringify({
+          phase: activeTier.phase,
+          resetAt: new Date().toISOString(),
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase ${activeTier.phase} timer reset by admin: ${req.admin!.email}`);
+    res.json({
+      success: true,
+      message: `Phase ${activeTier.phase} timer has been reset`,
+      newStartTime: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error('Error resetting phase timer:', error);
+    res.status(500).json({ error: 'Failed to reset phase timer' });
+  }
+});
+
+/**
+ * PUT /api/admin/phases/increase-percent
+ * Update the phase increase percentage
+ */
+router.put('/phases/increase-percent', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { percent } = req.body;
+
+    if (percent === undefined || percent === null) {
+      return res.status(400).json({ error: 'Percent is required' });
+    }
+
+    const percentNum = parseFloat(percent);
+    if (isNaN(percentNum) || percentNum < 0 || percentNum > 100) {
+      return res.status(400).json({ error: 'Percent must be between 0 and 100' });
+    }
+
+    await prisma.siteSettings.update({
+      where: { id: 'main' },
+      data: { phaseIncreasePercent: percentNum },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_INCREASE_PERCENT_UPDATE',
+        details: JSON.stringify({ newPercent: percentNum }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase increase percent updated to ${percentNum}% by admin: ${req.admin!.email}`);
+    res.json({
+      success: true,
+      message: `Phase increase percent updated to ${percentNum}%`,
+      phaseIncreasePercent: percentNum,
+    });
+  } catch (error) {
+    logger.error('Error updating phase increase percent:', error);
+    res.status(500).json({ error: 'Failed to update phase increase percent' });
   }
 });
 
@@ -566,6 +705,71 @@ router.put('/phases/:phase/end-time', requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Error updating phase end time:', error);
     res.status(500).json({ error: 'Failed to update phase end time' });
+  }
+});
+
+/**
+ * PUT /api/admin/phases/:phase/duration
+ * Update the duration (in days) for a specific phase
+ */
+router.put('/phases/:phase/duration', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { phase } = req.params;
+    const { durationDays } = req.body;
+
+    const phaseNum = parseInt(phase);
+    if (isNaN(phaseNum)) {
+      return res.status(400).json({ error: 'Invalid phase number' });
+    }
+
+    const days = parseFloat(durationDays);
+    if (isNaN(days) || days <= 0) {
+      return res.status(400).json({ error: 'Duration must be a positive number' });
+    }
+
+    const tier = await prisma.tier.findFirst({
+      where: { phase: phaseNum },
+    });
+
+    if (!tier) {
+      return res.status(404).json({ error: 'Phase not found' });
+    }
+
+    // Convert days to seconds
+    const newDuration = Math.floor(days * 24 * 60 * 60);
+    const oldDuration = tier.duration;
+
+    await prisma.tier.update({
+      where: { id: tier.id },
+      data: { duration: newDuration },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'PHASE_DURATION_UPDATE',
+        details: JSON.stringify({
+          phase: phaseNum,
+          oldDurationDays: oldDuration / 86400,
+          newDurationDays: days,
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Phase ${phaseNum} duration updated to ${days} days by admin: ${req.admin!.email}`);
+    res.json({
+      success: true,
+      message: `Phase ${phaseNum} duration updated to ${days} days`,
+      newDurationDays: days,
+      newDurationSeconds: newDuration,
+    });
+  } catch (error) {
+    logger.error('Error updating phase duration:', error);
+    res.status(500).json({ error: 'Failed to update phase duration' });
   }
 });
 
@@ -1107,6 +1311,98 @@ router.post('/change-password', requireAdmin, async (req, res) => {
   }
 });
 
+// ==================== WALLET & REVENUE CONFIGURATION ====================
+
+/**
+ * GET /api/admin/wallet-config
+ * Get wallet and revenue split configuration
+ */
+router.get('/wallet-config', requireAdmin, async (req, res) => {
+  try {
+    const settings = await siteSettingsService.getSettings();
+
+    res.json({
+      success: true,
+      config: {
+        ownerWalletAddress: settings.ownerWalletAddress,
+        benefactorWalletAddress: settings.benefactorWalletAddress,
+        benefactorName: settings.benefactorName,
+        ownerSharePercent: settings.ownerSharePercent,
+        benefactorSharePercent: settings.benefactorSharePercent,
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching wallet config:', error);
+    res.status(500).json({ error: 'Failed to fetch wallet configuration' });
+  }
+});
+
+/**
+ * PUT /api/admin/wallet-config
+ * Update wallet and revenue split configuration
+ */
+router.put('/wallet-config', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const {
+      ownerWalletAddress,
+      benefactorWalletAddress,
+      benefactorName,
+      ownerSharePercent,
+      benefactorSharePercent,
+    } = req.body;
+
+    // Validate percentages add up to 100
+    if (ownerSharePercent !== undefined && benefactorSharePercent !== undefined) {
+      if (ownerSharePercent + benefactorSharePercent !== 100) {
+        return res.status(400).json({ error: 'Owner and benefactor shares must add up to 100%' });
+      }
+    }
+
+    // Validate wallet addresses if provided
+    if (ownerWalletAddress && !/^0x[a-fA-F0-9]{40}$/.test(ownerWalletAddress)) {
+      return res.status(400).json({ error: 'Invalid owner wallet address' });
+    }
+    if (benefactorWalletAddress && !/^0x[a-fA-F0-9]{40}$/.test(benefactorWalletAddress)) {
+      return res.status(400).json({ error: 'Invalid benefactor wallet address' });
+    }
+
+    const updates: any = {};
+    if (ownerWalletAddress !== undefined) updates.ownerWalletAddress = ownerWalletAddress;
+    if (benefactorWalletAddress !== undefined) updates.benefactorWalletAddress = benefactorWalletAddress;
+    if (benefactorName !== undefined) updates.benefactorName = benefactorName;
+    if (ownerSharePercent !== undefined) updates.ownerSharePercent = ownerSharePercent;
+    if (benefactorSharePercent !== undefined) updates.benefactorSharePercent = benefactorSharePercent;
+
+    const settings = await siteSettingsService.updateSettings(updates);
+
+    // Audit log
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'WALLET_CONFIG_UPDATE',
+        details: JSON.stringify(updates),
+        ipAddress: req.ip,
+      },
+    });
+
+    res.json({
+      success: true,
+      config: {
+        ownerWalletAddress: settings.ownerWalletAddress,
+        benefactorWalletAddress: settings.benefactorWalletAddress,
+        benefactorName: settings.benefactorName,
+        ownerSharePercent: settings.ownerSharePercent,
+        benefactorSharePercent: settings.benefactorSharePercent,
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating wallet config:', error);
+    res.status(500).json({ error: 'Failed to update wallet configuration' });
+  }
+});
+
 // ==================== EMAIL BROADCAST ROUTE ====================
 
 /**
@@ -1156,6 +1452,1139 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Error sending broadcast:', error);
     res.status(500).json({ error: 'Failed to send broadcast' });
+  }
+});
+
+// ==================== NFT ADMIN ROUTES ====================
+
+// Badge assignment based on score
+function getBadgeForScore(score: number): string {
+  if (score >= 425) return 'ELITE';
+  if (score >= 400) return 'PREMIUM';
+  if (score >= 375) return 'EXCEPTIONAL';
+  return 'STANDARD';
+}
+
+/**
+ * GET /api/admin/nfts
+ * Get all NFTs with filtering (admin view - all statuses)
+ */
+router.get('/nfts', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const {
+      page = '1',
+      limit = '50',
+      offset,
+      status,
+      badge,
+      type,
+      search,
+      sortBy = 'id',
+      sortOrder = 'asc',
+    } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = Math.min(parseInt(limit as string), 100);
+    const skip = offset ? parseInt(offset as string) : (pageNum - 1) * limitNum;
+
+    // Build filter
+    const where: any = {};
+
+    // Status filter (all statuses supported)
+    if (status && status !== 'all') {
+      where.status = status as string;
+    }
+
+    // Object type filter
+    if (type && type !== 'all') {
+      where.objectType = type as string;
+    }
+
+    // Search filter
+    if (search) {
+      where.name = { contains: search as string, mode: 'insensitive' };
+    }
+
+    // Badge filter
+    if (badge && badge !== 'all') {
+      const badgeRanges: Record<string, { min: number; max: number }> = {
+        ELITE: { min: 425, max: 500 },
+        PREMIUM: { min: 400, max: 424 },
+        EXCEPTIONAL: { min: 375, max: 399 },
+        STANDARD: { min: 250, max: 374 },
+      };
+      const range = badgeRanges[badge as string];
+      if (range) {
+        where.OR = [
+          { totalScore: { gte: range.min, lte: range.max } },
+          { cosmicScore: { gte: range.min, lte: range.max } },
+        ];
+      }
+    }
+
+    // Sort options
+    const orderBy: any = {};
+    switch (sortBy) {
+      case 'score':
+        orderBy.totalScore = sortOrder;
+        break;
+      case 'price':
+        orderBy.currentPrice = sortOrder;
+        break;
+      case 'name':
+        orderBy.name = sortOrder;
+        break;
+      case 'id':
+      default:
+        orderBy.id = sortOrder;
+    }
+
+    const [total, nfts, siteSettings, activeTier] = await Promise.all([
+      prisma.nFT.count({ where }),
+      prisma.nFT.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limitNum,
+      }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+      prisma.tier.findFirst({ where: { active: true } }),
+    ]);
+
+    const currentPhase = activeTier?.phase || 1;
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
+
+    res.json({
+      success: true,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      currentPhase,
+      phaseMultiplier: phaseMultiplier.toFixed(4),
+      items: nfts.map((nft) => {
+        const score = nft.totalScore || nft.cosmicScore || 0;
+        const price = 0.10 * score * phaseMultiplier;
+        return {
+          id: nft.id,
+          tokenId: nft.tokenId,
+          name: nft.name,
+          description: nft.description,
+          objectType: nft.objectType,
+          totalScore: score,
+          badgeTier: nft.badgeTier || getBadgeForScore(score),
+          currentPrice: price,
+          status: nft.status,
+          image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
+        };
+      }),
+    });
+  } catch (error) {
+    logger.error('Error fetching admin NFTs:', error);
+    res.status(500).json({ error: 'Failed to fetch NFTs' });
+  }
+});
+
+/**
+ * GET /api/admin/nfts/:id
+ * Get single NFT with full details (admin view)
+ */
+router.get('/nfts/:id', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const id = parseInt(req.params.id);
+
+    const [nft, siteSettings, activeTier] = await Promise.all([
+      prisma.nFT.findUnique({ where: { id } }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+      prisma.tier.findFirst({ where: { active: true } }),
+    ]);
+
+    if (!nft) {
+      return res.status(404).json({ error: 'NFT not found' });
+    }
+
+    const currentPhase = activeTier?.phase || 1;
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
+    const score = nft.totalScore || nft.cosmicScore || 0;
+    const price = 0.10 * score * phaseMultiplier;
+
+    res.json({
+      success: true,
+      nft: {
+        id: nft.id,
+        tokenId: nft.tokenId,
+        name: nft.name,
+        description: nft.description,
+        objectType: nft.objectType,
+        status: nft.status,
+        // Score breakdown
+        totalScore: score,
+        scores: {
+          fameVisibility: nft.fameVisibility || nft.fameScore || 0,
+          scientificSignificance: nft.scientificSignificance || nft.significanceScore || 0,
+          rarity: nft.rarity || nft.rarityScore || 0,
+          discoveryRecency: nft.discoveryRecency || nft.discoveryRecencyScore || 0,
+          culturalImpact: nft.culturalImpact || nft.culturalImpactScore || 0,
+        },
+        discoveryYear: nft.discoveryYear,
+        badgeTier: nft.badgeTier || getBadgeForScore(score),
+        // Pricing
+        currentPrice: price,
+        displayPrice: `$${price.toFixed(2)}`,
+        priceFormula: `$0.10 × ${score} × ${phaseMultiplier.toFixed(4)}`,
+        currentPhase,
+        phaseMultiplier: phaseMultiplier.toFixed(4),
+        // Images
+        image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
+        imageIpfsHash: nft.imageIpfsHash,
+        metadataIpfsHash: nft.metadataIpfsHash,
+        // Ownership/Blockchain
+        ownerAddress: nft.ownerAddress,
+        transactionHash: nft.transactionHash,
+        // Timestamps
+        createdAt: nft.createdAt,
+        updatedAt: nft.updatedAt,
+        mintedAt: nft.mintedAt,
+        soldAt: nft.soldAt,
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching NFT details:', error);
+    res.status(500).json({ error: 'Failed to fetch NFT' });
+  }
+});
+
+/**
+ * POST /api/admin/nfts/:id/generate-image
+ * Generate image for a single NFT using Leonardo AI
+ */
+router.post('/nfts/:id/generate-image', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { leonardoService } = await import('../services/leonardo.service');
+    const id = parseInt(req.params.id);
+
+    const nft = await prisma.nFT.findUnique({ where: { id } });
+
+    if (!nft) {
+      return res.status(404).json({ error: 'NFT not found' });
+    }
+
+    // Check if Leonardo and Pinata are configured
+    const config = await leonardoService.isConfigured();
+    if (!config.leonardo) {
+      return res.status(400).json({ error: 'Leonardo AI API key not configured. Add it in Settings → API Keys.' });
+    }
+    if (!config.pinata) {
+      return res.status(400).json({ error: 'Pinata IPFS credentials not configured. Add them in Settings → API Keys.' });
+    }
+
+    // Start generation in background (don't wait for completion)
+    const nftData = {
+      tokenId: nft.tokenId,
+      name: nft.name,
+      description: nft.description,
+      fameScore: nft.fameScore,
+      significanceScore: nft.significanceScore,
+      rarityScore: nft.rarityScore,
+      discoveryRecencyScore: nft.discoveryRecencyScore,
+      culturalImpactScore: nft.culturalImpactScore,
+      totalScore: nft.totalScore,
+      objectType: nft.objectType || undefined,
+    };
+
+    // Start generation asynchronously
+    leonardoService.generateImage(nftData)
+      .then(async (imageIpfsHash) => {
+        // Generate metadata
+        const metadataIpfsHash = await leonardoService.generateMetadata(nftData, imageIpfsHash);
+
+        // Update database
+        await prisma.nFT.update({
+          where: { id },
+          data: {
+            imageIpfsHash,
+            metadataIpfsHash,
+            image: `https://gateway.pinata.cloud/ipfs/${imageIpfsHash}`,
+          },
+        });
+
+        logger.info(`Generated image for NFT #${nft.tokenId}: ${imageIpfsHash}`);
+      })
+      .catch((error) => {
+        logger.error(`Failed to generate image for NFT #${nft.tokenId}:`, error);
+      });
+
+    res.json({
+      success: true,
+      message: `Image generation started for "${nft.name}". This may take 1-2 minutes.`,
+    });
+  } catch (error) {
+    logger.error('Error starting image generation:', error);
+    res.status(500).json({ error: 'Failed to start image generation' });
+  }
+});
+
+// ==================== ADMIN USER MANAGEMENT ====================
+
+/**
+ * GET /api/admin/admin-users
+ * Get all admin users (super_admin only)
+ */
+router.get('/admin-users', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    const admins = await prisma.adminUser.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      admins: admins.map((admin) => ({
+        id: admin.id,
+        email: admin.email,
+        role: admin.role,
+        privileges: admin.privileges,
+        lastLoginAt: admin.lastLoginAt,
+        createdAt: admin.createdAt,
+        isDisabled: !admin.isActive,
+      })),
+    });
+  } catch (error) {
+    logger.error('Error fetching admin users:', error);
+    res.status(500).json({ error: 'Failed to fetch admin users' });
+  }
+});
+
+/**
+ * POST /api/admin/admin-users
+ * Create a new admin user (super_admin only)
+ */
+router.post('/admin-users', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const bcrypt = await import('bcryptjs');
+    const { email, password, role } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    // Check if email already exists
+    const existing = await prisma.adminUser.findUnique({
+      where: { email },
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const admin = await prisma.adminUser.create({
+      data: {
+        email,
+        passwordHash,
+        role: role || 'admin',
+      },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'ADMIN_CREATE',
+        details: `Created admin: ${email} with role: ${role || 'admin'}`,
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Admin user created: ${email} by ${req.admin!.email}`);
+    res.json({
+      success: true,
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        role: admin.role,
+      },
+    });
+  } catch (error) {
+    logger.error('Error creating admin:', error);
+    res.status(500).json({ error: 'Failed to create admin' });
+  }
+});
+
+/**
+ * PUT /api/admin/admin-users/:id/toggle
+ * Enable/disable an admin user (super_admin only)
+ */
+router.put('/admin-users/:id/toggle', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { id } = req.params;
+    const { disabled } = req.body;
+
+    // Can't disable yourself
+    if (id === req.admin!.id) {
+      return res.status(400).json({ error: 'Cannot disable yourself' });
+    }
+
+    const admin = await prisma.adminUser.findUnique({
+      where: { id },
+    });
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin not found' });
+    }
+
+    await prisma.adminUser.update({
+      where: { id },
+      data: { isActive: !disabled },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: disabled ? 'ADMIN_DISABLE' : 'ADMIN_ENABLE',
+        details: `${disabled ? 'Disabled' : 'Enabled'} admin: ${admin.email}`,
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Admin ${admin.email} ${disabled ? 'disabled' : 'enabled'} by ${req.admin!.email}`);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error toggling admin:', error);
+    res.status(500).json({ error: 'Failed to update admin' });
+  }
+});
+
+/**
+ * DELETE /api/admin/admin-users/:id
+ * Delete an admin user (super_admin only)
+ */
+router.delete('/admin-users/:id', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { id } = req.params;
+
+    // Can't delete yourself
+    if (id === req.admin!.id) {
+      return res.status(400).json({ error: 'Cannot delete yourself' });
+    }
+
+    const admin = await prisma.adminUser.findUnique({
+      where: { id },
+    });
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin not found' });
+    }
+
+    await prisma.adminUser.delete({
+      where: { id },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'ADMIN_DELETE',
+        details: `Deleted admin: ${admin.email}`,
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Admin ${admin.email} deleted by ${req.admin!.email}`);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error deleting admin:', error);
+    res.status(500).json({ error: 'Failed to delete admin' });
+  }
+});
+
+// ==================== CONTRACT INFO ====================
+
+/**
+ * GET /api/admin/contract-info
+ * Get smart contract information
+ */
+router.get('/contract-info', requireAdmin, async (req, res) => {
+  try {
+    res.json({
+      contract: {
+        address: process.env.CONTRACT_ADDRESS || null,
+        network: process.env.NETWORK || 'Polygon Amoy',
+        explorerUrl: process.env.EXPLORER_URL || 'https://amoy.polygonscan.com',
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching contract info:', error);
+    res.status(500).json({ error: 'Failed to fetch contract info' });
+  }
+});
+
+/**
+ * GET /api/admin/config-info
+ * Get system configuration status (read-only)
+ */
+router.get('/config-info', requireAdmin, async (req, res) => {
+  try {
+    res.json({
+      config: {
+        email: {
+          provider: 'SendGrid',
+          configured: !!(process.env.SENDGRID_API_KEY),
+        },
+        stripe: {
+          configured: !!(process.env.STRIPE_SECRET_KEY),
+          mode: process.env.STRIPE_SECRET_KEY?.startsWith('sk_live') ? 'live' : 'test',
+        },
+        ipfs: {
+          provider: 'Pinata',
+          configured: !!(process.env.PINATA_API_KEY && process.env.PINATA_SECRET_KEY),
+        },
+        blockchain: {
+          network: process.env.NETWORK || 'Polygon Amoy',
+          contractAddress: process.env.CONTRACT_ADDRESS || null,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching config info:', error);
+    res.status(500).json({ error: 'Failed to fetch config info' });
+  }
+});
+
+/**
+ * GET /api/admin/settings/export
+ * Export all admin-configurable settings
+ */
+router.get('/settings/export', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    const siteSettings = await prisma.siteSettings.findUnique({
+      where: { id: 'main' },
+    });
+
+    const marketplaceSettings = await prisma.marketplaceSettings.findUnique({
+      where: { id: 'main' },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'SETTINGS_EXPORT',
+        details: 'Exported settings',
+        ipAddress: req.ip,
+      },
+    });
+
+    res.json({
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+      siteSettings: siteSettings ? {
+        isLive: siteSettings.isLive,
+        maintenanceMode: siteSettings.maintenanceMode,
+        comingSoonMode: siteSettings.comingSoonMode,
+        comingSoonTitle: siteSettings.comingSoonTitle,
+        comingSoonMessage: siteSettings.comingSoonMessage,
+        comingSoonHtml: siteSettings.comingSoonHtml,
+        maintenanceHtml: siteSettings.maintenanceHtml,
+        phaseIncreasePercent: siteSettings.phaseIncreasePercent,
+        ownerWalletAddress: siteSettings.ownerWalletAddress,
+        benefactorWalletAddress: siteSettings.benefactorWalletAddress,
+        benefactorName: siteSettings.benefactorName,
+        ownerSharePercent: siteSettings.ownerSharePercent,
+        benefactorSharePercent: siteSettings.benefactorSharePercent,
+      } : null,
+      marketplaceSettings: marketplaceSettings ? {
+        tradingEnabled: marketplaceSettings.tradingEnabled,
+        listingsEnabled: marketplaceSettings.listingsEnabled,
+        offersEnabled: marketplaceSettings.offersEnabled,
+        auctionsEnabled: marketplaceSettings.auctionsEnabled,
+        creatorRoyaltyPercent: marketplaceSettings.creatorRoyaltyPercent,
+        platformFeePercent: marketplaceSettings.platformFeePercent,
+      } : null,
+    });
+  } catch (error) {
+    logger.error('Error exporting settings:', error);
+    res.status(500).json({ error: 'Failed to export settings' });
+  }
+});
+
+/**
+ * POST /api/admin/settings/import
+ * Import previously exported settings
+ */
+router.post('/settings/import', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { siteSettings, marketplaceSettings } = req.body;
+
+    if (siteSettings) {
+      await prisma.siteSettings.upsert({
+        where: { id: 'main' },
+        update: {
+          isLive: siteSettings.isLive,
+          maintenanceMode: siteSettings.maintenanceMode,
+          comingSoonMode: siteSettings.comingSoonMode,
+          comingSoonTitle: siteSettings.comingSoonTitle,
+          comingSoonMessage: siteSettings.comingSoonMessage,
+          comingSoonHtml: siteSettings.comingSoonHtml,
+          maintenanceHtml: siteSettings.maintenanceHtml,
+          phaseIncreasePercent: siteSettings.phaseIncreasePercent,
+          ownerWalletAddress: siteSettings.ownerWalletAddress,
+          benefactorWalletAddress: siteSettings.benefactorWalletAddress,
+          benefactorName: siteSettings.benefactorName,
+          ownerSharePercent: siteSettings.ownerSharePercent,
+          benefactorSharePercent: siteSettings.benefactorSharePercent,
+        },
+        create: {
+          id: 'main',
+          ...siteSettings,
+        },
+      });
+    }
+
+    if (marketplaceSettings) {
+      await prisma.marketplaceSettings.upsert({
+        where: { id: 'main' },
+        update: {
+          tradingEnabled: marketplaceSettings.tradingEnabled,
+          listingsEnabled: marketplaceSettings.listingsEnabled,
+          offersEnabled: marketplaceSettings.offersEnabled,
+          auctionsEnabled: marketplaceSettings.auctionsEnabled,
+          creatorRoyaltyPercent: marketplaceSettings.creatorRoyaltyPercent,
+          platformFeePercent: marketplaceSettings.platformFeePercent,
+        },
+        create: {
+          id: 'main',
+          ...marketplaceSettings,
+        },
+      });
+    }
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'SETTINGS_IMPORT',
+        details: 'Imported settings',
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`Settings imported by admin: ${req.admin!.email}`);
+    res.json({ success: true, message: 'Settings imported successfully' });
+  } catch (error) {
+    logger.error('Error importing settings:', error);
+    res.status(500).json({ error: 'Failed to import settings' });
+  }
+});
+
+// ==================== DASHBOARD PREFERENCES ====================
+
+/**
+ * GET /api/admin/dashboard-preferences
+ * Get dashboard layout preferences for current admin
+ */
+router.get('/dashboard-preferences', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    let prefs = await prisma.adminDashboardPreference.findUnique({
+      where: { adminId: req.admin!.id },
+    });
+
+    // Create default preferences if not exists
+    if (!prefs) {
+      prefs = await prisma.adminDashboardPreference.create({
+        data: {
+          adminId: req.admin!.id,
+          layout: '[]',
+          starredWidgets: '["sales","orders","nfts","phases"]',
+        },
+      });
+    }
+
+    res.json({
+      preferences: {
+        layout: JSON.parse(prefs.layout),
+        starredWidgets: JSON.parse(prefs.starredWidgets),
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching dashboard preferences:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboard preferences' });
+  }
+});
+
+/**
+ * PUT /api/admin/dashboard-preferences
+ * Update dashboard layout preferences for current admin
+ */
+router.put('/dashboard-preferences', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { layout, starredWidgets } = req.body;
+
+    const prefs = await prisma.adminDashboardPreference.upsert({
+      where: { adminId: req.admin!.id },
+      update: {
+        layout: JSON.stringify(layout || []),
+        starredWidgets: JSON.stringify(starredWidgets || []),
+      },
+      create: {
+        adminId: req.admin!.id,
+        layout: JSON.stringify(layout || []),
+        starredWidgets: JSON.stringify(starredWidgets || []),
+      },
+    });
+
+    res.json({
+      success: true,
+      preferences: {
+        layout: JSON.parse(prefs.layout),
+        starredWidgets: JSON.parse(prefs.starredWidgets),
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating dashboard preferences:', error);
+    res.status(500).json({ error: 'Failed to update dashboard preferences' });
+  }
+});
+
+// ==================== SYSTEM STATUS ====================
+
+/**
+ * GET /api/admin/system-status
+ * Get system health status - checks database keys first, falls back to env vars
+ */
+router.get('/system-status', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const axios = (await import('axios')).default;
+    const { getApiKey } = await import('../utils/apiKeys');
+
+    const status = {
+      database: 'online' as 'online' | 'offline' | 'error',
+      stripe: 'offline' as 'online' | 'offline' | 'error',
+      ipfs: 'offline' as 'online' | 'offline' | 'error',
+      blockchain: 'offline' as 'online' | 'offline' | 'error',
+    };
+
+    const details = {
+      database: '',
+      stripe: '',
+      ipfs: '',
+      blockchain: '',
+    };
+
+    // Check database
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      details.database = 'Connected';
+    } catch (e) {
+      status.database = 'error';
+      details.database = 'Connection failed';
+    }
+
+    // Check Stripe - get key from database or env var
+    const stripeKey = await getApiKey('stripe');
+    if (stripeKey) {
+      try {
+        const Stripe = (await import('stripe')).default;
+        const stripe = new Stripe(stripeKey);
+        await stripe.balance.retrieve();
+        status.stripe = 'online';
+        details.stripe = 'Connected';
+      } catch (e: any) {
+        status.stripe = 'error';
+        details.stripe = e.message || 'API error';
+      }
+    } else {
+      details.stripe = 'API key not configured';
+    }
+
+    // Check IPFS/Pinata - get keys from database or env vars
+    const pinataApiKey = await getApiKey('pinata_api');
+    const pinataSecretKey = await getApiKey('pinata_secret');
+    if (pinataApiKey && pinataSecretKey) {
+      try {
+        const response = await axios.get('https://api.pinata.cloud/data/testAuthentication', {
+          headers: {
+            pinata_api_key: pinataApiKey,
+            pinata_secret_api_key: pinataSecretKey,
+          },
+          timeout: 5000,
+        });
+        if (response.status === 200) {
+          status.ipfs = 'online';
+          details.ipfs = 'Pinata connected';
+        }
+      } catch (e: any) {
+        status.ipfs = 'error';
+        details.ipfs = e.message || 'Connection failed';
+      }
+    } else {
+      details.ipfs = 'Pinata credentials not configured';
+    }
+
+    // Check blockchain - get RPC URL from database or env var
+    const rpcUrl = await getApiKey('polygon_rpc');
+    if (rpcUrl) {
+      try {
+        const response = await axios.post(
+          rpcUrl,
+          {
+            jsonrpc: '2.0',
+            method: 'eth_blockNumber',
+            params: [],
+            id: 1,
+          },
+          { timeout: 5000 }
+        );
+        if (response.data?.result) {
+          status.blockchain = 'online';
+          const blockNumber = parseInt(response.data.result, 16);
+          details.blockchain = `Block #${blockNumber.toLocaleString()}`;
+        }
+      } catch (e: any) {
+        status.blockchain = 'error';
+        details.blockchain = e.message || 'RPC connection failed';
+      }
+    } else {
+      details.blockchain = 'RPC URL not configured';
+    }
+
+    // Get sandbox mode from site settings
+    const siteSettings = await prisma.siteSettings.findUnique({ where: { id: 'main' } });
+
+    res.json({
+      status,
+      details,
+      sandboxMode: siteSettings?.sandboxMode || false,
+      paymentsEnabled: siteSettings?.paymentsEnabled !== false,
+    });
+  } catch (error) {
+    logger.error('Error fetching system status:', error);
+    res.status(500).json({ error: 'Failed to fetch system status' });
+  }
+});
+
+// ==================== API KEY MANAGEMENT ====================
+
+// Allowed service names for API keys
+const ALLOWED_SERVICES = [
+  'stripe',
+  'stripe_webhook',
+  'pinata_api',
+  'pinata_secret',
+  'leonardo',
+  'polygon_rpc',
+  'sendgrid',
+] as const;
+
+type ServiceName = typeof ALLOWED_SERVICES[number];
+
+function isValidService(service: string): service is ServiceName {
+  return ALLOWED_SERVICES.includes(service as ServiceName);
+}
+
+/**
+ * GET /api/admin/api-keys
+ * List all API keys (masked, showing only last 4 chars)
+ */
+router.get('/api-keys', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { isEncryptionConfigured, decrypt, maskApiKey } = await import('../utils/encryption');
+
+    // Check if encryption is configured
+    if (!isEncryptionConfigured()) {
+      return res.status(503).json({
+        error: 'Encryption not configured',
+        message: 'ENCRYPTION_KEY environment variable is not set. API key management requires encryption to be configured.',
+      });
+    }
+
+    const apiKeys = await prisma.apiKey.findMany({
+      orderBy: { service: 'asc' },
+    });
+
+    // Map keys with masked values
+    const maskedKeys = apiKeys.map((key) => {
+      let maskedValue = '****';
+      try {
+        const decryptedKey = decrypt(key.encryptedKey);
+        maskedValue = maskApiKey(decryptedKey);
+      } catch (e) {
+        // If decryption fails, show error indicator
+        maskedValue = '[decryption error]';
+      }
+
+      return {
+        service: key.service,
+        maskedKey: maskedValue,
+        description: key.description,
+        lastRotated: key.lastRotated,
+        createdAt: key.createdAt,
+        updatedAt: key.updatedAt,
+      };
+    });
+
+    // Include services that don't have keys yet
+    const existingServices = new Set(apiKeys.map((k) => k.service));
+    const allServices = ALLOWED_SERVICES.map((service) => {
+      const existing = maskedKeys.find((k) => k.service === service);
+      if (existing) {
+        return existing;
+      }
+      return {
+        service,
+        maskedKey: null,
+        description: null,
+        lastRotated: null,
+        createdAt: null,
+        updatedAt: null,
+      };
+    });
+
+    res.json({
+      success: true,
+      apiKeys: allServices,
+      encryptionConfigured: true,
+    });
+  } catch (error) {
+    logger.error('Error fetching API keys:', error);
+    res.status(500).json({ error: 'Failed to fetch API keys' });
+  }
+});
+
+/**
+ * PUT /api/admin/api-keys/:service
+ * Update/create an API key for a service (super_admin only)
+ */
+router.put('/api-keys/:service', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { isEncryptionConfigured, encrypt, maskApiKey } = await import('../utils/encryption');
+    const { service } = req.params;
+    const { apiKey, description } = req.body;
+
+    // Validate service name
+    if (!isValidService(service)) {
+      return res.status(400).json({
+        error: 'Invalid service name',
+        message: `Service must be one of: ${ALLOWED_SERVICES.join(', ')}`,
+      });
+    }
+
+    // Check if encryption is configured
+    if (!isEncryptionConfigured()) {
+      return res.status(503).json({
+        error: 'Encryption not configured',
+        message: 'ENCRYPTION_KEY environment variable is not set. API key management requires encryption to be configured.',
+      });
+    }
+
+    // Validate API key
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+      return res.status(400).json({ error: 'API key is required' });
+    }
+
+    const trimmedKey = apiKey.trim();
+
+    // Encrypt the API key
+    const encryptedKey = encrypt(trimmedKey);
+
+    // Upsert the API key
+    const result = await prisma.apiKey.upsert({
+      where: { service },
+      update: {
+        encryptedKey,
+        description: description || null,
+        lastRotated: new Date(),
+        createdBy: req.admin!.id,
+      },
+      create: {
+        service,
+        encryptedKey,
+        description: description || null,
+        lastRotated: new Date(),
+        createdBy: req.admin!.id,
+      },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'API_KEY_UPDATE',
+        details: JSON.stringify({
+          service,
+          action: result.createdAt === result.updatedAt ? 'created' : 'updated',
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`API key for ${service} updated by admin: ${req.admin!.email}`);
+
+    // Clear API key cache so new key is used immediately
+    const { clearApiKeyCache } = await import('../utils/apiKeys');
+    clearApiKeyCache(service);
+
+    res.json({
+      success: true,
+      message: `API key for ${service} has been ${result.createdAt === result.updatedAt ? 'created' : 'updated'}`,
+      apiKey: {
+        service: result.service,
+        maskedKey: maskApiKey(trimmedKey),
+        description: result.description,
+        lastRotated: result.lastRotated,
+        updatedAt: result.updatedAt,
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating API key:', error);
+    res.status(500).json({ error: 'Failed to update API key' });
+  }
+});
+
+/**
+ * DELETE /api/admin/api-keys/:service
+ * Delete an API key (super_admin only)
+ */
+router.delete('/api-keys/:service', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { isEncryptionConfigured } = await import('../utils/encryption');
+    const { service } = req.params;
+
+    // Validate service name
+    if (!isValidService(service)) {
+      return res.status(400).json({
+        error: 'Invalid service name',
+        message: `Service must be one of: ${ALLOWED_SERVICES.join(', ')}`,
+      });
+    }
+
+    // Check if encryption is configured
+    if (!isEncryptionConfigured()) {
+      return res.status(503).json({
+        error: 'Encryption not configured',
+        message: 'ENCRYPTION_KEY environment variable is not set. API key management requires encryption to be configured.',
+      });
+    }
+
+    // Check if key exists
+    const existingKey = await prisma.apiKey.findUnique({
+      where: { service },
+    });
+
+    if (!existingKey) {
+      return res.status(404).json({
+        error: 'API key not found',
+        message: `No API key exists for service: ${service}`,
+      });
+    }
+
+    // Delete the key
+    await prisma.apiKey.delete({
+      where: { service },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'API_KEY_DELETE',
+        details: JSON.stringify({ service }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`API key for ${service} deleted by admin: ${req.admin!.email}`);
+
+    // Clear API key cache
+    const { clearApiKeyCache } = await import('../utils/apiKeys');
+    clearApiKeyCache(service);
+
+    res.json({
+      success: true,
+      message: `API key for ${service} has been deleted`,
+    });
+  } catch (error) {
+    logger.error('Error deleting API key:', error);
+    res.status(500).json({ error: 'Failed to delete API key' });
+  }
+});
+
+// ==================== DASHBOARD STATS ====================
+
+/**
+ * GET /api/admin/dashboard-stats
+ * Get dashboard statistics
+ */
+router.get('/dashboard-stats', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+
+    // Get total sales (sum of completed/minted purchases)
+    const salesResult = await prisma.purchase.aggregate({
+      where: { status: 'MINTED' },
+      _sum: { totalAmountCents: true },
+    });
+
+    // Get purchase counts
+    const [totalOrders, pendingOrders] = await Promise.all([
+      prisma.purchase.count(),
+      prisma.purchase.count({ where: { status: 'PENDING' } }),
+    ]);
+
+    // Get NFT count
+    const totalNFTs = await prisma.nFT.count();
+
+    // Get user count
+    const totalUsers = await prisma.user.count();
+
+    // Get active auctions count
+    const activeAuctions = await prisma.auction.count({
+      where: {
+        status: 'active',
+        endTime: { gt: new Date() },
+      },
+    });
+
+    res.json({
+      stats: {
+        totalSales: salesResult._sum?.totalAmountCents || 0,
+        totalOrders,
+        totalNFTs,
+        totalUsers,
+        pendingOrders,
+        activeAuctions,
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching dashboard stats:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboard stats' });
   }
 });
 

@@ -23,17 +23,37 @@ interface BannedAddress {
   bannedAt: string;
 }
 
+interface WhitelistEntry {
+  id: string;
+  walletAddress: string;
+  email: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
 export default function AdminUsers() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [bannedAddresses, setBannedAddresses] = useState<BannedAddress[]>([]);
+  const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'banned'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'whitelist' | 'banned' | 'broadcast'>('users');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Ban form
   const [banReason, setBanReason] = useState('');
   const [banAddress, setBanAddress] = useState('');
+
+  // Whitelist form
+  const [newWhitelistAddress, setNewWhitelistAddress] = useState('');
+  const [newWhitelistEmail, setNewWhitelistEmail] = useState('');
+  const [newWhitelistNote, setNewWhitelistNote] = useState('');
+
+  // Broadcast form
+  const [broadcastSubject, setBroadcastSubject] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -52,7 +72,7 @@ export default function AdminUsers() {
         return;
       }
 
-      await Promise.all([fetchUsers(), fetchBannedAddresses()]);
+      await Promise.all([fetchUsers(), fetchBannedAddresses(), fetchWhitelist()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
@@ -91,6 +111,23 @@ export default function AdminUsers() {
       }
     } catch (error) {
       console.error('Failed to fetch banned addresses:', error);
+    }
+  }
+
+  async function fetchWhitelist() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/whitelist`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setWhitelist(data.addresses || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch whitelist:', error);
     }
   }
 
@@ -149,6 +186,114 @@ export default function AdminUsers() {
     } catch (error) {
       console.error('Failed to unban user:', error);
       alert('Failed to unban address');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function addToWhitelist() {
+    if (!newWhitelistAddress) {
+      alert('Wallet address is required');
+      return;
+    }
+
+    setActionLoading('add-whitelist');
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/whitelist`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          walletAddress: newWhitelistAddress,
+          email: newWhitelistEmail || null,
+          note: newWhitelistNote || null,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchWhitelist();
+        setNewWhitelistAddress('');
+        setNewWhitelistEmail('');
+        setNewWhitelistNote('');
+        alert('Address added to whitelist');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to add to whitelist');
+      }
+    } catch (error) {
+      console.error('Failed to add to whitelist:', error);
+      alert('Failed to add to whitelist');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function removeFromWhitelist(id: string) {
+    if (!confirm('Remove this address from the whitelist?')) return;
+
+    setActionLoading(`remove-${id}`);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/whitelist/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        await fetchWhitelist();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to remove from whitelist');
+      }
+    } catch (error) {
+      console.error('Failed to remove from whitelist:', error);
+      alert('Failed to remove from whitelist');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function sendBroadcast() {
+    if (!broadcastSubject || !broadcastMessage) {
+      alert('Subject and message are required');
+      return;
+    }
+
+    if (!confirm('Send this email to all registered users?')) return;
+
+    setActionLoading('broadcast');
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/broadcast`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          subject: broadcastSubject,
+          message: broadcastMessage,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Broadcast sent to ${data.sentCount} users`);
+        setBroadcastSubject('');
+        setBroadcastMessage('');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to send broadcast');
+      }
+    } catch (error) {
+      console.error('Failed to send broadcast:', error);
+      alert('Failed to send broadcast');
     } finally {
       setActionLoading(null);
     }
@@ -231,31 +376,35 @@ export default function AdminUsers() {
 
         <main className="max-w-7xl mx-auto px-4 py-8">
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
               <div className="text-gray-400 text-sm mb-1">Total Users</div>
-              <div className="text-3xl font-bold text-white">{users.length}</div>
+              <div className="text-2xl font-bold text-white">{users.length}</div>
             </div>
-            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
               <div className="text-gray-400 text-sm mb-1">With Email</div>
-              <div className="text-3xl font-bold text-blue-400">
+              <div className="text-2xl font-bold text-blue-400">
                 {users.filter((u) => u.email).length}
               </div>
             </div>
-            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
               <div className="text-gray-400 text-sm mb-1">Buyers</div>
-              <div className="text-3xl font-bold text-green-400">
+              <div className="text-2xl font-bold text-green-400">
                 {users.filter((u) => u.totalPurchases > 0).length}
               </div>
             </div>
-            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+              <div className="text-gray-400 text-sm mb-1">Whitelisted</div>
+              <div className="text-2xl font-bold text-purple-400">{whitelist.length}</div>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
               <div className="text-gray-400 text-sm mb-1">Banned</div>
-              <div className="text-3xl font-bold text-red-400">{bannedAddresses.length}</div>
+              <div className="text-2xl font-bold text-red-400">{bannedAddresses.length}</div>
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-4 mb-6">
+          <div className="flex flex-wrap gap-2 mb-6">
             <button
               onClick={() => setActiveTab('users')}
               className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
@@ -267,6 +416,16 @@ export default function AdminUsers() {
               Users ({users.length})
             </button>
             <button
+              onClick={() => setActiveTab('whitelist')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                activeTab === 'whitelist'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              Whitelist ({whitelist.length})
+            </button>
+            <button
               onClick={() => setActiveTab('banned')}
               className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
                 activeTab === 'banned'
@@ -275,6 +434,16 @@ export default function AdminUsers() {
               }`}
             >
               Banned ({bannedAddresses.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('broadcast')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                activeTab === 'broadcast'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              Email Broadcast
             </button>
           </div>
 
@@ -360,12 +529,106 @@ export default function AdminUsers() {
             </div>
           )}
 
+          {/* Whitelist Tab */}
+          {activeTab === 'whitelist' && (
+            <div className="space-y-6">
+              {/* Add to Whitelist Form */}
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+                <h3 className="text-lg font-semibold text-white mb-4">Add to Whitelist</h3>
+                <p className="text-gray-400 text-sm mb-4">Grant early access to wallet addresses</p>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <input
+                    type="text"
+                    placeholder="Wallet Address (0x...)"
+                    value={newWhitelistAddress}
+                    onChange={(e) => setNewWhitelistAddress(e.target.value)}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email (optional)"
+                    value={newWhitelistEmail}
+                    onChange={(e) => setNewWhitelistEmail(e.target.value)}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Note (optional)"
+                    value={newWhitelistNote}
+                    onChange={(e) => setNewWhitelistNote(e.target.value)}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                  <button
+                    onClick={addToWhitelist}
+                    disabled={!!actionLoading}
+                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 font-semibold transition-colors disabled:opacity-50"
+                  >
+                    Add to Whitelist
+                  </button>
+                </div>
+              </div>
+
+              {/* Whitelist Table */}
+              <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+                <div className="p-6 border-b border-gray-800">
+                  <h2 className="text-xl font-bold text-white">Whitelisted Addresses</h2>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-800">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Address</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Note</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Added</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800">
+                      {whitelist.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                            No addresses whitelisted yet
+                          </td>
+                        </tr>
+                      ) : (
+                        whitelist.map((entry) => (
+                          <tr key={entry.id}>
+                            <td className="px-4 py-3 font-mono text-sm text-white">
+                              {formatAddress(entry.walletAddress)}
+                            </td>
+                            <td className="px-4 py-3 text-gray-300">{entry.email || '-'}</td>
+                            <td className="px-4 py-3 text-gray-400">{entry.note || '-'}</td>
+                            <td className="px-4 py-3 text-gray-400 text-sm">
+                              {new Date(entry.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => removeFromWhitelist(entry.id)}
+                                disabled={!!actionLoading}
+                                className="text-red-400 hover:text-red-300 text-sm"
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Banned Tab */}
           {activeTab === 'banned' && (
             <div className="space-y-6">
               {/* Ban Form */}
               <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
                 <h3 className="text-lg font-semibold text-white mb-4">Ban an Address</h3>
+                <p className="text-gray-400 text-sm mb-4">Prevent a wallet from purchasing or trading</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <input
                     type="text"
@@ -447,6 +710,49 @@ export default function AdminUsers() {
             </div>
           )}
 
+          {/* Broadcast Tab */}
+          {activeTab === 'broadcast' && (
+            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+              <h2 className="text-xl font-bold text-white mb-4">Email Broadcast</h2>
+              <p className="text-gray-400 mb-6">Send an email to all registered users with email addresses</p>
+
+              <div className="space-y-4 max-w-2xl">
+                <div>
+                  <label className="block text-gray-300 text-sm mb-2">Subject</label>
+                  <input
+                    type="text"
+                    placeholder="Email subject..."
+                    value={broadcastSubject}
+                    onChange={(e) => setBroadcastSubject(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-sm mb-2">Message</label>
+                  <textarea
+                    placeholder="Message content (supports basic HTML)..."
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                    rows={10}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                </div>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={sendBroadcast}
+                    disabled={!!actionLoading || !broadcastSubject || !broadcastMessage}
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-3 font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {actionLoading === 'broadcast' ? 'Sending...' : 'Send Broadcast'}
+                  </button>
+                  <span className="text-gray-400 text-sm">
+                    Will be sent to {users.filter((u) => u.email).length} users with email addresses
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* User Detail Modal */}
           {selectedUser && (
             <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -492,6 +798,16 @@ export default function AdminUsers() {
                 </div>
 
                 <div className="flex gap-4 mt-6">
+                  <button
+                    onClick={() => {
+                      setNewWhitelistAddress(selectedUser.walletAddress);
+                      setActiveTab('whitelist');
+                      setSelectedUser(null);
+                    }}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 font-semibold transition-colors"
+                  >
+                    Whitelist
+                  </button>
                   <button
                     onClick={() => {
                       setBanAddress(selectedUser.walletAddress);

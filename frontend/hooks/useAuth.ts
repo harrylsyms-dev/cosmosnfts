@@ -102,7 +102,16 @@ export function useAuth(): UseAuthReturn {
     }
   }
 
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const login = useCallback(async (walletAddress: string): Promise<boolean> => {
+    // Prevent duplicate login attempts
+    if (isLoggingIn) {
+      console.log('Login already in progress, ignoring');
+      return false;
+    }
+
+    setIsLoggingIn(true);
     setError(null);
 
     try {
@@ -111,6 +120,7 @@ export function useAuth(): UseAuthReturn {
         return false;
       }
 
+      console.log('Step 1: Getting nonce...');
       // Step 1: Get nonce from server
       const nonceRes = await fetch(`${apiUrl}/api/auth/nonce`, {
         method: 'POST',
@@ -119,11 +129,13 @@ export function useAuth(): UseAuthReturn {
       });
 
       if (!nonceRes.ok) {
-        setError('Failed to get authentication nonce');
+        const errorData = await nonceRes.json().catch(() => ({}));
+        setError(errorData.error || 'Failed to get authentication nonce');
         return false;
       }
 
       const { message } = await nonceRes.json();
+      console.log('Step 2: Requesting signature...');
 
       // Step 2: Request signature from MetaMask
       const signature = await window.ethereum.request({
@@ -131,6 +143,7 @@ export function useAuth(): UseAuthReturn {
         params: [message, walletAddress],
       });
 
+      console.log('Step 3: Verifying signature...');
       // Step 3: Verify signature with server
       const verifyRes = await fetch(`${apiUrl}/api/auth/verify`, {
         method: 'POST',
@@ -146,6 +159,7 @@ export function useAuth(): UseAuthReturn {
       }
 
       const { token, user: userData } = await verifyRes.json();
+      console.log('Login successful!');
 
       localStorage.setItem('userToken', token);
       setUser(userData);
@@ -155,12 +169,14 @@ export function useAuth(): UseAuthReturn {
       if (err.code === 4001) {
         setError('Signature request was rejected');
       } else {
-        setError('Authentication failed');
+        setError(err.message || 'Authentication failed');
       }
       console.error('Login failed:', err);
       return false;
+    } finally {
+      setIsLoggingIn(false);
     }
-  }, []);
+  }, [isLoggingIn]);
 
   const logout = useCallback(async () => {
     try {

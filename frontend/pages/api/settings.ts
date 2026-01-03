@@ -1,17 +1,56 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+import { prisma } from '../../lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    const response = await fetch(`${BACKEND_URL}/api/settings`, {
-      method: req.method,
-      headers: { 'Content-Type': 'application/json' },
+    const settings = await prisma.siteSettings.findUnique({
+      where: { id: 'main' },
     });
-    const data = await response.json();
-    res.status(response.status).json(data);
+
+    if (!settings) {
+      // Default settings if none exist
+      return res.json({
+        accessible: true,
+        isLive: true,
+        comingSoonMode: false,
+        maintenanceMode: false,
+      });
+    }
+
+    // Determine accessibility
+    let accessible = true;
+    let reason = null;
+
+    if (settings.maintenanceMode) {
+      accessible = false;
+      reason = 'maintenance';
+    } else if (settings.comingSoonMode && !settings.isLive) {
+      accessible = false;
+      reason = 'coming_soon';
+    }
+
+    res.json({
+      accessible,
+      reason,
+      isLive: settings.isLive,
+      comingSoonMode: settings.comingSoonMode,
+      maintenanceMode: settings.maintenanceMode,
+      launchDate: settings.launchDate,
+      comingSoonTitle: settings.comingSoonTitle,
+      comingSoonMessage: settings.comingSoonMessage,
+    });
   } catch (error) {
     console.error('Settings API error:', error);
-    res.status(500).json({ error: 'Failed to fetch settings' });
+    // Default to accessible if error
+    res.json({
+      accessible: true,
+      isLive: true,
+      comingSoonMode: false,
+      maintenanceMode: false,
+    });
   }
 }

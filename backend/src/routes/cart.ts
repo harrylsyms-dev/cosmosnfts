@@ -68,13 +68,26 @@ router.post('/add', verifyWalletOwnership, async (req: Request, res: Response) =
       return res.status(400).json({ error: 'NFT already in cart' });
     }
 
+    // Get current phase multiplier for pricing with dynamic percentage
+    const [activeTier, siteSettings] = await Promise.all([
+      prisma.tier.findFirst({ where: { active: true } }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+    ]);
+    const currentPhase = activeTier?.phase || 1;
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
+
+    // Calculate price: $0.10 × Score × Phase Multiplier
+    const score = nft.totalScore || nft.cosmicScore || 0;
+    const calculatedPrice = 0.10 * score * phaseMultiplier;
+
     // Add to cart and reserve NFT
     await prisma.$transaction([
       prisma.cartItem.create({
         data: {
           cartId: cart.id,
           nftId: parseInt(nftId),
-          priceAtAdd: nft.currentPrice,
+          priceAtAdd: calculatedPrice,
         },
       }),
       prisma.nFT.update({

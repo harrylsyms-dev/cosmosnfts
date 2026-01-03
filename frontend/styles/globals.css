@@ -129,3 +129,135 @@ a:hover {
 .btn-success {
   @apply bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors;
 }
+
+/* =============================================
+   COSMIC BACKGROUND ANIMATIONS
+   ============================================= */
+
+/* Star layers */
+.stars-small,
+.stars-medium,
+.stars-large {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+}
+
+.stars-small {
+  background-image: radial-gradient(1px 1px at 20px 30px, white, transparent),
+    radial-gradient(1px 1px at 40px 70px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 50px 160px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 90px 40px, white, transparent),
+    radial-gradient(1px 1px at 130px 80px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 160px 120px, white, transparent);
+  background-size: 200px 200px;
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+.stars-medium {
+  background-image: radial-gradient(1.5px 1.5px at 150px 150px, white, transparent),
+    radial-gradient(1.5px 1.5px at 200px 220px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1.5px 1.5px at 100px 280px, white, transparent),
+    radial-gradient(1.5px 1.5px at 250px 50px, rgba(255, 255, 255, 0.8), transparent);
+  background-size: 300px 300px;
+  animation: twinkle 5s ease-in-out infinite 1s;
+}
+
+.stars-large {
+  background-image: radial-gradient(2px 2px at 100px 200px, white, transparent),
+    radial-gradient(2px 2px at 300px 100px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2px 2px at 400px 300px, white, transparent);
+  background-size: 500px 500px;
+  animation: twinkle 6s ease-in-out infinite 2s;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Planet orbit animations */
+@keyframes orbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.animate-orbit-fast {
+  animation: orbit 8s linear infinite;
+}
+
+.animate-orbit-medium {
+  animation: orbit 12s linear infinite;
+}
+
+.animate-orbit-slow {
+  animation: orbit 18s linear infinite;
+}
+
+.animate-orbit-slower {
+  animation: orbit 26s linear infinite;
+}
+
+.animate-orbit-slowest {
+  animation: orbit 40s linear infinite;
+}
+
+.animate-orbit-saturn {
+  animation: orbit 60s linear infinite;
+}
+
+/* Spin animations for black hole */
+@keyframes spin-slow {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 30s linear infinite;
+}
+
+.animate-spin-medium {
+  animation: spin-slow 20s linear infinite reverse;
+}
+
+.animate-spin-fast {
+  animation: spin-slow 12s linear infinite;
+}
+
+.animate-spin-slower {
+  animation: spin-slow 45s linear infinite reverse;
+}
+
+/* Pulse animation for sun */
+.animate-pulse-slow {
+  animation: pulse-glow 4s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 60px 20px rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 80px 30px rgba(251, 191, 36, 0.6);
+  }
+}
+
+/* Float animations for nebula */
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  25% { transform: translateY(-20px) translateX(10px); }
+  50% { transform: translateY(0) translateX(20px); }
+  75% { transform: translateY(20px) translateX(10px); }
+}
+
+.animate-float-slow {
+  animation: float 20s ease-in-out infinite;
+}
+
+.animate-float-medium {
+  animation: float 15s ease-in-out infinite 2s;
+}
+
+.animate-float-fast {
+  animation: float 12s ease-in-out infinite 4s;
+}

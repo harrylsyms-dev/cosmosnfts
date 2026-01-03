@@ -86,7 +86,7 @@ router.get('/available', async (req: Request, res: Response) => {
         orderBy.totalScore = 'desc';
     }
 
-    const [total, nfts] = await Promise.all([
+    const [total, nfts, siteSettings] = await Promise.all([
       prisma.nFT.count({ where }),
       prisma.nFT.findMany({
         where,
@@ -94,18 +94,28 @@ router.get('/available', async (req: Request, res: Response) => {
         skip,
         take: limitNum,
       }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
     ]);
+
+    // Get current phase multiplier with dynamic percentage
+    const activeTier = await prisma.tier.findFirst({ where: { active: true } });
+    const currentPhase = activeTier?.phase || 1;
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
 
     res.json({
       total,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
+      currentPhase,
+      phaseIncreasePercent: increasePercent,
+      phaseMultiplier: phaseMultiplier.toFixed(4),
       items: nfts.map((nft) => {
         // Use totalScore (populated by seed) or cosmicScore
         const score = nft.totalScore || nft.cosmicScore || 0;
-        // Use currentPrice or calculate from basePriceCents
-        const price = nft.currentPrice || (nft.basePriceCents / 100) || 0;
+        // Price = $0.10 × Score × Phase Multiplier
+        const price = 0.10 * score * phaseMultiplier;
         return {
           id: nft.id,
           name: nft.name,
@@ -115,7 +125,10 @@ router.get('/available', async (req: Request, res: Response) => {
           badge: nft.badgeTier || getBadgeForScore(score),
           currentPrice: price,
           displayPrice: `$${price.toFixed(2)}`,
+          priceFormula: `$0.10 × ${score} × ${phaseMultiplier.toFixed(4)}`,
           objectType: nft.objectType,
+          constellation: nft.constellation,
+          distance: nft.distance,
           status: nft.status,
         };
       }),
@@ -135,23 +148,34 @@ router.get('/search', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
 
-    const nfts = await prisma.nFT.findMany({
-      where: {
-        name: {
-          contains: q as string,
+    const [nfts, siteSettings] = await Promise.all([
+      prisma.nFT.findMany({
+        where: {
+          name: {
+            contains: q as string,
+          },
+          status: 'AVAILABLE',
         },
-        status: 'AVAILABLE',
-      },
-      take: Math.min(parseInt(limit as string), 50),
-      orderBy: { totalScore: 'desc' },
-    });
+        take: Math.min(parseInt(limit as string), 50),
+        orderBy: { totalScore: 'desc' },
+      }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+    ]);
+
+    // Get current phase multiplier with dynamic percentage
+    const activeTier = await prisma.tier.findFirst({ where: { active: true } });
+    const currentPhase = activeTier?.phase || 1;
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
 
     res.json({
       query: q,
       count: nfts.length,
+      currentPhase,
       items: nfts.map((nft) => {
         const score = nft.totalScore || nft.cosmicScore || 0;
-        const price = nft.currentPrice || (nft.basePriceCents / 100) || 0;
+        // Price = $0.10 × Score × Phase Multiplier
+        const price = 0.10 * score * phaseMultiplier;
         return {
           id: nft.id,
           name: nft.name,
@@ -251,7 +275,7 @@ router.get('/by-phase', async (req: Request, res: Response) => {
       },
     };
 
-    const [total, nfts] = await Promise.all([
+    const [total, nfts, siteSettings] = await Promise.all([
       prisma.nFT.count({ where }),
       prisma.nFT.findMany({
         where,
@@ -259,22 +283,24 @@ router.get('/by-phase', async (req: Request, res: Response) => {
         skip: offsetNum,
         take: limitNum,
       }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
     ]);
 
-    // Calculate phase price
-    const basePrice = 350;
-    const phasePrice = basePrice * Math.pow(1.075, phaseNum - 1);
+    // Calculate phase price multiplier with dynamic percentage
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), phaseNum - 1);
 
     res.json({
       phase: phaseNum,
-      phasePrice: `$${phasePrice.toFixed(2)}`,
+      phaseMultiplier: phaseMultiplier.toFixed(4),
       idRange: { min: actualMinId, max: actualMaxId },
       total,
       limit: limitNum,
       offset: offsetNum,
       items: nfts.map((nft) => {
         const score = nft.totalScore || nft.cosmicScore || 0;
-        const price = nft.currentPrice || (nft.basePriceCents / 100) || 0;
+        // Price = $0.10 × Score × Phase Multiplier
+        const price = 0.10 * score * phaseMultiplier;
         return {
           id: nft.id,
           name: nft.name,
@@ -282,8 +308,11 @@ router.get('/by-phase', async (req: Request, res: Response) => {
           score,
           badge: nft.badgeTier || getBadgeForScore(score),
           objectType: nft.objectType,
+          constellation: nft.constellation,
+          distance: nft.distance,
           status: nft.status,
           displayPrice: `$${price.toFixed(2)}`,
+          priceFormula: `$0.10 × ${score} × ${phaseMultiplier.toFixed(4)}`,
         };
       }),
     });
@@ -306,6 +335,16 @@ router.get('/:nftId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'NFT not found' });
     }
 
+    // Get current phase multiplier with dynamic percentage
+    const [activeTier, siteSettings] = await Promise.all([
+      prisma.tier.findFirst({ where: { active: true } }),
+      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+    ]);
+    const currentPhase = activeTier?.phase || 1;
+    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
+    const multiplierBase = 1 + (increasePercent / 100);
+    const phaseMultiplier = Math.pow(multiplierBase, currentPhase - 1);
+
     // Use the correct score fields (from seed: fameScore, significanceScore, etc.)
     // Fall back to alternative fields if main ones are 0
     const fameScore = nft.fameScore || nft.fameVisibility || 0;
@@ -316,33 +355,43 @@ router.get('/:nftId', async (req: Request, res: Response) => {
 
     // Calculate total score and price
     const totalScore = nft.totalScore || (fameScore + significanceScore + rarityScore + discoveryScore + culturalScore);
-    const currentPrice = nft.currentPrice || (nft.basePriceCents / 100) || (totalScore * 1);
+    // Price = $0.10 × Score × Phase Multiplier
+    const currentPrice = 0.10 * totalScore * phaseMultiplier;
 
-    // Calculate price projections based on current tier price
-    const basePrice = 350;
-    const tierPrice = basePrice * Math.pow(1.075, (nft.currentTier || 1) - 1);
-    const projections = [1, 2, 5, 10, 20, 30].map((phase) => ({
-      phase,
-      price: `$${(tierPrice * Math.pow(1.075, phase - 1)).toFixed(2)}`,
-    }));
+    // Calculate price projections for future phases (77 total phases)
+    const projections = [1, 2, 5, 10, 20, 30, 50, 77].map((phase) => {
+      const mult = Math.pow(multiplierBase, phase - 1);
+      const price = 0.10 * totalScore * mult;
+      return {
+        phase,
+        price: `$${price.toFixed(2)}`,
+        multiplier: mult.toFixed(4),
+      };
+    });
 
     res.json({
       nftId: nft.id,
       name: nft.name,
       description: nft.description,
-      image: nft.image || nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null,
+      image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
+      objectType: nft.objectType,
+      constellation: nft.constellation,
+      distance: nft.distance,
       score: totalScore,
-      badge: getBadgeForScore(totalScore),
+      badge: nft.badgeTier || getBadgeForScore(totalScore),
       fameVisibility: fameScore,
       scientificSignificance: significanceScore,
       rarity: rarityScore,
       discoveryRecency: discoveryScore,
       culturalImpact: culturalScore,
-      basePrice: (totalScore * 1e18).toString(),
-      currentPhasePrice: (currentPrice * 1e18).toString(),
+      currentPhase,
+      phaseMultiplier: phaseMultiplier.toFixed(4),
+      currentPrice,
       displayPrice: `$${currentPrice.toFixed(2)}`,
+      priceFormula: `$0.10 × ${totalScore} × ${phaseMultiplier.toFixed(4)}`,
       status: nft.status,
       availablePhases: projections,
+      priceProjections: projections,
     });
   } catch (error) {
     logger.error('Error fetching NFT:', error);

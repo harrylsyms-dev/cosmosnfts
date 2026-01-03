@@ -68,6 +68,7 @@ class MarketplaceService {
     tradingEnabled?: boolean;
     listingsEnabled?: boolean;
     offersEnabled?: boolean;
+    auctionsEnabled?: boolean;
     creatorRoyaltyPercent?: number;
     platformFeePercent?: number;
   }) {

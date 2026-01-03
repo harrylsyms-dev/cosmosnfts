@@ -8,6 +8,7 @@ import Layout from '../components/Layout';
 import NFTCard from '../components/NFTCard';
 import CountdownTimer from '../components/CountdownTimer';
 import PricingDisplay from '../components/PricingDisplay';
+import CosmicBackground from '../components/CosmicBackground';
 
 interface NFT {
   id: number;
@@ -53,15 +54,26 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Cosmic Background with Solar System and Black Hole */}
+        <CosmicBackground />
+
         {/* Gradient overlay at bottom for transition */}
         <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-gray-950 to-transparent z-[1]" />
 
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-4 text-center py-20">
           {/* Floating badge */}
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-8 animate-pulse">
-            <span className="w-2 h-2 bg-green-400 rounded-full" />
-            <span className="text-sm text-gray-300">Phase 1 Now Live</span>
+          <div className={`inline-flex items-center gap-2 backdrop-blur-sm border rounded-full px-4 py-2 mb-8 ${
+            pricing?.isPaused
+              ? 'bg-yellow-900/30 border-yellow-500/30'
+              : 'bg-white/10 border-white/20 animate-pulse'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${pricing?.isPaused ? 'bg-yellow-400' : 'bg-green-400'}`} />
+            <span className="text-sm text-gray-300">
+              {pricing?.isPaused
+                ? 'Timer Paused - Price Locked'
+                : `Phase ${pricing?.tierIndex || 1} Now Live`}
+            </span>
           </div>
 
           <h1 className="text-6xl md:text-8xl font-bold mb-6 leading-tight">
@@ -128,12 +140,12 @@ export default function Home() {
           </div>
           <div>
             <div className="text-4xl font-bold text-green-400">
-              {pricing ? `$${pricing.displayPrice}` : '$350'}
+              {pricing ? `$${pricing.displayPrice}` : '$0.10'}
             </div>
-            <div className="text-gray-400">Current Price</div>
+            <div className="text-gray-400">Base Rate × Score</div>
           </div>
           <div>
-            <div className="text-4xl font-bold text-purple-400">7.5%</div>
+            <div className="text-4xl font-bold text-purple-400">{pricing?.phaseIncreasePercent || 7.5}%</div>
             <div className="text-gray-400">Per Phase Increase</div>
           </div>
           <div>
@@ -202,7 +214,7 @@ export default function Home() {
               <h3 className="text-xl font-semibold mb-2">Receive Your NFT</h3>
               <p className="text-gray-400">
                 NFT mints automatically to your wallet on Polygon.
-                View and trade on OpenSea within minutes.
+                View and trade on our marketplace within minutes.
               </p>
             </div>
           </div>
@@ -269,15 +281,26 @@ export default function Home() {
             Prices Go Up Every Phase
           </h2>
           <p className="text-xl text-gray-300 mb-8">
-            Don't miss Phase 1 pricing. Once it ends, prices increase 7.5%.
+            {pricing?.isPaused
+              ? 'Timer is paused. Prices are locked until resumed.'
+              : `Don't miss Phase ${pricing?.tierIndex || 1} pricing. Once it ends, prices increase ${pricing?.phaseIncreasePercent || 7.5}%.`}
           </p>
 
           {pricing && (
             <div className="mb-8">
-              <CountdownTimer
-                targetTime={Date.now() + pricing.timeUntilNextTier * 1000}
-                onComplete={() => window.location.reload()}
-              />
+              {pricing.isPaused ? (
+                <div className="inline-flex items-center gap-3 bg-yellow-900/30 border border-yellow-500/30 px-6 py-4 rounded-xl">
+                  <span className="text-yellow-400 text-2xl">⏸️</span>
+                  <span className="text-yellow-300 font-medium">
+                    Timer paused - price will not increase until resumed
+                  </span>
+                </div>
+              ) : (
+                <CountdownTimer
+                  targetTime={Date.now() + pricing.timeUntilNextTier * 1000}
+                  onComplete={() => window.location.reload()}
+                />
+              )}
             </div>
           )}
 

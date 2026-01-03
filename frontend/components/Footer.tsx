@@ -32,14 +32,9 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a
-                  href="https://opensea.io/collection/cosmonfts"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
-                  OpenSea
-                </a>
+                <Link href="/auctions" className="hover:text-white transition-colors">
+                  Auctions
+                </Link>
               </li>
             </ul>
           </div>

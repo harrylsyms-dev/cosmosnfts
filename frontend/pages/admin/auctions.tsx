@@ -5,18 +5,6 @@ import Link from 'next/link';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
-interface Auction {
-  id: string;
-  tokenId: number;
-  nftName: string;
-  startingBid: number;
-  currentBid: number;
-  bidCount: number;
-  status: string;
-  startTime: string;
-  endTime: string;
-}
-
 interface AuctionStats {
   active: number;
   ended: number;
@@ -26,14 +14,6 @@ interface AuctionStats {
   totalRevenue: number;
 }
 
-interface ReservedNFT {
-  id: number;
-  tokenId: number;
-  name: string;
-  totalScore: number;
-  badgeTier: string;
-}
-
 interface ScheduledAuction {
   name: string;
   week: number;
@@ -41,6 +21,7 @@ interface ScheduledAuction {
   startingBidDisplay: string;
   weeksUntil: number;
   status: string;
+  finalPriceCents?: number;
   existingAuctionId: string | null;
   nft: {
     id: number;
@@ -60,31 +41,33 @@ interface ScheduledAuction {
   } | null;
 }
 
+interface MarketplaceSettings {
+  auctionsEnabled: boolean;
+  tradingEnabled: boolean;
+  listingsEnabled: boolean;
+  offersEnabled: boolean;
+}
+
 export default function AdminAuctions() {
   const router = useRouter();
-  const [auctions, setAuctions] = useState<Auction[]>([]);
   const [stats, setStats] = useState<AuctionStats | null>(null);
-  const [reservedNFTs, setReservedNFTs] = useState<ReservedNFT[]>([]);
   const [scheduledAuctions, setScheduledAuctions] = useState<ScheduledAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    tokenId: '',
-    startingBid: '500',
-    durationDays: '7',
-  });
-  const [isCreating, setIsCreating] = useState(false);
-  const [autoPopulatePhase, setAutoPopulatePhase] = useState('1');
-  const [autoPopulateCount, setAutoPopulateCount] = useState('5');
-  const [isAutoPopulating, setIsAutoPopulating] = useState(false);
-  const [previewPhase, setPreviewPhase] = useState('1');
   const [selectedAuction, setSelectedAuction] = useState<ScheduledAuction | null>(null);
   const [currentWeek, setCurrentWeek] = useState(0);
   const [editingPrice, setEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState('');
   const [isSavingPrice, setIsSavingPrice] = useState(false);
+  const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings | null>(null);
+  const [isTogglingAuctions, setIsTogglingAuctions] = useState(false);
+  const [showStartAuction, setShowStartAuction] = useState(false);
+  const [auctionStartDate, setAuctionStartDate] = useState('');
+  const [auctionStartTime, setAuctionStartTime] = useState('');
+  const [auctionEndDate, setAuctionEndDate] = useState('');
+  const [auctionEndTime, setAuctionEndTime] = useState('');
+  const [isStartingAuction, setIsStartingAuction] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -103,11 +86,61 @@ export default function AdminAuctions() {
         return;
       }
 
-      await Promise.all([fetchAuctions(), fetchStats(), fetchReservedNFTs('1'), fetchScheduledAuctions()]);
+      await Promise.all([fetchStats(), fetchScheduledAuctions(), fetchMarketplaceSettings()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchMarketplaceSettings() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMarketplaceSettings(data.settings);
+      }
+    } catch (error) {
+      console.error('Failed to fetch marketplace settings:', error);
+    }
+  }
+
+  async function handleToggleAuctions() {
+    if (!marketplaceSettings) return;
+
+    setIsTogglingAuctions(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          auctionsEnabled: !marketplaceSettings.auctionsEnabled,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMarketplaceSettings(data.settings);
+        setSuccess(`Auctions ${data.settings.auctionsEnabled ? 'enabled' : 'disabled'}`);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to toggle auctions');
+      }
+    } catch (error) {
+      setError('Failed to toggle auctions');
+    } finally {
+      setIsTogglingAuctions(false);
     }
   }
 
@@ -211,20 +244,78 @@ export default function AdminAuctions() {
     setSelectedAuction(null);
     setEditingPrice(false);
     setNewPrice('');
+    setShowStartAuction(false);
+    setAuctionStartDate('');
+    setAuctionStartTime('');
+    setAuctionEndDate('');
+    setAuctionEndTime('');
   }
 
-  async function fetchAuctions() {
+  function initializeAuctionDates() {
+    // Set default start to now + 1 hour
+    const start = new Date();
+    start.setHours(start.getHours() + 1);
+    start.setMinutes(0, 0, 0);
+
+    // Set default end to 7 days after start
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+
+    setAuctionStartDate(start.toISOString().split('T')[0]);
+    setAuctionStartTime(start.toTimeString().slice(0, 5));
+    setAuctionEndDate(end.toISOString().split('T')[0]);
+    setAuctionEndTime(end.toTimeString().slice(0, 5));
+    setShowStartAuction(true);
+  }
+
+  async function handleStartAuction() {
+    if (!selectedAuction || !auctionStartDate || !auctionStartTime || !auctionEndDate || !auctionEndTime) {
+      setError('Please fill in all date and time fields');
+      return;
+    }
+
+    const startTime = new Date(`${auctionStartDate}T${auctionStartTime}:00`);
+    const endTime = new Date(`${auctionEndDate}T${auctionEndTime}:00`);
+
+    if (endTime <= startTime) {
+      setError('End time must be after start time');
+      return;
+    }
+
+    setIsStartingAuction(true);
     try {
-      const res = await fetch(`${apiUrl}/api/auctions/active`);
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/auctions/admin/start`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          nftName: selectedAuction.name,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          startingBidCents: selectedAuction.startingBidCents,
+        }),
+      });
 
       if (res.ok) {
         const data = await res.json();
-        setAuctions(data.auctions || []);
+        setSuccess(`Auction started! Status: ${data.auction.status}`);
+        handleCloseModal();
+        await Promise.all([fetchStats(), fetchScheduledAuctions()]);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to start auction');
       }
     } catch (error) {
-      console.error('Failed to fetch auctions:', error);
+      setError('Failed to start auction');
+    } finally {
+      setIsStartingAuction(false);
     }
   }
+
 
   async function fetchStats() {
     try {
@@ -241,103 +332,6 @@ export default function AdminAuctions() {
     } catch (error) {
       console.error('Failed to fetch auction stats:', error);
     }
-  }
-
-  async function fetchReservedNFTs(phase: string) {
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/auctions/admin/reserved/${phase}?count=5`, {
-        credentials: 'include',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setReservedNFTs(data.reserved || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch reserved NFTs:', error);
-    }
-  }
-
-  async function handleCreateAuction(e: React.FormEvent) {
-    e.preventDefault();
-    setIsCreating(true);
-    setError(null);
-
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/auctions/create`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          tokenId: parseInt(createForm.tokenId),
-          nftName: `NFT #${createForm.tokenId}`,
-          startingBidCents: parseInt(createForm.startingBid) * 100,
-          durationDays: parseInt(createForm.durationDays),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setShowCreateForm(false);
-        setCreateForm({ tokenId: '', startingBid: '500', durationDays: '7' });
-        setSuccess('Auction created successfully');
-        await Promise.all([fetchAuctions(), fetchStats()]);
-      } else {
-        setError(data.error || 'Failed to create auction');
-      }
-    } catch (error) {
-      setError('Failed to create auction');
-    } finally {
-      setIsCreating(false);
-    }
-  }
-
-  async function handleAutoPopulate(e: React.FormEvent) {
-    e.preventDefault();
-    setIsAutoPopulating(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/auctions/admin/auto-populate`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          phase: parseInt(autoPopulatePhase),
-          count: parseInt(autoPopulateCount),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setSuccess(data.message || `Created ${data.auctionsCreated} auctions`);
-        await Promise.all([fetchAuctions(), fetchStats(), fetchReservedNFTs(autoPopulatePhase)]);
-      } else {
-        setError(data.error || 'Failed to auto-populate auctions');
-      }
-    } catch (error) {
-      setError('Failed to auto-populate auctions');
-    } finally {
-      setIsAutoPopulating(false);
-    }
-  }
-
-  function handlePreviewPhaseChange(phase: string) {
-    setPreviewPhase(phase);
-    fetchReservedNFTs(phase);
   }
 
   if (isLoading) {
@@ -368,6 +362,51 @@ export default function AdminAuctions() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 py-8">
+          {/* Auctions Toggle */}
+          <div className="bg-gray-900 rounded-lg p-6 mb-6 border border-gray-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">Auctions System</h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  Enable or disable the auction system for the marketplace
+                </p>
+              </div>
+              <button
+                onClick={handleToggleAuctions}
+                disabled={isTogglingAuctions || !marketplaceSettings}
+                className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 ${
+                  marketplaceSettings?.auctionsEnabled
+                    ? 'bg-green-600'
+                    : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                    marketplaceSettings?.auctionsEnabled ? 'translate-x-9' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {marketplaceSettings && (
+              <div className="mt-4 flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    marketplaceSettings.auctionsEnabled
+                      ? 'bg-green-900/50 text-green-400 border border-green-700'
+                      : 'bg-red-900/50 text-red-400 border border-red-700'
+                  }`}
+                >
+                  {marketplaceSettings.auctionsEnabled ? 'ENABLED' : 'DISABLED'}
+                </span>
+                <span className="text-gray-500 text-sm">
+                  {marketplaceSettings.auctionsEnabled
+                    ? 'Users can participate in auctions'
+                    : 'Auctions are currently hidden from users'}
+                </span>
+              </div>
+            )}
+          </div>
+
           {error && (
             <div className="mb-6 p-4 rounded bg-red-900/30 border border-red-600 text-red-400">
               {error}
@@ -545,6 +584,103 @@ export default function AdminAuctions() {
                     </div>
                   )}
 
+                  {/* Start Auction Section */}
+                  {(selectedAuction.status === 'SCHEDULED' || selectedAuction.status === 'READY') && !selectedAuction.existingAuctionId && selectedAuction.nft && (
+                    <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-purple-700">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-purple-400">Start Auction</h3>
+                        {!showStartAuction && (
+                          <button
+                            onClick={initializeAuctionDates}
+                            className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                          >
+                            Schedule Auction
+                          </button>
+                        )}
+                      </div>
+
+                      {showStartAuction && (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1">Start Date</label>
+                              <input
+                                type="date"
+                                value={auctionStartDate}
+                                onChange={(e) => setAuctionStartDate(e.target.value)}
+                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1">Start Time</label>
+                              <input
+                                type="time"
+                                value={auctionStartTime}
+                                onChange={(e) => setAuctionStartTime(e.target.value)}
+                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1">End Date</label>
+                              <input
+                                type="date"
+                                value={auctionEndDate}
+                                onChange={(e) => setAuctionEndDate(e.target.value)}
+                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1">End Time</label>
+                              <input
+                                type="time"
+                                value={auctionEndTime}
+                                onChange={(e) => setAuctionEndTime(e.target.value)}
+                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="bg-gray-700/50 rounded-lg p-3">
+                            <p className="text-sm text-gray-400">
+                              Starting Bid: <span className="text-green-400 font-medium">{selectedAuction.startingBidDisplay}</span>
+                            </p>
+                            {auctionStartDate && auctionStartTime && auctionEndDate && auctionEndTime && (
+                              <p className="text-sm text-gray-400 mt-1">
+                                Duration: {(() => {
+                                  const start = new Date(`${auctionStartDate}T${auctionStartTime}:00`);
+                                  const end = new Date(`${auctionEndDate}T${auctionEndTime}:00`);
+                                  const diffMs = end.getTime() - start.getTime();
+                                  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                  const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                  return `${days} days, ${hours} hours`;
+                                })()}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex gap-3">
+                            <button
+                              onClick={handleStartAuction}
+                              disabled={isStartingAuction}
+                              className="flex-1 bg-green-600 hover:bg-green-500 text-white font-medium px-4 py-2 rounded-lg disabled:opacity-50"
+                            >
+                              {isStartingAuction ? 'Starting...' : 'Start Auction'}
+                            </button>
+                            <button
+                              onClick={() => setShowStartAuction(false)}
+                              className="bg-gray-600 hover:bg-gray-500 text-white font-medium px-4 py-2 rounded-lg"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Action buttons */}
                   <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-700">
                     {selectedAuction.nft && (
@@ -603,7 +739,7 @@ export default function AdminAuctions() {
                   <button
                     key={auction.name}
                     onClick={() => setSelectedAuction(auction)}
-                    className="bg-gray-800 hover:bg-gray-700 rounded-lg p-4 text-left transition-all border border-gray-700 hover:border-purple-500"
+                    className="bg-gray-800 hover:bg-gray-700 rounded-lg p-4 text-left transition-all border border-gray-700 hover:border-purple-500 relative overflow-hidden"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <span className="text-2xl">
@@ -615,14 +751,33 @@ export default function AdminAuctions() {
                     </div>
                     <h3 className="font-medium truncate mb-1">{auction.name}</h3>
                     <p className="text-xs text-gray-400 mb-2">Week {auction.week}</p>
-                    <p className="text-sm text-green-400 font-medium">{auction.startingBidDisplay}</p>
-                    {auction.weeksUntil > 0 && (
+                    {auction.status === 'FINALIZED' && auction.finalPriceCents ? (
+                      <div>
+                        <p className="text-xs text-gray-500 line-through">{auction.startingBidDisplay}</p>
+                        <p className="text-sm text-green-400 font-medium">
+                          Sold: ${(auction.finalPriceCents / 100).toLocaleString()}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-green-400 font-medium">{auction.startingBidDisplay}</p>
+                    )}
+                    {auction.weeksUntil > 0 && auction.status !== 'FINALIZED' && (
                       <p className="text-xs text-gray-500 mt-1">
                         {auction.weeksUntil} week{auction.weeksUntil !== 1 ? 's' : ''} away
                       </p>
                     )}
                     {!auction.nft && (
                       <p className="text-xs text-red-400 mt-2">NFT not found</p>
+                    )}
+                    {/* Image thumbnail in bottom right */}
+                    {auction.nft?.image && (
+                      <div className="absolute bottom-2 right-2 w-12 h-12 rounded-lg overflow-hidden border border-gray-600 shadow-lg">
+                        <img
+                          src={auction.nft.image}
+                          alt={auction.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     )}
                   </button>
                 ))}
@@ -631,202 +786,6 @@ export default function AdminAuctions() {
               <div className="text-center py-8 text-gray-400">
                 <p>Loading scheduled auctions...</p>
               </div>
-            )}
-          </div>
-
-          {/* Auto-Populate Section */}
-          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
-            <h2 className="text-xl font-bold mb-4">Auto-Populate Auctions</h2>
-            <p className="text-gray-400 mb-4">
-              Automatically create auctions for the top-scoring NFTs in a phase. Auctions run on odd-numbered phases (1, 3, 5, etc.).
-            </p>
-
-            <form onSubmit={handleAutoPopulate} className="grid md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Phase Number</label>
-                <select
-                  value={autoPopulatePhase}
-                  onChange={(e) => setAutoPopulatePhase(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                >
-                  {Array.from({ length: 41 }, (_, i) => i * 2 + 1).map((phase) => (
-                    <option key={phase} value={phase.toString()}>
-                      Phase {phase}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Number of Auctions</label>
-                <select
-                  value={autoPopulateCount}
-                  onChange={(e) => setAutoPopulateCount(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                >
-                  <option value="3">3 NFTs</option>
-                  <option value="5">5 NFTs</option>
-                  <option value="7">7 NFTs</option>
-                  <option value="10">10 NFTs</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  disabled={isAutoPopulating}
-                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg disabled:opacity-50"
-                >
-                  {isAutoPopulating ? 'Creating...' : 'Auto-Populate'}
-                </button>
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={() => handlePreviewPhaseChange(autoPopulatePhase)}
-                  className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
-                >
-                  Preview NFTs
-                </button>
-              </div>
-            </form>
-
-            <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium">Reserved for Phase {previewPhase} Auctions</h3>
-                <span className="text-sm text-gray-400">
-                  {parseInt(previewPhase) % 2 === 1 ? 'Auction Phase' : 'Not an Auction Phase'}
-                </span>
-              </div>
-              {reservedNFTs.length > 0 ? (
-                <div className="grid md:grid-cols-5 gap-2">
-                  {reservedNFTs.map((nft) => (
-                    <div key={nft.tokenId} className="bg-gray-900 rounded p-3 text-sm">
-                      <p className="font-medium truncate">{nft.name}</p>
-                      <p className="text-gray-400">#{nft.tokenId}</p>
-                      <p className="text-xs">
-                        Score: <span className="text-green-400">{nft.totalScore}</span>
-                        {' | '}
-                        <span className={`${
-                          nft.badgeTier === 'ELITE' ? 'text-purple-400' :
-                          nft.badgeTier === 'PREMIUM' ? 'text-yellow-400' :
-                          nft.badgeTier === 'EXCEPTIONAL' ? 'text-blue-400' :
-                          'text-gray-400'
-                        }`}>{nft.badgeTier}</span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">No NFTs available for auction in this phase</p>
-              )}
-            </div>
-          </div>
-
-          {/* Manual Create */}
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Active Auctions</h2>
-            <button
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg"
-            >
-              {showCreateForm ? 'Cancel' : 'Create Manual Auction'}
-            </button>
-          </div>
-
-          {showCreateForm && (
-            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
-              <h2 className="text-lg font-bold mb-4">Create Manual Auction</h2>
-              <form onSubmit={handleCreateAuction} className="grid md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-gray-400 text-sm mb-2">NFT Token ID</label>
-                  <input
-                    type="number"
-                    value={createForm.tokenId}
-                    onChange={(e) => setCreateForm({ ...createForm, tokenId: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                    placeholder="e.g. 1"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 text-sm mb-2">Starting Bid ($)</label>
-                  <input
-                    type="number"
-                    value={createForm.startingBid}
-                    onChange={(e) => setCreateForm({ ...createForm, startingBid: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 text-sm mb-2">Duration (days)</label>
-                  <input
-                    type="number"
-                    value={createForm.durationDays}
-                    onChange={(e) => setCreateForm({ ...createForm, durationDays: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                    required
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    type="submit"
-                    disabled={isCreating}
-                    className="w-full bg-green-600 hover:bg-green-500 text-white font-bold px-4 py-2 rounded-lg disabled:opacity-50"
-                  >
-                    {isCreating ? 'Creating...' : 'Create'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          <div className="bg-gray-900 rounded-lg overflow-hidden">
-            {auctions.length === 0 ? (
-              <div className="p-12 text-center text-gray-400">
-                <p className="text-xl mb-2">No active auctions</p>
-                <p>Use auto-populate or create a manual auction to get started</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="px-4 py-3 text-left">NFT</th>
-                    <th className="px-4 py-3 text-left">Starting Bid</th>
-                    <th className="px-4 py-3 text-left">Current Bid</th>
-                    <th className="px-4 py-3 text-left">Bids</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left">End Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auctions.map((auction) => (
-                    <tr key={auction.id} className="border-t border-gray-800 hover:bg-gray-800/50">
-                      <td className="px-4 py-3">
-                        <span className="font-medium">{auction.nftName}</span>
-                        <span className="text-gray-500 ml-2">#{auction.tokenId}</span>
-                      </td>
-                      <td className="px-4 py-3">${(auction.startingBid / 100).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-green-400 font-bold">
-                        ${(auction.currentBid / 100).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3">{auction.bidCount}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded text-sm ${
-                          auction.status === 'ACTIVE' ? 'bg-green-900 text-green-300' :
-                          auction.status === 'ENDED' ? 'bg-gray-700 text-gray-300' :
-                          auction.status === 'FINALIZED' ? 'bg-blue-900 text-blue-300' :
-                          'bg-yellow-900 text-yellow-300'
-                        }`}>
-                          {auction.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {new Date(auction.endTime).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             )}
           </div>
 

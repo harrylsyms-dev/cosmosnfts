@@ -55,6 +55,8 @@ model NFT {
 
   // Metadata
   objectType              String?   @map("object_type")
+  constellation           String?   // Constellation location (e.g., "Orion", "Cygnus")
+  distance                String?   // Distance from Earth (e.g., "4.24 ly", "2.5M ly")
 
   // Timestamps
   createdAt               DateTime  @default(now()) @map("created_at")
@@ -285,10 +287,26 @@ model AdminUser {
   lastLoginAt   DateTime? @map("last_login_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
+  privileges    String?   @default("[]") // JSON: section access privileges
 
   sessions      AdminSession[]
+  dashboardPreference AdminDashboardPreference?
 
   @@map("admin_users")
+}
+
+// Admin Dashboard Preferences
+model AdminDashboardPreference {
+  id              String    @id @default(uuid())
+  adminId         String    @unique @map("admin_id")
+  layout          String    @default("[]") @map("layout") // JSON: widget configs
+  starredWidgets  String    @default("[]") @map("starred_widgets") // JSON: starred widget IDs
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  admin           AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_dashboard_preferences")
 }
 
 // Admin Sessions
@@ -319,15 +337,51 @@ model SiteSettings {
   comingSoonMessage String? @map("coming_soon_message")
   previewPassword String?   @map("preview_password")
 
+  // HTML Content for Coming Soon and Maintenance pages
+  comingSoonHtml      String?   @map("coming_soon_html")
+  comingSoonPassword  String?   @map("coming_soon_password")
+  maintenanceHtml     String?   @map("maintenance_html")
+
+  // Leonardo AI global prompt
+  leonardoPrompt      String?   @map("leonardo_prompt")
+
   // Phase timer controls
   phasePaused       Boolean   @default(false) @map("phase_paused")
   pausedAt          DateTime? @map("paused_at")
   pauseDurationMs   Int       @default(0) @map("pause_duration_ms")
   contractPaused    Boolean   @default(false) @map("contract_paused")
 
+  // Phase pricing configuration
+  phaseIncreasePercent  Float     @default(7.5) @map("phase_increase_percent")
+
+  // Sandbox/Testing Mode
+  sandboxMode           Boolean   @default(false) @map("sandbox_mode")
+  paymentsEnabled       Boolean   @default(true) @map("payments_enabled")
+
+  // Wallet & Revenue Configuration
+  ownerWalletAddress      String?   @map("owner_wallet_address")
+  benefactorWalletAddress String?   @map("benefactor_wallet_address")
+  benefactorName          String?   @default("Space Exploration Fund") @map("benefactor_name")
+  ownerSharePercent       Int       @default(70) @map("owner_share_percent")
+  benefactorSharePercent  Int       @default(30) @map("benefactor_share_percent")
+
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("site_settings")
+}
+
+// Encrypted API Keys Storage
+model ApiKey {
+  id            String    @id @default(uuid())
+  service       String    @unique  // e.g., "stripe", "pinata", "leonardo", "polygon_rpc"
+  encryptedKey  String    @map("encrypted_key")  // AES-256-GCM encrypted
+  description   String?   // Human-readable description
+  lastRotated   DateTime? @map("last_rotated")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdBy     String?   @map("created_by")  // Admin ID who created/updated
+
+  @@map("api_keys")
 }
 
 // User (Wallet-based authentication)

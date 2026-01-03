@@ -114,7 +114,7 @@ export async function sendMintedEmail(
         <p style="margin: 0; font-size: 18px; font-weight: bold; color: #ffffff;">${nft.name}</p>
         <p style="margin: 5px 0; color: #a0a0a0;">Cosmic Score: ${nft.cosmicScore}/500 | ${getBadgeForScore(nft.cosmicScore)}</p>
         <p style="margin: 5px 0;">
-          <a href="https://opensea.io/assets/polygon/${process.env.CONTRACT_ADDRESS}/${nft.tokenId}" style="color: #0066ff;">View on OpenSea</a>
+          <a href="${process.env.FRONTEND_URL}/nft/${nft.tokenId}" style="color: #0066ff;">View NFT</a>
         </p>
       </div>
     `
@@ -169,8 +169,8 @@ export async function sendMintedEmail(
         <div class="section">
           <p class="label">What's Next?</p>
           <ol style="color: #a0a0a0;">
-            <li>Connect your wallet to OpenSea to view your collection</li>
-            <li>List your NFTs for secondary sales if desired</li>
+            <li>View your NFTs in your wallet or on our marketplace</li>
+            <li>List your NFTs for secondary sales on our marketplace</li>
             <li>Join our community on Discord and Twitter</li>
           </ol>
         </div>

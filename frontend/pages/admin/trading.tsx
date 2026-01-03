@@ -39,6 +39,13 @@ interface FloorStats {
   averagePrice: string;
 }
 
+interface MarketplaceSettings {
+  tradingEnabled: boolean;
+  listingsEnabled: boolean;
+  offersEnabled: boolean;
+  auctionsEnabled: boolean;
+}
+
 export default function AdminTrading() {
   const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
@@ -46,6 +53,10 @@ export default function AdminTrading() {
   const [floorStats, setFloorStats] = useState<FloorStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'listings' | 'auctions' | 'disputes'>('listings');
+  const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings | null>(null);
+  const [isTogglingMarketplace, setIsTogglingMarketplace] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -64,11 +75,127 @@ export default function AdminTrading() {
         return;
       }
 
-      await Promise.all([fetchListings(), fetchAuctions(), fetchFloorStats()]);
+      await Promise.all([fetchListings(), fetchAuctions(), fetchFloorStats(), fetchMarketplaceSettings()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchMarketplaceSettings() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMarketplaceSettings(data.settings);
+      }
+    } catch (error) {
+      console.error('Failed to fetch marketplace settings:', error);
+    }
+  }
+
+  async function handleToggleMarketplace() {
+    if (!marketplaceSettings) return;
+
+    setIsTogglingMarketplace(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          tradingEnabled: !marketplaceSettings.tradingEnabled,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMarketplaceSettings(data.settings);
+        setSuccess(`Marketplace trading ${data.settings.tradingEnabled ? 'enabled' : 'disabled'}`);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to toggle marketplace');
+      }
+    } catch (error) {
+      setError('Failed to toggle marketplace');
+    } finally {
+      setIsTogglingMarketplace(false);
+    }
+  }
+
+  async function handleToggleListings() {
+    if (!marketplaceSettings) return;
+
+    setIsTogglingMarketplace(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          listingsEnabled: !marketplaceSettings.listingsEnabled,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMarketplaceSettings(data.settings);
+        setSuccess(`Listings ${data.settings.listingsEnabled ? 'enabled' : 'disabled'}`);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to toggle listings');
+      }
+    } catch (error) {
+      setError('Failed to toggle listings');
+    } finally {
+      setIsTogglingMarketplace(false);
+    }
+  }
+
+  async function handleToggleOffers() {
+    if (!marketplaceSettings) return;
+
+    setIsTogglingMarketplace(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          offersEnabled: !marketplaceSettings.offersEnabled,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMarketplaceSettings(data.settings);
+        setSuccess(`Offers ${data.settings.offersEnabled ? 'enabled' : 'disabled'}`);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to toggle offers');
+      }
+    } catch (error) {
+      setError('Failed to toggle offers');
+    } finally {
+      setIsTogglingMarketplace(false);
     }
   }
 
@@ -159,6 +286,103 @@ export default function AdminTrading() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 py-8">
+          {/* Marketplace Toggle */}
+          <div className="bg-gray-900 rounded-lg p-6 mb-6 border border-gray-800">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-white">Marketplace Controls</h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  Enable or disable marketplace features
+                </p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-600 text-red-400 text-sm">
+                {error}
+                <button onClick={() => setError(null)} className="float-right hover:opacity-75">&times;</button>
+              </div>
+            )}
+
+            {success && (
+              <div className="mb-4 p-3 rounded bg-green-900/30 border border-green-600 text-green-400 text-sm">
+                {success}
+                <button onClick={() => setSuccess(null)} className="float-right hover:opacity-75">&times;</button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Trading Toggle */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-white">Trading</div>
+                    <div className="text-xs text-gray-400">Allow buying/selling</div>
+                  </div>
+                  <button
+                    onClick={handleToggleMarketplace}
+                    disabled={isTogglingMarketplace || !marketplaceSettings}
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                      marketplaceSettings?.tradingEnabled ? 'bg-green-600' : 'bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        marketplaceSettings?.tradingEnabled ? 'translate-x-8' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Listings Toggle */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-white">Listings</div>
+                    <div className="text-xs text-gray-400">Allow creating listings</div>
+                  </div>
+                  <button
+                    onClick={handleToggleListings}
+                    disabled={isTogglingMarketplace || !marketplaceSettings}
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                      marketplaceSettings?.listingsEnabled ? 'bg-green-600' : 'bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        marketplaceSettings?.listingsEnabled ? 'translate-x-8' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Offers Toggle */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-white">Offers</div>
+                    <div className="text-xs text-gray-400">Allow making offers</div>
+                  </div>
+                  <button
+                    onClick={handleToggleOffers}
+                    disabled={isTogglingMarketplace || !marketplaceSettings}
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                      marketplaceSettings?.offersEnabled ? 'bg-green-600' : 'bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        marketplaceSettings?.offersEnabled ? 'translate-x-8' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">

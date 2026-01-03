@@ -8,11 +8,28 @@ interface SiteSettings {
   launchDate: Date | null;
   comingSoonTitle: string | null;
   comingSoonMessage: string | null;
+  // HTML content for pages
+  comingSoonHtml: string | null;
+  comingSoonPassword: string | null;
+  maintenanceHtml: string | null;
+  // Leonardo AI
+  leonardoPrompt: string | null;
   // Phase timer controls
   phasePaused: boolean;
   pausedAt: Date | null;
   pauseDurationMs: number;
   contractPaused: boolean;
+  // Phase pricing configuration
+  phaseIncreasePercent: number;
+  // Sandbox/Testing Mode
+  sandboxMode: boolean;
+  paymentsEnabled: boolean;
+  // Wallet & Revenue Configuration
+  ownerWalletAddress: string | null;
+  benefactorWalletAddress: string | null;
+  benefactorName: string | null;
+  ownerSharePercent: number;
+  benefactorSharePercent: number;
 }
 
 class SiteSettingsService {
@@ -45,10 +62,22 @@ class SiteSettingsService {
       launchDate: settings.launchDate,
       comingSoonTitle: settings.comingSoonTitle,
       comingSoonMessage: settings.comingSoonMessage,
+      comingSoonHtml: settings.comingSoonHtml,
+      comingSoonPassword: settings.comingSoonPassword,
+      maintenanceHtml: settings.maintenanceHtml,
+      leonardoPrompt: settings.leonardoPrompt,
       phasePaused: settings.phasePaused,
       pausedAt: settings.pausedAt,
       pauseDurationMs: settings.pauseDurationMs,
       contractPaused: settings.contractPaused,
+      phaseIncreasePercent: settings.phaseIncreasePercent,
+      sandboxMode: settings.sandboxMode,
+      paymentsEnabled: settings.paymentsEnabled,
+      ownerWalletAddress: settings.ownerWalletAddress,
+      benefactorWalletAddress: settings.benefactorWalletAddress,
+      benefactorName: settings.benefactorName,
+      ownerSharePercent: settings.ownerSharePercent,
+      benefactorSharePercent: settings.benefactorSharePercent,
     };
   }
 
@@ -91,10 +120,22 @@ class SiteSettingsService {
       launchDate: settings.launchDate,
       comingSoonTitle: settings.comingSoonTitle,
       comingSoonMessage: settings.comingSoonMessage,
+      comingSoonHtml: settings.comingSoonHtml,
+      comingSoonPassword: settings.comingSoonPassword,
+      maintenanceHtml: settings.maintenanceHtml,
+      leonardoPrompt: settings.leonardoPrompt,
       phasePaused: settings.phasePaused,
       pausedAt: settings.pausedAt,
       pauseDurationMs: settings.pauseDurationMs,
       contractPaused: settings.contractPaused,
+      phaseIncreasePercent: settings.phaseIncreasePercent,
+      sandboxMode: settings.sandboxMode,
+      paymentsEnabled: settings.paymentsEnabled,
+      ownerWalletAddress: settings.ownerWalletAddress,
+      benefactorWalletAddress: settings.benefactorWalletAddress,
+      benefactorName: settings.benefactorName,
+      ownerSharePercent: settings.ownerSharePercent,
+      benefactorSharePercent: settings.benefactorSharePercent,
     };
   }
 

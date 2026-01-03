@@ -16,7 +16,6 @@ interface PurchaseData {
     name: string;
     contractAddress: string;
     transactionHash: string | null;
-    openSeaUrl: string | null;
   }[];
   mintedAt: number | null;
 }
@@ -182,15 +181,13 @@ export default function Success() {
                   )}
                 </div>
 
-                {nft.openSeaUrl ? (
-                  <a
-                    href={nft.openSeaUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {nft.tokenId ? (
+                  <Link
+                    href={`/nft/${nft.tokenId}`}
                     className="text-blue-400 hover:text-blue-300"
                   >
-                    View on OpenSea &rarr;
-                  </a>
+                    View NFT &rarr;
+                  </Link>
                 ) : (
                   <span className="text-gray-500">Minting...</span>
                 )}
@@ -242,7 +239,7 @@ export default function Success() {
           <h2 className="text-xl font-semibold mb-4 text-green-300">What's Next?</h2>
           <ul className="space-y-2 text-green-200">
             <li>✓ Check your email for a detailed receipt</li>
-            <li>✓ View your NFTs on OpenSea</li>
+            <li>✓ View your NFTs in your collection</li>
             <li>✓ Join our Discord community</li>
             <li>✓ 30% of your purchase funds space exploration!</li>
           </ul>
@@ -253,14 +250,9 @@ export default function Success() {
           <Link href="/" className="flex-1 btn-primary text-center">
             Continue Shopping
           </Link>
-          <a
-            href="https://opensea.io/collection/cosmonfts"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 btn-secondary text-center"
-          >
-            View on OpenSea
-          </a>
+          <Link href="/browse" className="flex-1 btn-secondary text-center">
+            Browse More NFTs
+          </Link>
         </div>
       </div>
     </Layout>

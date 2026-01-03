@@ -18,6 +18,8 @@ dist/
 .env.production
 backend/.env
 backend/.env.production
+frontend/.env
+frontend/.env.local
 frontend/.env.production
 
 # Debug logs
@@ -58,3 +60,4 @@ backend/nul
 backend/typechain-types/
 backend/dist/
 backend/logs/
+.env*.local

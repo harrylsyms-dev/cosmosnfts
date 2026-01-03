@@ -149,7 +149,19 @@ export default function Marketplace() {
           {/* Filters */}
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-white">Marketplace</h1>
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-center">
+              <Link
+                href="/marketplace/my-listings"
+                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors"
+              >
+                List NFT
+              </Link>
+              <Link
+                href="/marketplace/my-listings"
+                className="text-purple-400 hover:text-purple-300 font-medium"
+              >
+                My Listings
+              </Link>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}

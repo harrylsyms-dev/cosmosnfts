@@ -78,7 +78,6 @@
 - [ ] Complete test purchase (small amount)
 - [ ] Verify NFT minting on PolygonScan
 - [ ] Check email delivery
-- [ ] Verify OpenSea listing
 
 ---
 

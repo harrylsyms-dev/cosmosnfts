@@ -21,6 +21,12 @@ router.post('/checkout', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
+    // Check if payments are enabled
+    const siteSettings = await prisma.siteSettings.findUnique({
+      where: { id: 'main' },
+    });
+    const paymentsEnabled = siteSettings?.paymentsEnabled ?? true;
+
     // Fetch NFTs and verify availability
     const nfts = await prisma.nFT.findMany({
       where: {
@@ -60,7 +66,36 @@ router.post('/checkout', async (req: Request, res: Response) => {
       },
     });
 
-    // Create Stripe payment intent
+    // If payments are disabled, simulate success (test mode)
+    if (!paymentsEnabled) {
+      logger.info(`[TEST MODE] Simulating payment success for purchase: ${purchaseId}`);
+
+      // Mark purchase as paid (simulated)
+      await prisma.purchase.update({
+        where: { id: purchaseId },
+        data: {
+          status: 'PROCESSING',
+          stripeTransactionId: `test_${purchaseId}`,
+        },
+      });
+
+      // Reserve the NFTs
+      await prisma.nFT.updateMany({
+        where: { id: { in: nftIdsList } },
+        data: { status: 'RESERVED' },
+      });
+
+      return res.json({
+        clientSecret: null,
+        amount: totalCents,
+        currency: 'usd',
+        purchaseId,
+        testMode: true,
+        message: 'Payments disabled - purchase simulated successfully',
+      });
+    }
+
+    // Create Stripe payment intent (normal flow)
     const paymentIntent = await createPaymentIntent(
       totalCents,
       email,
@@ -84,6 +119,71 @@ router.post('/checkout', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Error creating checkout:', error);
     res.status(500).json({ error: 'Failed to create checkout' });
+  }
+});
+
+// POST /api/purchase/simulate-complete/:purchaseId - Complete a test purchase (only when payments disabled)
+router.post('/simulate-complete/:purchaseId', async (req: Request, res: Response) => {
+  try {
+    const { purchaseId } = req.params;
+
+    // Check if payments are disabled (test mode)
+    const siteSettings = await prisma.siteSettings.findUnique({
+      where: { id: 'main' },
+    });
+
+    if (siteSettings?.paymentsEnabled !== false) {
+      return res.status(403).json({
+        error: 'Simulation only available when payments are disabled',
+      });
+    }
+
+    const purchase = await prisma.purchase.findUnique({
+      where: { id: purchaseId },
+    });
+
+    if (!purchase) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+
+    if (purchase.status !== 'PROCESSING') {
+      return res.status(400).json({
+        error: `Cannot complete purchase with status: ${purchase.status}`,
+      });
+    }
+
+    // Mark as minted (simulated)
+    const nftIds = JSON.parse(purchase.nftIds) as number[];
+
+    await prisma.$transaction([
+      prisma.purchase.update({
+        where: { id: purchaseId },
+        data: {
+          status: 'MINTED',
+          mintedAt: new Date(),
+          transactionHash: `0xtest_${purchaseId.replace(/-/g, '')}`,
+        },
+      }),
+      prisma.nFT.updateMany({
+        where: { id: { in: nftIds } },
+        data: {
+          status: 'SOLD',
+          transactionHash: `0xtest_${purchaseId.replace(/-/g, '')}`,
+          ownerAddress: purchase.walletAddress,
+        },
+      }),
+    ]);
+
+    logger.info(`[TEST MODE] Simulated minting for purchase: ${purchaseId}`);
+
+    res.json({
+      success: true,
+      message: 'Purchase completed (simulated)',
+      purchaseId,
+    });
+  } catch (error) {
+    logger.error('Error simulating purchase completion:', error);
+    res.status(500).json({ error: 'Failed to simulate purchase completion' });
   }
 });
 
@@ -116,9 +216,6 @@ router.get('/:transactionId', async (req: Request, res: Response) => {
         name: nft.name,
         contractAddress: process.env.CONTRACT_ADDRESS,
         transactionHash: nft.transactionHash,
-        openSeaUrl: nft.tokenId
-          ? `https://opensea.io/assets/polygon/${process.env.CONTRACT_ADDRESS}/${nft.tokenId}`
-          : null,
       })),
       mintedAt: purchase.mintedAt?.getTime() || null,
       createdAt: purchase.createdAt.getTime(),

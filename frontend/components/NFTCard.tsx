@@ -46,7 +46,7 @@ export default function NFTCard({ nft, onAddToCart }: NFTCardProps) {
       <Link href={`/nft/${nft.id}`}>
         <div className="relative aspect-square bg-gray-800 overflow-hidden">
           <img
-            src={nft.image || '/images/placeholder.jpg'}
+            src={nft.image || '/images/placeholder.svg'}
             alt={nft.name}
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
           />
@@ -79,8 +79,10 @@ export default function NFTCard({ nft, onAddToCart }: NFTCardProps) {
         {/* Price & CTA */}
         <div className="mt-4 flex items-center justify-between">
           <div>
-            <div className="text-gray-400 text-xs">Current Price</div>
             <div className="text-xl font-bold text-white">{nft.displayPrice}</div>
+            <div className="text-blue-400 text-xs font-mono">
+              $0.10 × {nft.score}
+            </div>
           </div>
 
           <button

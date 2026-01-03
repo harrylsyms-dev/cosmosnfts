@@ -15,30 +15,44 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const res = await fetch(`${apiUrl}/api/admin/login`, {
+      // Use alternative auth endpoint path
+      const url = `/api/auth/admin-login`;
+      console.log('Fetching:', url);
+
+      const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        cache: 'no-store',
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Login failed');
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError(`Server returned non-JSON (${res.status}): ${text.substring(0, 100)}`);
         return;
       }
 
-      // Store token in localStorage as backup
+      if (!res.ok) {
+        setError(JSON.stringify(data) || 'Login failed');
+        return;
+      }
+
+      // Store token in localStorage
       if (data.token) {
         localStorage.setItem('adminToken', data.token);
       }
 
       // Redirect to admin dashboard
       router.push('/admin');
-    } catch (err) {
-      setError('Failed to connect to server');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(`Failed to connect: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }

@@ -7,24 +7,31 @@ const router = express.Router();
 
 /**
  * GET /api/images/status
- * Check if image generation is properly configured
+ * Check if image generation is properly configured (database or env vars)
  */
 router.get('/status', requireAdmin, async (req, res) => {
-  const leonardoKey = process.env.LEONARDO_AI_API_KEY;
-  const pinataKey = process.env.PINATA_API_KEY;
-  const pinataSecret = process.env.PINATA_API_SECRET;
+  try {
+    const { prisma } = await import('../config/database');
+    const config = await leonardoService.isConfigured();
 
-  res.json({
-    success: true,
-    configured: {
-      leonardo: !!leonardoKey && leonardoKey.length > 10,
-      pinata: !!pinataKey && !!pinataSecret,
-    },
-    message: !leonardoKey ? 'LEONARDO_AI_API_KEY not configured' :
-             !pinataKey ? 'PINATA_API_KEY not configured' :
-             !pinataSecret ? 'PINATA_API_SECRET not configured' :
-             'All API keys configured',
-  });
+    // Get global prompt from site settings
+    const siteSettings = await prisma.siteSettings.findUnique({
+      where: { id: 'main' },
+      select: { leonardoPrompt: true },
+    });
+
+    res.json({
+      success: true,
+      configured: config,
+      message: !config.leonardo ? 'Leonardo AI: Not Configured' :
+               !config.pinata ? 'Pinata IPFS: Not Configured' :
+               'All API keys configured',
+      globalPrompt: siteSettings?.leonardoPrompt || null,
+    });
+  } catch (error) {
+    logger.error('Failed to check image generation config:', error);
+    res.status(500).json({ error: 'Failed to check configuration' });
+  }
 });
 
 /**
@@ -61,8 +68,8 @@ router.post('/generate-phase/:phaseNumber', requireAdmin, async (req, res) => {
   try {
     const phaseNumber = parseInt(req.params.phaseNumber);
 
-    if (isNaN(phaseNumber) || phaseNumber < 1 || phaseNumber > 81) {
-      return res.status(400).json({ error: 'Invalid phase number (1-81)' });
+    if (isNaN(phaseNumber) || phaseNumber < 1 || phaseNumber > 77) {
+      return res.status(400).json({ error: 'Invalid phase number (1-77)' });
     }
 
     // Start generation in background

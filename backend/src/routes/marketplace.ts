@@ -404,6 +404,7 @@ router.put('/admin/settings', requireAdmin, async (req: Request, res: Response) 
       tradingEnabled,
       listingsEnabled,
       offersEnabled,
+      auctionsEnabled,
       creatorRoyaltyPercent,
       platformFeePercent,
     } = req.body;
@@ -412,6 +413,7 @@ router.put('/admin/settings', requireAdmin, async (req: Request, res: Response) 
       tradingEnabled,
       listingsEnabled,
       offersEnabled,
+      auctionsEnabled,
       creatorRoyaltyPercent,
       platformFeePercent,
     });
