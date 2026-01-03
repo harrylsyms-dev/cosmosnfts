@@ -83,7 +83,7 @@ async function getAuctionStartingBid(nftName: string): Promise<number | null> {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Set headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Cache-Control', 'no-store');
 
@@ -91,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).end();
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -114,7 +114,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Invalid NFT ID' });
     }
 
-    // Get NFT details
+    // Handle DELETE request
+    if (req.method === 'DELETE') {
+      // Check if NFT exists
+      const existingNft = await prisma.nFT.findUnique({
+        where: { id: nftId },
+      });
+
+      if (!existingNft) {
+        return res.status(404).json({ error: 'NFT not found' });
+      }
+
+      // Don't allow deleting sold NFTs
+      if (existingNft.status === 'SOLD') {
+        return res.status(400).json({ error: 'Cannot delete sold NFTs' });
+      }
+
+      // Delete the NFT
+      await prisma.nFT.delete({
+        where: { id: nftId },
+      });
+
+      console.log(`NFT #${nftId} (${existingNft.name}) deleted by admin ${admin.email}`);
+
+      return res.json({
+        success: true,
+        message: `NFT #${nftId} (${existingNft.name}) has been deleted`,
+        deletedNft: {
+          id: existingNft.id,
+          name: existingNft.name,
+          objectType: existingNft.objectType,
+        },
+      });
+    }
+
+    // Get NFT details (GET request)
     const nft = await prisma.nFT.findUnique({
       where: { id: nftId },
     });

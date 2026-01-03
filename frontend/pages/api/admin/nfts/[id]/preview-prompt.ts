@@ -61,12 +61,14 @@ Visual Style: Bold digital art, vibrant colors, stylized but detailed, cosmic ar
 ${features}
 - Nebulae in vivid purples, blues, golds, oranges, and reds
 - Stars twinkling with magical light effects
-- Surreal cosmic landscape
+- Isolated cosmic object against deep black void
+- Pure black space background
+- No landscape or environmental elements
 - Dreamlike, fantastical yet scientifically inspired
 ${isElite ? '- Ultra premium, museum-worthy composition with breathtaking detail' : ''}
 ${isPremium ? '- Premium quality with exceptional luminosity' : ''}
 
-Composition: Eye-catching, dramatic, energetic
+Composition: Eye-catching, dramatic, energetic, centered cosmic object
 Quality: Professional digital art, vibrant, gallery-quality illustration
 Medium: Digital painting, concept art, stylized 3D render
 Color: Vibrant, saturated, cosmic palette with glow effects and deep space blacks
