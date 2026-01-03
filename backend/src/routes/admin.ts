@@ -2248,6 +2248,249 @@ router.get('/system-status', requireAdmin, async (req, res) => {
   }
 });
 
+// ==================== API KEY MANAGEMENT ====================
+
+// Allowed service names for API keys
+const ALLOWED_SERVICES = [
+  'stripe',
+  'stripe_webhook',
+  'pinata_api',
+  'pinata_secret',
+  'leonardo',
+  'polygon_rpc',
+  'sendgrid',
+] as const;
+
+type ServiceName = typeof ALLOWED_SERVICES[number];
+
+function isValidService(service: string): service is ServiceName {
+  return ALLOWED_SERVICES.includes(service as ServiceName);
+}
+
+/**
+ * GET /api/admin/api-keys
+ * List all API keys (masked, showing only last 4 chars)
+ */
+router.get('/api-keys', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { isEncryptionConfigured, decrypt, maskApiKey } = await import('../utils/encryption');
+
+    // Check if encryption is configured
+    if (!isEncryptionConfigured()) {
+      return res.status(503).json({
+        error: 'Encryption not configured',
+        message: 'ENCRYPTION_KEY environment variable is not set. API key management requires encryption to be configured.',
+      });
+    }
+
+    const apiKeys = await prisma.apiKey.findMany({
+      orderBy: { service: 'asc' },
+    });
+
+    // Map keys with masked values
+    const maskedKeys = apiKeys.map((key) => {
+      let maskedValue = '****';
+      try {
+        const decryptedKey = decrypt(key.encryptedKey);
+        maskedValue = maskApiKey(decryptedKey);
+      } catch (e) {
+        // If decryption fails, show error indicator
+        maskedValue = '[decryption error]';
+      }
+
+      return {
+        service: key.service,
+        maskedKey: maskedValue,
+        description: key.description,
+        lastRotated: key.lastRotated,
+        createdAt: key.createdAt,
+        updatedAt: key.updatedAt,
+      };
+    });
+
+    // Include services that don't have keys yet
+    const existingServices = new Set(apiKeys.map((k) => k.service));
+    const allServices = ALLOWED_SERVICES.map((service) => {
+      const existing = maskedKeys.find((k) => k.service === service);
+      if (existing) {
+        return existing;
+      }
+      return {
+        service,
+        maskedKey: null,
+        description: null,
+        lastRotated: null,
+        createdAt: null,
+        updatedAt: null,
+      };
+    });
+
+    res.json({
+      success: true,
+      apiKeys: allServices,
+      encryptionConfigured: true,
+    });
+  } catch (error) {
+    logger.error('Error fetching API keys:', error);
+    res.status(500).json({ error: 'Failed to fetch API keys' });
+  }
+});
+
+/**
+ * PUT /api/admin/api-keys/:service
+ * Update/create an API key for a service (super_admin only)
+ */
+router.put('/api-keys/:service', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { isEncryptionConfigured, encrypt, maskApiKey } = await import('../utils/encryption');
+    const { service } = req.params;
+    const { apiKey, description } = req.body;
+
+    // Validate service name
+    if (!isValidService(service)) {
+      return res.status(400).json({
+        error: 'Invalid service name',
+        message: `Service must be one of: ${ALLOWED_SERVICES.join(', ')}`,
+      });
+    }
+
+    // Check if encryption is configured
+    if (!isEncryptionConfigured()) {
+      return res.status(503).json({
+        error: 'Encryption not configured',
+        message: 'ENCRYPTION_KEY environment variable is not set. API key management requires encryption to be configured.',
+      });
+    }
+
+    // Validate API key
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+      return res.status(400).json({ error: 'API key is required' });
+    }
+
+    const trimmedKey = apiKey.trim();
+
+    // Encrypt the API key
+    const encryptedKey = encrypt(trimmedKey);
+
+    // Upsert the API key
+    const result = await prisma.apiKey.upsert({
+      where: { service },
+      update: {
+        encryptedKey,
+        description: description || null,
+        lastRotated: new Date(),
+        createdBy: req.admin!.id,
+      },
+      create: {
+        service,
+        encryptedKey,
+        description: description || null,
+        lastRotated: new Date(),
+        createdBy: req.admin!.id,
+      },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'API_KEY_UPDATE',
+        details: JSON.stringify({
+          service,
+          action: result.createdAt === result.updatedAt ? 'created' : 'updated',
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`API key for ${service} updated by admin: ${req.admin!.email}`);
+
+    res.json({
+      success: true,
+      message: `API key for ${service} has been ${result.createdAt === result.updatedAt ? 'created' : 'updated'}`,
+      apiKey: {
+        service: result.service,
+        maskedKey: maskApiKey(trimmedKey),
+        description: result.description,
+        lastRotated: result.lastRotated,
+        updatedAt: result.updatedAt,
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating API key:', error);
+    res.status(500).json({ error: 'Failed to update API key' });
+  }
+});
+
+/**
+ * DELETE /api/admin/api-keys/:service
+ * Delete an API key (super_admin only)
+ */
+router.delete('/api-keys/:service', requireSuperAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { isEncryptionConfigured } = await import('../utils/encryption');
+    const { service } = req.params;
+
+    // Validate service name
+    if (!isValidService(service)) {
+      return res.status(400).json({
+        error: 'Invalid service name',
+        message: `Service must be one of: ${ALLOWED_SERVICES.join(', ')}`,
+      });
+    }
+
+    // Check if encryption is configured
+    if (!isEncryptionConfigured()) {
+      return res.status(503).json({
+        error: 'Encryption not configured',
+        message: 'ENCRYPTION_KEY environment variable is not set. API key management requires encryption to be configured.',
+      });
+    }
+
+    // Check if key exists
+    const existingKey = await prisma.apiKey.findUnique({
+      where: { service },
+    });
+
+    if (!existingKey) {
+      return res.status(404).json({
+        error: 'API key not found',
+        message: `No API key exists for service: ${service}`,
+      });
+    }
+
+    // Delete the key
+    await prisma.apiKey.delete({
+      where: { service },
+    });
+
+    // Log audit
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        adminEmail: req.admin!.email,
+        action: 'API_KEY_DELETE',
+        details: JSON.stringify({ service }),
+        ipAddress: req.ip,
+      },
+    });
+
+    logger.info(`API key for ${service} deleted by admin: ${req.admin!.email}`);
+
+    res.json({
+      success: true,
+      message: `API key for ${service} has been deleted`,
+    });
+  } catch (error) {
+    logger.error('Error deleting API key:', error);
+    res.status(500).json({ error: 'Failed to delete API key' });
+  }
+});
+
 // ==================== DASHBOARD STATS ====================
 
 /**

@@ -39,6 +39,28 @@ interface ConfigInfo {
   };
 }
 
+interface ApiKeyInfo {
+  service: string;
+  maskedKey: string | null;
+  description: string;
+  lastRotated: string | null;
+}
+
+interface ApiKeysResponse {
+  apiKeys: ApiKeyInfo[];
+  encryptionConfigured: boolean;
+}
+
+const API_KEY_SERVICES = [
+  { id: 'stripe', name: 'Stripe Secret Key', description: 'Stripe API secret key for payment processing' },
+  { id: 'stripe_webhook', name: 'Stripe Webhook Secret', description: 'Webhook signing secret for Stripe events' },
+  { id: 'pinata_api', name: 'Pinata API Key', description: 'Pinata API key for IPFS uploads' },
+  { id: 'pinata_secret', name: 'Pinata Secret Key', description: 'Pinata secret key for IPFS uploads' },
+  { id: 'leonardo', name: 'Leonardo AI Key', description: 'Leonardo AI API key for image generation' },
+  { id: 'polygon_rpc', name: 'Polygon RPC URL', description: 'RPC endpoint for Polygon blockchain' },
+  { id: 'sendgrid', name: 'SendGrid API Key', description: 'SendGrid API key for email delivery' },
+];
+
 export default function AdminSettings() {
   const router = useRouter();
   const [admin, setAdmin] = useState<Admin | null>(null);
@@ -47,7 +69,14 @@ export default function AdminSettings() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'wallet' | 'config' | 'export'>('wallet');
+  const [activeTab, setActiveTab] = useState<'wallet' | 'config' | 'export' | 'apikeys'>('wallet');
+
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<ApiKeyInfo[]>([]);
+  const [isEncryptionConfigured, setIsEncryptionConfigured] = useState(true);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editKeyValue, setEditKeyValue] = useState('');
+  const [editKeyDescription, setEditKeyDescription] = useState('');
 
   // Wallet config form
   const [ownerWallet, setOwnerWallet] = useState('');
@@ -76,7 +105,11 @@ export default function AdminSettings() {
       const data = await res.json();
       setAdmin(data.admin);
 
-      await Promise.all([fetchWalletConfig(), fetchConfigInfo()]);
+      const fetchPromises = [fetchWalletConfig(), fetchConfigInfo()];
+      if (data.admin?.role === 'super_admin') {
+        fetchPromises.push(fetchApiKeys());
+      }
+      await Promise.all(fetchPromises);
     } catch (error) {
       router.push('/admin/login');
     } finally {
@@ -134,6 +167,117 @@ export default function AdminSettings() {
         blockchain: { network: 'Polygon Amoy', contractAddress: null },
       });
     }
+  }
+
+  async function fetchApiKeys() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/api-keys`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const data: ApiKeysResponse = await res.json();
+        setApiKeys(data.apiKeys);
+        setIsEncryptionConfigured(data.encryptionConfigured);
+      }
+    } catch (error) {
+      console.error('Failed to fetch API keys:', error);
+    }
+  }
+
+  async function handleUpdateApiKey(service: string) {
+    if (!editKeyValue.trim()) {
+      setMessage({ type: 'error', text: 'API key value is required' });
+      return;
+    }
+
+    setActionLoading(`apikey-${service}`);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/api-keys/${service}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          apiKey: editKeyValue,
+          description: editKeyDescription,
+        }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: 'success', text: `API key for ${service} updated successfully` });
+        setEditingKey(null);
+        setEditKeyValue('');
+        setEditKeyDescription('');
+        await fetchApiKeys();
+      } else {
+        const data = await res.json();
+        setMessage({ type: 'error', text: data.error || 'Failed to update API key' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to update API key' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDeleteApiKey(service: string) {
+    if (!confirm(`Are you sure you want to delete the API key for ${service}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setActionLoading(`apikey-delete-${service}`);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/api-keys/${service}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        setMessage({ type: 'success', text: `API key for ${service} deleted successfully` });
+        await fetchApiKeys();
+      } else {
+        const data = await res.json();
+        setMessage({ type: 'error', text: data.error || 'Failed to delete API key' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to delete API key' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function startEditingKey(service: string) {
+    const existingKey = apiKeys.find(k => k.service === service);
+    setEditingKey(service);
+    setEditKeyValue('');
+    setEditKeyDescription(existingKey?.description || '');
+  }
+
+  function cancelEditingKey() {
+    setEditingKey(null);
+    setEditKeyValue('');
+    setEditKeyDescription('');
+  }
+
+  function getServiceInfo(serviceId: string) {
+    return API_KEY_SERVICES.find(s => s.id === serviceId);
+  }
+
+  function getKeyStatus(serviceId: string): { configured: boolean; maskedKey: string | null; lastRotated: string | null } {
+    const key = apiKeys.find(k => k.service === serviceId);
+    return {
+      configured: !!key?.maskedKey,
+      maskedKey: key?.maskedKey || null,
+      lastRotated: key?.lastRotated || null,
+    };
   }
 
   async function handleSaveWalletConfig(e: React.FormEvent) {
@@ -344,6 +488,18 @@ export default function AdminSettings() {
             >
               Export / Import
             </button>
+            {admin?.role === 'super_admin' && (
+              <button
+                onClick={() => setActiveTab('apikeys')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  activeTab === 'apikeys'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                }`}
+              >
+                API Keys
+              </button>
+            )}
           </div>
 
           {/* Wallet & Revenue Tab */}
@@ -630,6 +786,177 @@ export default function AdminSettings() {
                     >
                       Reset
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* API Keys Tab - Super Admin Only */}
+          {activeTab === 'apikeys' && admin?.role === 'super_admin' && (
+            <div className="space-y-6">
+              {/* Encryption Warning */}
+              {!isEncryptionConfigured && (
+                <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-yellow-400 text-xl">!</span>
+                    <div>
+                      <h3 className="font-semibold text-yellow-400">Encryption Not Configured</h3>
+                      <p className="text-yellow-300/80 text-sm mt-1">
+                        API keys will be stored without encryption. Set the <code className="bg-yellow-900/50 px-1 rounded">ENCRYPTION_KEY</code> environment variable to enable secure storage.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+                <h2 className="text-xl font-bold text-white mb-2">API Key Management</h2>
+                <p className="text-gray-400 mb-6">
+                  Manage API keys for external services. Keys are stored securely and shown masked for security.
+                </p>
+
+                <div className="space-y-4">
+                  {API_KEY_SERVICES.map((service) => {
+                    const status = getKeyStatus(service.id);
+                    const isEditing = editingKey === service.id;
+                    const isLoading = actionLoading === `apikey-${service.id}` || actionLoading === `apikey-delete-${service.id}`;
+
+                    return (
+                      <div
+                        key={service.id}
+                        className="bg-gray-800 rounded-lg p-4 border border-gray-700"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="font-semibold text-white">{service.name}</h3>
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                status.configured
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-gray-600/50 text-gray-400'
+                              }`}>
+                                {status.configured ? 'Configured' : 'Not Set'}
+                              </span>
+                            </div>
+                            <p className="text-gray-500 text-sm">{service.description}</p>
+                            {status.configured && status.maskedKey && (
+                              <div className="mt-2 flex items-center gap-4">
+                                <code className="text-purple-400 text-sm bg-gray-900 px-2 py-1 rounded">
+                                  {status.maskedKey}
+                                </code>
+                                {status.lastRotated && (
+                                  <span className="text-gray-500 text-xs">
+                                    Last updated: {new Date(status.lastRotated).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {!isEditing && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => startEditingKey(service.id)}
+                                disabled={isLoading}
+                                className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold px-3 py-1.5 rounded disabled:opacity-50"
+                              >
+                                {status.configured ? 'Edit' : 'Add'}
+                              </button>
+                              {status.configured && (
+                                <button
+                                  onClick={() => handleDeleteApiKey(service.id)}
+                                  disabled={isLoading}
+                                  className="bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-3 py-1.5 rounded disabled:opacity-50"
+                                >
+                                  {actionLoading === `apikey-delete-${service.id}` ? '...' : 'Delete'}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Inline Edit Form */}
+                        {isEditing && (
+                          <div className="mt-4 pt-4 border-t border-gray-700">
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-gray-400 text-sm mb-1">
+                                  API Key Value
+                                </label>
+                                <input
+                                  type="password"
+                                  value={editKeyValue}
+                                  onChange={(e) => setEditKeyValue(e.target.value)}
+                                  placeholder={status.configured ? 'Enter new key to replace existing' : 'Enter API key'}
+                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono text-sm focus:border-purple-500 outline-none"
+                                  autoFocus
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-gray-400 text-sm mb-1">
+                                  Description (optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editKeyDescription}
+                                  onChange={(e) => setEditKeyDescription(e.target.value)}
+                                  placeholder="e.g., Production key, Test key"
+                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:border-purple-500 outline-none"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleUpdateApiKey(service.id)}
+                                  disabled={isLoading || !editKeyValue.trim()}
+                                  className="bg-green-600 hover:bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded disabled:opacity-50"
+                                >
+                                  {actionLoading === `apikey-${service.id}` ? 'Saving...' : 'Save Key'}
+                                </button>
+                                <button
+                                  onClick={cancelEditingKey}
+                                  disabled={isLoading}
+                                  className="bg-gray-600 hover:bg-gray-500 text-white text-sm font-semibold px-4 py-2 rounded disabled:opacity-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Summary Card */}
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+                <h3 className="font-bold text-white mb-4">Configuration Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-gray-800 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-green-400">
+                      {API_KEY_SERVICES.filter(s => getKeyStatus(s.id).configured).length}
+                    </div>
+                    <div className="text-gray-500 text-sm">Configured</div>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-gray-400">
+                      {API_KEY_SERVICES.filter(s => !getKeyStatus(s.id).configured).length}
+                    </div>
+                    <div className="text-gray-500 text-sm">Not Set</div>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-purple-400">
+                      {API_KEY_SERVICES.length}
+                    </div>
+                    <div className="text-gray-500 text-sm">Total Services</div>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-3 text-center">
+                    <div className={`text-2xl font-bold ${isEncryptionConfigured ? 'text-green-400' : 'text-yellow-400'}`}>
+                      {isEncryptionConfigured ? 'Yes' : 'No'}
+                    </div>
+                    <div className="text-gray-500 text-sm">Encryption</div>
                   </div>
                 </div>
               </div>

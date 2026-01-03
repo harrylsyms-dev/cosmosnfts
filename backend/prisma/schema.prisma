@@ -367,6 +367,20 @@ model SiteSettings {
   @@map("site_settings")
 }
 
+// Encrypted API Keys Storage
+model ApiKey {
+  id            String    @id @default(uuid())
+  service       String    @unique  // e.g., "stripe", "pinata", "leonardo", "polygon_rpc"
+  encryptedKey  String    @map("encrypted_key")  // AES-256-GCM encrypted
+  description   String?   // Human-readable description
+  lastRotated   DateTime? @map("last_rotated")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdBy     String?   @map("created_by")  // Admin ID who created/updated
+
+  @@map("api_keys")
+}
+
 // User (Wallet-based authentication)
 model User {
   id            String    @id @default(uuid())
