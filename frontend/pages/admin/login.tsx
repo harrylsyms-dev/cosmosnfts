@@ -2,12 +2,27 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 
+interface AdminInfo {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  mustChangePassword: boolean;
+}
+
 export default function AdminLogin() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Password change state
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [adminInfo, setAdminInfo] = useState<AdminInfo | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +63,18 @@ export default function AdminLogin() {
         localStorage.setItem('adminToken', data.token);
       }
 
+      // Store admin info if provided
+      if (data.admin) {
+        localStorage.setItem('adminInfo', JSON.stringify(data.admin));
+      }
+
+      // Check if password change is required
+      if (data.admin?.mustChangePassword) {
+        setAdminInfo(data.admin);
+        setShowPasswordChange(true);
+        return;
+      }
+
       // Redirect to admin dashboard
       router.push('/admin');
     } catch (err: any) {
@@ -55,6 +82,66 @@ export default function AdminLogin() {
       setError(`Failed to connect: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    // Validate password strength
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError(`Server returned non-JSON (${res.status}): ${text.substring(0, 100)}`);
+        return;
+      }
+
+      if (!res.ok) {
+        setError(data.error || data.message || 'Failed to change password');
+        return;
+      }
+
+      // Update stored admin info to reflect password change
+      if (adminInfo) {
+        const updatedAdmin = { ...adminInfo, mustChangePassword: false };
+        localStorage.setItem('adminInfo', JSON.stringify(updatedAdmin));
+      }
+
+      // Redirect to admin dashboard
+      router.push('/admin');
+    } catch (err: any) {
+      console.error('Password change error:', err);
+      setError(`Failed to change password: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsChangingPassword(false);
     }
   }
 
@@ -72,53 +159,121 @@ export default function AdminLogin() {
             <p className="text-gray-400">Admin Dashboard</p>
           </div>
 
-          {/* Login Form */}
+          {/* Login Form or Password Change Form */}
           <div className="bg-gray-900 rounded-lg p-8 border border-gray-800">
-            <h2 className="text-2xl font-bold mb-6">Sign In</h2>
+            {!showPasswordChange ? (
+              <>
+                <h2 className="text-2xl font-bold mb-6">Sign In</h2>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                  placeholder="admin@cosmonfts.com"
-                  required
-                />
-              </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                      placeholder="admin@cosmonfts.com"
+                      required
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                      placeholder="Enter your password"
+                      required
+                    />
+                  </div>
 
-              {error && (
-                <div className="bg-red-900/30 border border-red-600 text-red-400 px-4 py-2 rounded text-sm">
-                  {error}
-                </div>
-              )}
+                  {error && (
+                    <div className="bg-red-900/30 border border-red-600 text-red-400 px-4 py-2 rounded text-sm">
+                      {error}
+                    </div>
+                  )}
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </form>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Signing in...' : 'Sign In'}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold mb-2">Change Your Password</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  You must change your password before continuing.
+                </p>
+
+                {adminInfo && (
+                  <div className="bg-gray-800 rounded-lg px-4 py-3 mb-6">
+                    <p className="text-sm text-gray-400">Logged in as</p>
+                    <p className="text-white font-medium">{adminInfo.email}</p>
+                  </div>
+                )}
+
+                <form onSubmit={handlePasswordChange} className="space-y-4">
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                      placeholder="Enter new password"
+                      minLength={8}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                      placeholder="Confirm new password"
+                      minLength={8}
+                      required
+                    />
+                  </div>
+
+                  <p className="text-gray-500 text-xs">
+                    Password must be at least 8 characters long.
+                  </p>
+
+                  {error && (
+                    <div className="bg-red-900/30 border border-red-600 text-red-400 px-4 py-2 rounded text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isChangingPassword ? 'Changing Password...' : 'Change Password'}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
 
           {/* Back link */}

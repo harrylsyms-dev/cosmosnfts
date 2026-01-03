@@ -327,26 +327,26 @@ export default function AdminNFTs() {
               <div className="bg-gray-800 rounded-lg px-4 py-2">
                 <div className="flex items-center gap-3">
                   <div className="text-sm text-gray-400">
-                    <span className="text-white font-bold">{capacity.current.toLocaleString()}</span>
+                    <span className="text-white font-bold">{(capacity?.current ?? 0).toLocaleString()}</span>
                     <span className="mx-1">/</span>
-                    <span>{capacity.max.toLocaleString()}</span>
+                    <span>{(capacity?.max ?? MAX_NFTS).toLocaleString()}</span>
                   </div>
                   <div className="w-32 bg-gray-700 rounded-full h-2.5">
                     <div
                       className={`h-2.5 rounded-full ${
-                        capacity.remaining === 0 ? 'bg-red-500' :
-                        capacity.remaining < 1000 ? 'bg-yellow-500' : 'bg-green-500'
+                        (capacity?.remaining ?? MAX_NFTS) === 0 ? 'bg-red-500' :
+                        (capacity?.remaining ?? MAX_NFTS) < 1000 ? 'bg-yellow-500' : 'bg-green-500'
                       }`}
-                      style={{ width: `${(capacity.current / capacity.max) * 100}%` }}
+                      style={{ width: `${((capacity?.current ?? 0) / (capacity?.max ?? MAX_NFTS)) * 100}%` }}
                     ></div>
                   </div>
-                  <span className="text-xs text-gray-500">{capacity.remaining.toLocaleString()} left</span>
+                  <span className="text-xs text-gray-500">{(capacity?.remaining ?? MAX_NFTS).toLocaleString()} left</span>
                 </div>
               </div>
               {/* Generate Button */}
               <button
                 onClick={() => setShowGeneratePanel(!showGeneratePanel)}
-                disabled={capacity.remaining === 0}
+                disabled={(capacity?.remaining ?? MAX_NFTS) === 0}
                 className="bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2"
               >
                 <span>+</span>

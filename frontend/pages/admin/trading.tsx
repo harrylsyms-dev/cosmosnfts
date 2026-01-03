@@ -199,6 +199,39 @@ export default function AdminTrading() {
     }
   }
 
+  async function handleToggleAuctions() {
+    if (!marketplaceSettings) return;
+
+    setIsTogglingMarketplace(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/marketplace/admin/settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          auctionsEnabled: !marketplaceSettings.auctionsEnabled,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMarketplaceSettings(data.settings);
+        setSuccess(`Auctions ${data.settings.auctionsEnabled ? 'enabled' : 'disabled'}`);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to toggle auctions');
+      }
+    } catch (error) {
+      setError('Failed to toggle auctions');
+    } finally {
+      setIsTogglingMarketplace(false);
+    }
+  }
+
   async function fetchListings() {
     try {
       const token = localStorage.getItem('adminToken');
@@ -286,55 +319,73 @@ export default function AdminTrading() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 py-8">
-          {/* Marketplace Toggle */}
+          {/* Master Marketplace Toggle */}
+          <div className={`rounded-lg p-6 mb-6 border-2 ${
+            marketplaceSettings?.tradingEnabled
+              ? 'bg-green-900/20 border-green-600'
+              : 'bg-red-900/20 border-red-600'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={`w-4 h-4 rounded-full ${
+                  marketplaceSettings?.tradingEnabled ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                }`} />
+                <div>
+                  <h1 className="text-2xl font-bold text-white">
+                    Marketplace {marketplaceSettings?.tradingEnabled ? 'ENABLED' : 'DISABLED'}
+                  </h1>
+                  <p className="text-gray-400 text-sm mt-1">
+                    {marketplaceSettings?.tradingEnabled
+                      ? 'The marketplace is currently live. Users can buy, sell, and trade NFTs.'
+                      : 'The marketplace is currently offline. All trading activity is paused.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleToggleMarketplace}
+                disabled={isTogglingMarketplace || !marketplaceSettings}
+                className={`px-6 py-3 rounded-lg font-bold text-lg transition-all disabled:opacity-50 ${
+                  marketplaceSettings?.tradingEnabled
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
+                {isTogglingMarketplace
+                  ? 'Updating...'
+                  : marketplaceSettings?.tradingEnabled
+                    ? 'Turn OFF'
+                    : 'Turn ON'}
+              </button>
+            </div>
+          </div>
+
+          {/* Status Messages */}
+          {error && (
+            <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-600 text-red-400 text-sm">
+              {error}
+              <button onClick={() => setError(null)} className="float-right hover:opacity-75">&times;</button>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-3 rounded bg-green-900/30 border border-green-600 text-green-400 text-sm">
+              {success}
+              <button onClick={() => setSuccess(null)} className="float-right hover:opacity-75">&times;</button>
+            </div>
+          )}
+
+          {/* Marketplace Controls */}
           <div className="bg-gray-900 rounded-lg p-6 mb-6 border border-gray-800">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl font-bold text-white">Marketplace Controls</h2>
+                <h2 className="text-xl font-bold text-white">Feature Controls</h2>
                 <p className="text-gray-400 text-sm mt-1">
-                  Enable or disable marketplace features
+                  Fine-tune individual marketplace features (requires marketplace to be enabled)
                 </p>
               </div>
             </div>
 
-            {error && (
-              <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-600 text-red-400 text-sm">
-                {error}
-                <button onClick={() => setError(null)} className="float-right hover:opacity-75">&times;</button>
-              </div>
-            )}
-
-            {success && (
-              <div className="mb-4 p-3 rounded bg-green-900/30 border border-green-600 text-green-400 text-sm">
-                {success}
-                <button onClick={() => setSuccess(null)} className="float-right hover:opacity-75">&times;</button>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Trading Toggle */}
-              <div className="bg-gray-800 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-white">Trading</div>
-                    <div className="text-xs text-gray-400">Allow buying/selling</div>
-                  </div>
-                  <button
-                    onClick={handleToggleMarketplace}
-                    disabled={isTogglingMarketplace || !marketplaceSettings}
-                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
-                      marketplaceSettings?.tradingEnabled ? 'bg-green-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                        marketplaceSettings?.tradingEnabled ? 'translate-x-8' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
               {/* Listings Toggle */}
               <div className="bg-gray-800 rounded-lg p-4">
                 <div className="flex items-center justify-between">
@@ -375,6 +426,29 @@ export default function AdminTrading() {
                     <span
                       className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
                         marketplaceSettings?.offersEnabled ? 'translate-x-8' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Auctions Toggle */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-white">Auctions</div>
+                    <div className="text-xs text-gray-400">Allow live auctions</div>
+                  </div>
+                  <button
+                    onClick={handleToggleAuctions}
+                    disabled={isTogglingMarketplace || !marketplaceSettings}
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                      marketplaceSettings?.auctionsEnabled ? 'bg-green-600' : 'bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        marketplaceSettings?.auctionsEnabled ? 'translate-x-8' : 'translate-x-1'
                       }`}
                     />
                   </button>

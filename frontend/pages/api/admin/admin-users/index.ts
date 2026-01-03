@@ -72,12 +72,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const passwordHash = await bcrypt.hash(password, 10);
 
+      // Normalize role to uppercase
+      const normalizedRole = role ? role.toUpperCase().replace(' ', '_') : 'ADMIN';
+      const validRole = ['ADMIN', 'SUPER_ADMIN'].includes(normalizedRole) ? normalizedRole : 'ADMIN';
+
       const newAdmin = await prisma.adminUser.create({
         data: {
           email,
           passwordHash,
           name: name || null,
-          role: role || 'ADMIN',
+          role: validRole,
+          mustChangePassword: true,
         },
       });
 
@@ -88,7 +93,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             adminId: admin.id,
             adminEmail: admin.email,
             action: 'ADMIN_CREATE',
-            details: `Created admin: ${email} with role: ${role || 'ADMIN'}`,
+            details: `Created admin: ${email} with role: ${validRole}`,
             ipAddress: req.headers['x-forwarded-for'] as string || 'unknown',
           },
         });

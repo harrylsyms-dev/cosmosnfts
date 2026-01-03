@@ -62,12 +62,6 @@ export default function AdminAuctions() {
   const [isSavingPrice, setIsSavingPrice] = useState(false);
   const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings | null>(null);
   const [isTogglingAuctions, setIsTogglingAuctions] = useState(false);
-  const [showStartAuction, setShowStartAuction] = useState(false);
-  const [auctionStartDate, setAuctionStartDate] = useState('');
-  const [auctionStartTime, setAuctionStartTime] = useState('');
-  const [auctionEndDate, setAuctionEndDate] = useState('');
-  const [auctionEndTime, setAuctionEndTime] = useState('');
-  const [isStartingAuction, setIsStartingAuction] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -244,78 +238,7 @@ export default function AdminAuctions() {
     setSelectedAuction(null);
     setEditingPrice(false);
     setNewPrice('');
-    setShowStartAuction(false);
-    setAuctionStartDate('');
-    setAuctionStartTime('');
-    setAuctionEndDate('');
-    setAuctionEndTime('');
   }
-
-  function initializeAuctionDates() {
-    // Set default start to now + 1 hour
-    const start = new Date();
-    start.setHours(start.getHours() + 1);
-    start.setMinutes(0, 0, 0);
-
-    // Set default end to 7 days after start
-    const end = new Date(start);
-    end.setDate(end.getDate() + 7);
-
-    setAuctionStartDate(start.toISOString().split('T')[0]);
-    setAuctionStartTime(start.toTimeString().slice(0, 5));
-    setAuctionEndDate(end.toISOString().split('T')[0]);
-    setAuctionEndTime(end.toTimeString().slice(0, 5));
-    setShowStartAuction(true);
-  }
-
-  async function handleStartAuction() {
-    if (!selectedAuction || !auctionStartDate || !auctionStartTime || !auctionEndDate || !auctionEndTime) {
-      setError('Please fill in all date and time fields');
-      return;
-    }
-
-    const startTime = new Date(`${auctionStartDate}T${auctionStartTime}:00`);
-    const endTime = new Date(`${auctionEndDate}T${auctionEndTime}:00`);
-
-    if (endTime <= startTime) {
-      setError('End time must be after start time');
-      return;
-    }
-
-    setIsStartingAuction(true);
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/auctions/admin/start`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          nftName: selectedAuction.name,
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          startingBidCents: selectedAuction.startingBidCents,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setSuccess(`Auction started! Status: ${data.auction.status}`);
-        handleCloseModal();
-        await Promise.all([fetchStats(), fetchScheduledAuctions()]);
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to start auction');
-      }
-    } catch (error) {
-      setError('Failed to start auction');
-    } finally {
-      setIsStartingAuction(false);
-    }
-  }
-
 
   async function fetchStats() {
     try {
@@ -581,103 +504,6 @@ export default function AdminAuctions() {
                     <div className="bg-gray-800 rounded-lg p-4 mb-6">
                       <h3 className="text-sm text-gray-400 mb-2">Description</h3>
                       <p className="text-gray-200">{selectedAuction.nft.description}</p>
-                    </div>
-                  )}
-
-                  {/* Start Auction Section */}
-                  {(selectedAuction.status === 'SCHEDULED' || selectedAuction.status === 'READY') && !selectedAuction.existingAuctionId && selectedAuction.nft && (
-                    <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-purple-700">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-purple-400">Start Auction</h3>
-                        {!showStartAuction && (
-                          <button
-                            onClick={initializeAuctionDates}
-                            className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                          >
-                            Schedule Auction
-                          </button>
-                        )}
-                      </div>
-
-                      {showStartAuction && (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm text-gray-400 mb-1">Start Date</label>
-                              <input
-                                type="date"
-                                value={auctionStartDate}
-                                onChange={(e) => setAuctionStartDate(e.target.value)}
-                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm text-gray-400 mb-1">Start Time</label>
-                              <input
-                                type="time"
-                                value={auctionStartTime}
-                                onChange={(e) => setAuctionStartTime(e.target.value)}
-                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm text-gray-400 mb-1">End Date</label>
-                              <input
-                                type="date"
-                                value={auctionEndDate}
-                                onChange={(e) => setAuctionEndDate(e.target.value)}
-                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm text-gray-400 mb-1">End Time</label>
-                              <input
-                                type="time"
-                                value={auctionEndTime}
-                                onChange={(e) => setAuctionEndTime(e.target.value)}
-                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="bg-gray-700/50 rounded-lg p-3">
-                            <p className="text-sm text-gray-400">
-                              Starting Bid: <span className="text-green-400 font-medium">{selectedAuction.startingBidDisplay}</span>
-                            </p>
-                            {auctionStartDate && auctionStartTime && auctionEndDate && auctionEndTime && (
-                              <p className="text-sm text-gray-400 mt-1">
-                                Duration: {(() => {
-                                  const start = new Date(`${auctionStartDate}T${auctionStartTime}:00`);
-                                  const end = new Date(`${auctionEndDate}T${auctionEndTime}:00`);
-                                  const diffMs = end.getTime() - start.getTime();
-                                  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                                  const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                  return `${days} days, ${hours} hours`;
-                                })()}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex gap-3">
-                            <button
-                              onClick={handleStartAuction}
-                              disabled={isStartingAuction}
-                              className="flex-1 bg-green-600 hover:bg-green-500 text-white font-medium px-4 py-2 rounded-lg disabled:opacity-50"
-                            >
-                              {isStartingAuction ? 'Starting...' : 'Start Auction'}
-                            </button>
-                            <button
-                              onClick={() => setShowStartAuction(false)}
-                              className="bg-gray-600 hover:bg-gray-500 text-white font-medium px-4 py-2 rounded-lg"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
 

@@ -56,7 +56,7 @@ export default function AdminSecurity() {
   // New admin form
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
-  const [newAdminRole, setNewAdminRole] = useState<'admin' | 'super_admin'>('admin');
+  const [newAdminRole, setNewAdminRole] = useState<'ADMIN' | 'SUPER_ADMIN'>('ADMIN');
 
   // Contract address editing
   const [editContractAddress, setEditContractAddress] = useState('');
@@ -284,7 +284,7 @@ export default function AdminSecurity() {
         await fetchAdminUsers();
         setNewAdminEmail('');
         setNewAdminPassword('');
-        setNewAdminRole('admin');
+        setNewAdminRole('ADMIN');
         alert('Admin user created successfully');
       } else {
         const data = await res.json();
@@ -772,11 +772,11 @@ export default function AdminSecurity() {
                   />
                   <select
                     value={newAdminRole}
-                    onChange={(e) => setNewAdminRole(e.target.value as 'admin' | 'super_admin')}
+                    onChange={(e) => setNewAdminRole(e.target.value as 'ADMIN' | 'SUPER_ADMIN')}
                     className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
                   >
-                    <option value="admin">Admin</option>
-                    <option value="super_admin">Super Admin</option>
+                    <option value="ADMIN">Admin</option>
+                    <option value="SUPER_ADMIN">Super Admin</option>
                   </select>
                   <button
                     onClick={createAdmin}

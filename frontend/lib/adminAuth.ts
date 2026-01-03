@@ -7,6 +7,7 @@ interface AdminUser {
   email: string;
   name: string | null;
   role: string;
+  mustChangePassword?: boolean;
 }
 
 // Token secret for admin authentication - MUST be set in environment
@@ -139,6 +140,7 @@ export async function loginAdmin(
       email: admin.email,
       name: admin.name,
       role: admin.role,
+      mustChangePassword: (admin as any).mustChangePassword || false,
     },
   };
 }
