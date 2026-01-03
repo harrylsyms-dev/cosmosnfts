@@ -55,6 +55,8 @@ model NFT {
 
   // Metadata
   objectType              String?   @map("object_type")
+  constellation           String?   // Constellation location (e.g., "Orion", "Cygnus")
+  distance                String?   // Distance from Earth (e.g., "4.24 ly", "2.5M ly")
 
   // Timestamps
   createdAt               DateTime  @default(now()) @map("created_at")

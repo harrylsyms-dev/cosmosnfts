@@ -12,6 +12,9 @@ interface NFTDetail {
   name: string;
   description: string;
   image: string;
+  objectType?: string;
+  constellation?: string;
+  distance?: string;
   score: number;
   badge: string;
   fameVisibility: number;
@@ -55,6 +58,8 @@ export default function NFTDetail() {
 
   function getBadgeStyle(badge: string) {
     switch (badge) {
+      case 'LEGENDARY':
+        return 'bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-300 text-black';
       case 'ELITE':
         return 'badge-elite';
       case 'PREMIUM':
@@ -68,6 +73,8 @@ export default function NFTDetail() {
 
   function getBadgeIcon(badge: string) {
     switch (badge) {
+      case 'LEGENDARY':
+        return '👑';
       case 'ELITE':
         return '⭐';
       case 'PREMIUM':
@@ -145,6 +152,25 @@ export default function NFTDetail() {
 
             <p className="text-gray-300 text-lg mb-6">{nft.description}</p>
 
+            {/* Object Metadata */}
+            <div className="flex flex-wrap gap-3 mb-6">
+              {nft.objectType && (
+                <span className="px-3 py-1 bg-blue-900/50 border border-blue-500/50 rounded-full text-blue-300 text-sm">
+                  {nft.objectType}
+                </span>
+              )}
+              {nft.constellation && (
+                <span className="px-3 py-1 bg-purple-900/50 border border-purple-500/50 rounded-full text-purple-300 text-sm">
+                  {nft.constellation}
+                </span>
+              )}
+              {nft.distance && (
+                <span className="px-3 py-1 bg-green-900/50 border border-green-500/50 rounded-full text-green-300 text-sm">
+                  {nft.distance}
+                </span>
+              )}
+            </div>
+
             {/* Price */}
             <div className="bg-gray-900 rounded-xl p-6 mb-6">
               <div className="text-gray-400 text-sm mb-1">Current Price</div>
@@ -187,7 +213,8 @@ export default function NFTDetail() {
                 </>
               ) : (
                 <div className="bg-gray-800 text-gray-400 py-4 px-6 rounded-lg text-center text-lg">
-                  {nft.status === 'SOLD' ? 'Sold' : 'Reserved'}
+                  {nft.status === 'SOLD' ? 'Sold' :
+                   nft.status === 'AUCTION_RESERVED' ? 'Reserved for Auction' : 'Reserved'}
                 </div>
               )}
             </div>
