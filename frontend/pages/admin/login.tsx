@@ -15,14 +15,25 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      // Use relative URL - API is on same domain
-      const res = await fetch('/api/admin/login', {
+      // Use full URL to avoid any routing issues
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const res = await fetch(`${baseUrl}/api/admin/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError(`Server returned non-JSON (${res.status}): ${text.substring(0, 100)}`);
+        return;
+      }
 
       if (!res.ok) {
         setError(JSON.stringify(data) || 'Login failed');
