@@ -88,6 +88,10 @@ export default function AdminNFTs() {
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
 
+  // Delete state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Image Generation Queue
   const [imageGenQueue, setImageGenQueue] = useState<ImageGenJob[]>([]);
   const [showGenQueue, setShowGenQueue] = useState(false);
@@ -324,6 +328,40 @@ export default function AdminNFTs() {
 
   function clearCompletedJobs() {
     setImageGenQueue(prev => prev.filter(job => job.status === 'queued' || job.status === 'generating'));
+  }
+
+  async function handleDeleteNft(nftId: number) {
+    if (!selectedNft) return;
+
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/nfts/${nftId}/delete`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setGenerateMessage({ type: 'success', text: data.message || 'NFT deleted successfully!' });
+        setShowDeleteConfirm(false);
+        setSelectedNft(null);
+        // Refresh the list
+        await fetchNFTs();
+      } else {
+        setGenerateMessage({ type: 'error', text: data.message || data.error || 'Failed to delete NFT' });
+        setShowDeleteConfirm(false);
+      }
+    } catch (error) {
+      setGenerateMessage({ type: 'error', text: 'Failed to delete NFT' });
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   async function handlePreviewPrompt(nftId: number) {
@@ -1004,6 +1042,34 @@ export default function AdminNFTs() {
                         {generateMessage.text}
                       </div>
                     )}
+                    {/* Delete Confirmation */}
+                    {showDeleteConfirm && (
+                      <div className="bg-red-900/30 border border-red-600 rounded-lg p-4 mb-4">
+                        <p className="text-red-400 font-medium mb-3">
+                          Are you sure you want to delete &quot;{selectedNft.name}&quot;?
+                        </p>
+                        <p className="text-red-300 text-sm mb-4">
+                          This action cannot be undone. The NFT and any associated image data will be permanently removed.
+                        </p>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleDeleteNft(selectedNft.id)}
+                            disabled={isDeleting}
+                            className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg"
+                          >
+                            {isDeleting ? 'Deleting...' : 'Yes, Delete NFT'}
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            disabled={isDeleting}
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-3">
                       <button
                         onClick={() => handleGenerateImage(selectedNft.id, selectedNft.name)}
@@ -1021,10 +1087,20 @@ export default function AdminNFTs() {
                       >
                         View Public Page
                       </Link>
+                      {/* Delete button - only show for AVAILABLE NFTs */}
+                      {selectedNft.status === 'AVAILABLE' && !selectedNft.ownerAddress && (
+                        <button
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="bg-red-600/20 hover:bg-red-600/40 border border-red-600 text-red-400 font-medium px-4 py-2 rounded-lg"
+                        >
+                          Delete
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setSelectedNft(null);
                           setGenerateMessage(null);
+                          setShowDeleteConfirm(false);
                         }}
                         className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-lg"
                       >
