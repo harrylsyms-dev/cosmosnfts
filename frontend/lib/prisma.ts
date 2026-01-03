@@ -1,16 +1,26 @@
 import { PrismaClient } from '@prisma/client';
 import { withAccelerate } from '@prisma/extension-accelerate';
 
-// Use the standard Prisma singleton pattern
-// The env var is read from schema.prisma at runtime
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: ReturnType<typeof createClient> | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient().$extends(withAccelerate());
+function createClient() {
+  // Explicitly pass the database URL to avoid schema.prisma env var issues
+  const databaseUrl = process.env.COSMO_PRISMA_DATABASE_URL;
+
+  if (!databaseUrl) {
+    console.error('COSMO_PRISMA_DATABASE_URL is not set!');
+    throw new Error('Database URL not configured');
+  }
+
+  return new PrismaClient({
+    datasourceUrl: databaseUrl,
+  }).$extends(withAccelerate());
+}
+
+export const prisma = globalForPrisma.prisma ?? createClient();
 
 if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma as unknown as PrismaClient;
+  globalForPrisma.prisma = prisma;
 }
