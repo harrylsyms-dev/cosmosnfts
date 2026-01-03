@@ -173,6 +173,31 @@ async function generateWithLeonardo(apiKey: string, prompt: string): Promise<str
   throw new Error('Generation timed out');
 }
 
+// Unpin (remove) from Pinata
+async function unpinFromPinata(ipfsHash: string, apiKey: string, secretKey: string): Promise<boolean> {
+  try {
+    const unpinRes = await fetch(`https://api.pinata.cloud/pinning/unpin/${ipfsHash}`, {
+      method: 'DELETE',
+      headers: {
+        'pinata_api_key': apiKey,
+        'pinata_secret_api_key': secretKey,
+      },
+    });
+
+    if (!unpinRes.ok) {
+      const error = await unpinRes.text();
+      console.warn(`Failed to unpin ${ipfsHash}: ${error}`);
+      return false;
+    }
+
+    console.log(`Successfully unpinned ${ipfsHash} from Pinata`);
+    return true;
+  } catch (err: any) {
+    console.warn(`Error unpinning ${ipfsHash}:`, err.message);
+    return false;
+  }
+}
+
 // Upload to Pinata
 async function uploadToPinata(imageUrl: string, apiKey: string, secretKey: string, nftName: string): Promise<{ hash: string; url: string }> {
   // Download image
@@ -358,6 +383,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Remove old images from Pinata if they exist
+    const removedHashes: string[] = [];
+    if (nft.imageIpfsHash) {
+      console.log(`Removing old image from Pinata: ${nft.imageIpfsHash}`);
+      const imageRemoved = await unpinFromPinata(nft.imageIpfsHash, pinataApiKey, pinataSecretKey);
+      if (imageRemoved) removedHashes.push(nft.imageIpfsHash);
+    }
+    if (nft.metadataIpfsHash) {
+      console.log(`Removing old metadata from Pinata: ${nft.metadataIpfsHash}`);
+      const metadataRemoved = await unpinFromPinata(nft.metadataIpfsHash, pinataApiKey, pinataSecretKey);
+      if (metadataRemoved) removedHashes.push(nft.metadataIpfsHash);
+    }
+
     // Build prompt
     const prompt = buildPrompt(nft);
 
@@ -366,6 +404,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`NFT: #${nft.id} - ${nft.name}`);
     console.log(`Object Type: ${nft.objectType}`);
     console.log(`Total Score: ${nft.totalScore}`);
+    if (removedHashes.length > 0) {
+      console.log(`Removed old IPFS hashes: ${removedHashes.join(', ')}`);
+    }
     console.log(`--- PROMPT START ---`);
     console.log(prompt);
     console.log(`--- PROMPT END ---`);
@@ -398,7 +439,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.json({
       success: true,
-      message: 'Image and metadata generated successfully!',
+      message: removedHashes.length > 0
+        ? `Image regenerated! Removed ${removedHashes.length} old file(s) from IPFS.`
+        : 'Image and metadata generated successfully!',
       nftId: nft.id,
       nftName: nft.name,
       objectType: nft.objectType,
@@ -407,6 +450,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadataHash,
       metadataUrl: `https://gateway.pinata.cloud/ipfs/${metadataHash}`,
       promptUsed: prompt,
+      removedHashes: removedHashes.length > 0 ? removedHashes : undefined,
     });
   } catch (error: any) {
     console.error('Failed to generate image:', error);
