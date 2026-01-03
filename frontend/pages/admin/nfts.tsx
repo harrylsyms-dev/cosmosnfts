@@ -15,6 +15,8 @@ interface NFT {
   badgeTier: string;
   status: string;
   currentPrice: number;
+  displayPrice?: string;
+  priceFormula?: string;
   image: string | null;
 }
 
@@ -508,7 +510,9 @@ export default function AdminNFTs() {
                           {nft.badgeTier}
                         </span>
                       </td>
-                      <td className="px-4 py-3">${nft.currentPrice?.toFixed(2) || 'N/A'}</td>
+                      <td className="px-4 py-3" title={nft.priceFormula || ''}>
+                        {nft.displayPrice || `$${nft.currentPrice?.toFixed(2)}` || 'N/A'}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded text-sm ${
                           nft.status === 'AVAILABLE' ? 'bg-green-900 text-green-300' :

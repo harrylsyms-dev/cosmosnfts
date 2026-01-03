@@ -2,6 +2,38 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../lib/adminAuth';
 
+// Calculate current phase based on NFTs sold
+async function getCurrentPhaseInfo() {
+  try {
+    // Get site settings for phase pause state
+    const settings = await prisma.siteSettings.findUnique({ where: { id: 'main' } });
+
+    // Get scoring config for base price per point
+    const scoringConfig = await prisma.scoringConfig.findUnique({ where: { id: 'main' } });
+    const basePricePerPoint = scoringConfig?.basePricePerPoint || 0.10;
+
+    // Get active tier info
+    const activeTier = await prisma.tier.findFirst({
+      where: { active: true },
+      orderBy: { phase: 'asc' },
+    });
+
+    // Calculate phase multiplier (7.5% increase per phase after phase 1)
+    const phaseIncreasePercent = settings?.phaseIncreasePercent || 7.5;
+    const currentPhase = activeTier?.phase || 1;
+    const phaseMultiplier = currentPhase === 1 ? 1 : Math.pow(1 + (phaseIncreasePercent / 100), currentPhase - 1);
+
+    return {
+      currentPhase,
+      phaseMultiplier,
+      basePricePerPoint,
+      isPaused: settings?.phasePaused || false,
+    };
+  } catch {
+    return { currentPhase: 1, phaseMultiplier: 1, basePricePerPoint: 0.10, isPaused: false };
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Set headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -54,6 +86,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get total count
     const total = await prisma.nFT.count({ where });
 
+    // Get current phase info for dynamic pricing
+    const phaseInfo = await getCurrentPhaseInfo();
+
     // Get NFTs with pagination
     const nfts = await prisma.nFT.findMany({
       where,
@@ -74,13 +109,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
+    // Calculate dynamic prices for each NFT
+    const nftsWithDynamicPricing = nfts.map((nft: any) => {
+      // Dynamic price = basePricePerPoint × score × phaseMultiplier
+      const dynamicPrice = phaseInfo.basePricePerPoint * nft.totalScore * phaseInfo.phaseMultiplier;
+      const displayPrice = `$${dynamicPrice.toFixed(2)}`;
+      const priceFormula = phaseInfo.currentPhase === 1
+        ? `$${phaseInfo.basePricePerPoint.toFixed(2)} × ${nft.totalScore}`
+        : `$${phaseInfo.basePricePerPoint.toFixed(2)} × ${nft.totalScore} × ${phaseInfo.phaseMultiplier.toFixed(3)}`;
+
+      return {
+        ...nft,
+        currentPrice: dynamicPrice,
+        displayPrice,
+        priceFormula,
+      };
+    });
+
     res.json({
       success: true,
-      items: nfts,
+      items: nftsWithDynamicPricing,
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      phaseInfo: {
+        currentPhase: phaseInfo.currentPhase,
+        phaseMultiplier: phaseInfo.phaseMultiplier.toFixed(3),
+        basePricePerPoint: phaseInfo.basePricePerPoint,
+      },
     });
   } catch (error: any) {
     console.error('Failed to fetch NFTs:', error);
