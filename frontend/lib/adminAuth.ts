@@ -132,6 +132,14 @@ export async function loginAdmin(
 
   const token = generateToken(admin.id);
 
+  // Handle mustChangePassword safely (column may not exist in older databases)
+  let mustChangePassword = false;
+  try {
+    mustChangePassword = (admin as any).mustChangePassword || false;
+  } catch {
+    mustChangePassword = false;
+  }
+
   return {
     success: true,
     token,
@@ -140,7 +148,7 @@ export async function loginAdmin(
       email: admin.email,
       name: admin.name,
       role: admin.role,
-      mustChangePassword: (admin as any).mustChangePassword || false,
+      mustChangePassword,
     },
   };
 }

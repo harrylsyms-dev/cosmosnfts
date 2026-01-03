@@ -82,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           passwordHash,
           name: name || null,
           role: validRole,
-          mustChangePassword: true,
+          // mustChangePassword: true, // Enable after DB migration
         },
       });
 
