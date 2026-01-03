@@ -15,10 +15,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
+
+    console.log('Login attempt:', { email, hasPassword: !!password, body: req.body });
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+      return res.status(400).json({ error: 'Email and password required', received: { email: !!email, password: !!password } });
     }
 
     const result = await loginAdmin(email, password);

@@ -25,7 +25,7 @@ export default function AdminLogin() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Login failed');
+        setError(JSON.stringify(data) || 'Login failed');
         return;
       }
 
