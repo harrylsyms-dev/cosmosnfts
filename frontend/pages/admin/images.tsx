@@ -20,6 +20,17 @@ interface APIStatus {
   globalPrompt?: string;
 }
 
+interface PromptPreview {
+  id: number;
+  name: string;
+  objectType: string;
+  description: string;
+  totalScore: number;
+  badgeTier: string;
+  prompt: string;
+  hasImage: boolean;
+}
+
 export default function AdminImages() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +43,10 @@ export default function AdminImages() {
   const [globalPrompt, setGlobalPrompt] = useState('');
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+  const [promptPreviews, setPromptPreviews] = useState<PromptPreview[]>([]);
+  const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
+  const [showPreviews, setShowPreviews] = useState(false);
+  const [selectedPreview, setSelectedPreview] = useState<PromptPreview | null>(null);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -90,8 +105,12 @@ export default function AdminImages() {
       });
 
       if (res.ok) {
-        setMessage({ type: 'success', text: 'Global prompt saved successfully' });
+        setMessage({ type: 'success', text: 'Global prompt saved successfully. Click "Preview Prompts" to see updated previews.' });
         setIsEditingPrompt(false);
+        // Refresh previews if they were open
+        if (showPreviews) {
+          fetchPromptPreviews();
+        }
       } else {
         const data = await res.json();
         setMessage({ type: 'error', text: data.error || 'Failed to save prompt' });
@@ -100,6 +119,43 @@ export default function AdminImages() {
       setMessage({ type: 'error', text: 'Failed to save prompt' });
     } finally {
       setIsSavingPrompt(false);
+    }
+  }
+
+  async function fetchPromptPreviews(testPrompt?: string) {
+    setIsLoadingPreviews(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/nfts/preview-prompts`, {
+        method: testPrompt ? 'POST' : 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        ...(testPrompt ? { body: JSON.stringify({ testPrompt, limit: 20 }) } : {}),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setPromptPreviews(data.previews || []);
+        setShowPreviews(true);
+      } else {
+        setMessage({ type: 'error', text: 'Failed to fetch prompt previews' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to fetch prompt previews' });
+    } finally {
+      setIsLoadingPreviews(false);
+    }
+  }
+
+  function handlePreviewWithCurrentEdit() {
+    // Preview prompts using the current edit (before saving)
+    if (isEditingPrompt && globalPrompt) {
+      fetchPromptPreviews(globalPrompt);
+    } else {
+      fetchPromptPreviews();
     }
   }
 
@@ -314,18 +370,128 @@ export default function AdminImages() {
                 onChange={(e) => setGlobalPrompt(e.target.value)}
                 rows={6}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm"
-                placeholder="Enter the global prompt for AI image generation..."
+                placeholder="Enter the global prompt for AI image generation. Use variables: {name}, {description}, {objectType}, {features}, {score}, {badge}"
               />
             ) : (
               <div className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3">
                 {globalPrompt ? (
                   <p className="text-gray-300 whitespace-pre-wrap font-mono text-sm">{globalPrompt}</p>
                 ) : (
-                  <p className="text-gray-500 italic">No global prompt configured. Click &quot;Edit Prompt&quot; to add one.</p>
+                  <p className="text-gray-500 italic">No global prompt configured. Using default template. Click &quot;Edit Prompt&quot; to customize.</p>
                 )}
               </div>
             )}
+
+            {/* Preview Prompts Button */}
+            <div className="mt-4 flex items-center gap-4">
+              <button
+                onClick={handlePreviewWithCurrentEdit}
+                disabled={isLoadingPreviews}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm disabled:opacity-50"
+              >
+                {isLoadingPreviews ? 'Loading...' : 'Preview Prompts'}
+              </button>
+              {isEditingPrompt && (
+                <span className="text-yellow-400 text-sm">
+                  Preview will use your unsaved changes
+                </span>
+              )}
+              {showPreviews && (
+                <button
+                  onClick={() => setShowPreviews(false)}
+                  className="text-gray-400 hover:text-white text-sm"
+                >
+                  Hide Previews
+                </button>
+              )}
+            </div>
+
+            {/* Prompt Variables Help */}
+            {isEditingPrompt && (
+              <div className="mt-4 p-3 bg-gray-800 border border-gray-700 rounded-lg">
+                <p className="text-gray-400 text-xs font-semibold mb-2">Available Variables:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                  <code className="text-blue-400">{'{name}'}</code>
+                  <code className="text-blue-400">{'{description}'}</code>
+                  <code className="text-blue-400">{'{objectType}'}</code>
+                  <code className="text-blue-400">{'{features}'}</code>
+                  <code className="text-blue-400">{'{score}'}</code>
+                  <code className="text-blue-400">{'{badge}'}</code>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Prompt Previews */}
+          {showPreviews && promptPreviews.length > 0 && (
+            <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-bold">Prompt Previews</h2>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Showing how prompts will look for {promptPreviews.length} sample NFTs
+                  </p>
+                </div>
+                <button
+                  onClick={() => fetchPromptPreviews(isEditingPrompt ? globalPrompt : undefined)}
+                  disabled={isLoadingPreviews}
+                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {promptPreviews.map((preview) => (
+                  <div
+                    key={preview.id}
+                    className={`p-3 bg-gray-800 rounded-lg border cursor-pointer transition-colors ${
+                      selectedPreview?.id === preview.id
+                        ? 'border-blue-500'
+                        : 'border-gray-700 hover:border-gray-600'
+                    }`}
+                    onClick={() => setSelectedPreview(selectedPreview?.id === preview.id ? null : preview)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-500 text-sm">#{preview.id}</span>
+                        <span className="font-semibold text-white">{preview.name}</span>
+                        <span className="px-2 py-0.5 bg-purple-900/50 text-purple-300 text-xs rounded">
+                          {preview.objectType}
+                        </span>
+                        <span className={`px-2 py-0.5 text-xs rounded ${
+                          preview.badgeTier === 'LEGENDARY' ? 'bg-yellow-900/50 text-yellow-300' :
+                          preview.badgeTier === 'ELITE' ? 'bg-blue-900/50 text-blue-300' :
+                          'bg-gray-700 text-gray-300'
+                        }`}>
+                          {preview.badgeTier}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {preview.hasImage ? (
+                          <span className="text-green-400 text-xs">Has Image</span>
+                        ) : (
+                          <span className="text-yellow-400 text-xs">No Image</span>
+                        )}
+                        <span className="text-gray-500 text-sm">
+                          {selectedPreview?.id === preview.id ? '▼' : '▶'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {selectedPreview?.id === preview.id && (
+                      <div className="mt-3 pt-3 border-t border-gray-700">
+                        <p className="text-gray-400 text-xs mb-2">Generated Prompt:</p>
+                        <pre className="text-gray-300 text-xs whitespace-pre-wrap font-mono bg-gray-900 p-3 rounded max-h-48 overflow-y-auto">
+                          {preview.prompt}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Generate Form */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
