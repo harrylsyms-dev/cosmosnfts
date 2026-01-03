@@ -2,6 +2,8 @@ import express from 'express';
 import { adminService } from '../services/admin.service';
 import { siteSettingsService } from '../services/siteSettings.service';
 import { requireAdmin, requireSuperAdmin } from '../middleware/adminAuth';
+import { authRateLimiter } from '../middleware/rateLimiting';
+import { validatePassword } from '../utils/passwordValidator';
 import { logger } from '../utils/logger';
 
 const router = express.Router();
@@ -10,9 +12,9 @@ const router = express.Router();
 
 /**
  * POST /api/admin/login
- * Admin login
+ * Admin login (rate limited to prevent brute force)
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -92,8 +94,13 @@ router.post('/change-password', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Both passwords required' });
     }
 
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    // Validate password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        error: 'Password does not meet security requirements',
+        details: passwordValidation.errors,
+      });
     }
 
     const result = await adminService.changePassword(
@@ -140,8 +147,13 @@ router.post('/users', requireSuperAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        error: 'Password does not meet security requirements',
+        details: passwordValidation.errors,
+      });
     }
 
     const result = await adminService.createAdmin(email, password, name, role);
@@ -1270,8 +1282,13 @@ router.post('/change-password', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Current and new password required' });
     }
 
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    // Validate password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        error: 'Password does not meet security requirements',
+        details: passwordValidation.errors,
+      });
     }
 
     // Verify current password

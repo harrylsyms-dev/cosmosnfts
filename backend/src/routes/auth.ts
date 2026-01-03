@@ -1,14 +1,15 @@
 import express from 'express';
 import { userAuthService } from '../services/userAuth.service';
+import { authRateLimiter } from '../middleware/rateLimiting';
 import { logger } from '../utils/logger';
 
 const router = express.Router();
 
 /**
  * POST /api/auth/nonce
- * Get a nonce for wallet to sign
+ * Get a nonce for wallet to sign (rate limited)
  */
-router.post('/nonce', async (req, res) => {
+router.post('/nonce', authRateLimiter, async (req, res) => {
   try {
     const { walletAddress } = req.body;
 
@@ -40,9 +41,9 @@ router.post('/nonce', async (req, res) => {
 
 /**
  * POST /api/auth/verify
- * Verify the signed message and authenticate
+ * Verify the signed message and authenticate (rate limited)
  */
-router.post('/verify', async (req, res) => {
+router.post('/verify', authRateLimiter, async (req, res) => {
   try {
     const { walletAddress, signature } = req.body;
 

@@ -1,6 +1,24 @@
 import rateLimit from 'express-rate-limit';
 import { logger } from '../utils/logger';
 
+// Strict rate limiter for authentication endpoints (login, nonce)
+// Prevents brute force attacks on admin/user authentication
+export const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Only 5 login attempts per 15 minutes per IP
+  message: {
+    error: 'Too many authentication attempts. Please try again in 15 minutes.',
+    code: 'AUTH_RATE_LIMITED',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful logins
+  handler: (req, res, next, options) => {
+    logger.warn(`Auth rate limit exceeded for IP: ${req.ip}, path: ${req.path}`);
+    res.status(429).json(options.message);
+  },
+});
+
 // General rate limiter
 export const rateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
