@@ -1,4 +1,4 @@
-import { stripe, stripeConfig } from '../config/stripe';
+import { getStripe, stripeConfig } from '../config/stripe';
 import { logger } from '../utils/logger';
 
 export async function createPaymentIntent(
@@ -7,6 +7,8 @@ export async function createPaymentIntent(
   nftIds: number[],
   purchaseId: string
 ) {
+  const stripe = await getStripe();
+
   // Enable 3D Secure for higher amounts
   const requiresSecure = amount > stripeConfig.threeDSecure.minimumAmount;
 
@@ -39,11 +41,13 @@ export async function createPaymentIntent(
 }
 
 export async function retrievePaymentIntent(paymentIntentId: string) {
+  const stripe = await getStripe();
   return stripe.paymentIntents.retrieve(paymentIntentId);
 }
 
 export async function cancelPaymentIntent(paymentIntentId: string) {
   try {
+    const stripe = await getStripe();
     await stripe.paymentIntents.cancel(paymentIntentId);
     logger.info(`Payment intent cancelled: ${paymentIntentId}`);
   } catch (error) {
@@ -56,6 +60,7 @@ export async function createRefund(
   amount?: number,
   reason?: string
 ) {
+  const stripe = await getStripe();
   const refund = await stripe.refunds.create({
     payment_intent: paymentIntentId,
     ...(amount && { amount }),
@@ -71,6 +76,7 @@ export async function createRefund(
 }
 
 export async function getPaymentMethods(customerId: string) {
+  const stripe = await getStripe();
   return stripe.paymentMethods.list({
     customer: customerId,
     type: 'card',
@@ -78,6 +84,7 @@ export async function getPaymentMethods(customerId: string) {
 }
 
 export async function createCustomer(email: string, name?: string) {
+  const stripe = await getStripe();
   const customer = await stripe.customers.create({
     email,
     ...(name && { name }),
@@ -100,6 +107,7 @@ export async function submitDisputeEvidence(
     contractAddress: string;
   }
 ) {
+  const stripe = await getStripe();
   const dispute = await stripe.disputes.update(disputeId, {
     evidence: {
       product_description: evidence.productDescription,

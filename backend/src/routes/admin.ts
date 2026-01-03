@@ -2140,12 +2140,13 @@ router.put('/dashboard-preferences', requireAdmin, async (req, res) => {
 
 /**
  * GET /api/admin/system-status
- * Get system health status
+ * Get system health status - checks database keys first, falls back to env vars
  */
 router.get('/system-status', requireAdmin, async (req, res) => {
   try {
     const { prisma } = await import('../config/database');
     const axios = (await import('axios')).default;
+    const { getApiKey } = await import('../utils/apiKeys');
 
     const status = {
       database: 'online' as 'online' | 'offline' | 'error',
@@ -2170,11 +2171,12 @@ router.get('/system-status', requireAdmin, async (req, res) => {
       details.database = 'Connection failed';
     }
 
-    // Check Stripe - actually verify the key works
-    if (process.env.STRIPE_SECRET_KEY) {
+    // Check Stripe - get key from database or env var
+    const stripeKey = await getApiKey('stripe');
+    if (stripeKey) {
       try {
         const Stripe = (await import('stripe')).default;
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+        const stripe = new Stripe(stripeKey);
         await stripe.balance.retrieve();
         status.stripe = 'online';
         details.stripe = 'Connected';
@@ -2186,13 +2188,15 @@ router.get('/system-status', requireAdmin, async (req, res) => {
       details.stripe = 'API key not configured';
     }
 
-    // Check IPFS/Pinata - actually verify connectivity
-    if (process.env.PINATA_API_KEY && process.env.PINATA_SECRET_KEY) {
+    // Check IPFS/Pinata - get keys from database or env vars
+    const pinataApiKey = await getApiKey('pinata_api');
+    const pinataSecretKey = await getApiKey('pinata_secret');
+    if (pinataApiKey && pinataSecretKey) {
       try {
         const response = await axios.get('https://api.pinata.cloud/data/testAuthentication', {
           headers: {
-            pinata_api_key: process.env.PINATA_API_KEY,
-            pinata_secret_api_key: process.env.PINATA_SECRET_KEY,
+            pinata_api_key: pinataApiKey,
+            pinata_secret_api_key: pinataSecretKey,
           },
           timeout: 5000,
         });
@@ -2208,11 +2212,12 @@ router.get('/system-status', requireAdmin, async (req, res) => {
       details.ipfs = 'Pinata credentials not configured';
     }
 
-    // Check blockchain - verify RPC connection
-    if (process.env.POLYGON_RPC_URL) {
+    // Check blockchain - get RPC URL from database or env var
+    const rpcUrl = await getApiKey('polygon_rpc');
+    if (rpcUrl) {
       try {
         const response = await axios.post(
-          process.env.POLYGON_RPC_URL,
+          rpcUrl,
           {
             jsonrpc: '2.0',
             method: 'eth_blockNumber',
@@ -2408,6 +2413,10 @@ router.put('/api-keys/:service', requireSuperAdmin, async (req, res) => {
 
     logger.info(`API key for ${service} updated by admin: ${req.admin!.email}`);
 
+    // Clear API key cache so new key is used immediately
+    const { clearApiKeyCache } = await import('../utils/apiKeys');
+    clearApiKeyCache(service);
+
     res.json({
       success: true,
       message: `API key for ${service} has been ${result.createdAt === result.updatedAt ? 'created' : 'updated'}`,
@@ -2480,6 +2489,10 @@ router.delete('/api-keys/:service', requireSuperAdmin, async (req, res) => {
     });
 
     logger.info(`API key for ${service} deleted by admin: ${req.admin!.email}`);
+
+    // Clear API key cache
+    const { clearApiKeyCache } = await import('../utils/apiKeys');
+    clearApiKeyCache(service);
 
     res.json({
       success: true,

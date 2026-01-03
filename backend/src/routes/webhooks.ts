@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
-import { stripe, stripeConfig } from '../config/stripe';
+import { getStripe, getWebhookSecret } from '../config/stripe';
 import { prisma } from '../config/database';
 import { mintNFTs } from '../services/blockchain.service';
 import { sendPurchaseReceipt, sendMintedEmail, sendFailureEmail } from '../services/email.service';
@@ -15,10 +15,18 @@ router.post('/stripe', async (req: Request, res: Response) => {
   let event: Stripe.Event;
 
   try {
+    const stripe = await getStripe();
+    const webhookSecret = await getWebhookSecret();
+
+    if (!webhookSecret) {
+      logger.error('Stripe webhook secret not configured');
+      return res.status(500).send('Webhook secret not configured');
+    }
+
     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
-      stripeConfig.webhookSecret
+      webhookSecret
     );
   } catch (error: any) {
     logger.error('Webhook signature verification failed:', error.message);
@@ -171,6 +179,7 @@ async function handleDispute(dispute: Stripe.Dispute) {
   logger.warn(`Chargeback dispute created: ${dispute.id}`);
 
   // Get the charge and find the purchase
+  const stripe = await getStripe();
   const charge = await stripe.charges.retrieve(dispute.charge as string);
   const paymentIntentId = charge.payment_intent as string;
 
