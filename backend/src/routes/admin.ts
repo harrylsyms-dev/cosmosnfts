@@ -210,6 +210,33 @@ router.put('/settings', requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/admin/site-settings
+ * Get site settings (alias for /settings)
+ */
+router.get('/site-settings', requireAdmin, async (req, res) => {
+  try {
+    const settings = await siteSettingsService.getSettings();
+    res.json({ success: true, settings });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+/**
+ * PUT /api/admin/site-settings
+ * Update site settings (alias for /settings)
+ */
+router.put('/site-settings', requireAdmin, async (req, res) => {
+  try {
+    const updates = req.body;
+    const settings = await siteSettingsService.updateSettings(updates);
+    res.json({ success: true, settings });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+/**
  * POST /api/admin/settings/go-live
  * Take site live (disable coming soon)
  */

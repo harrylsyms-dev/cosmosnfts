@@ -205,27 +205,29 @@ export default function NFTDetail() {
             </div>
 
             {/* Price Projection */}
-            <div className="bg-gray-900 rounded-xl p-6">
-              <h3 className="text-xl font-semibold mb-4">Price Over Time</h3>
-              <div className="grid grid-cols-3 gap-4">
-                {nft.availablePhases.slice(0, 6).map((phase) => (
-                  <div
-                    key={phase.phase}
-                    className={`p-3 rounded-lg text-center ${
-                      phase.phase === 1
-                        ? 'bg-blue-900/50 border border-blue-500'
-                        : 'bg-gray-800'
-                    }`}
-                  >
-                    <div className="text-gray-400 text-xs">Phase {phase.phase}</div>
-                    <div className="font-semibold">{phase.price}</div>
-                  </div>
-                ))}
+            {nft.availablePhases && nft.availablePhases.length > 0 && (
+              <div className="bg-gray-900 rounded-xl p-6">
+                <h3 className="text-xl font-semibold mb-4">Price Over Time</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {nft.availablePhases.slice(0, 6).map((phase) => (
+                    <div
+                      key={phase.phase}
+                      className={`p-3 rounded-lg text-center ${
+                        phase.phase === 1
+                          ? 'bg-blue-900/50 border border-blue-500'
+                          : 'bg-gray-800'
+                      }`}
+                    >
+                      <div className="text-gray-400 text-xs">Phase {phase.phase}</div>
+                      <div className="font-semibold">{phase.price}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-gray-400 text-sm mt-4">
+                  Prices increase 7.5% each phase. Buy early for the best price!
+                </p>
               </div>
-              <p className="text-gray-400 text-sm mt-4">
-                Prices increase 7.5% each phase. Buy early for the best price!
-              </p>
-            </div>
+            )}
           </div>
         </div>
       </div>

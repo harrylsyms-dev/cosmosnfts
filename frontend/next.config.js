@@ -4,14 +4,8 @@ const nextConfig = {
   images: {
     domains: ['ipfs.io', 'gateway.pinata.cloud'],
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/:path*`,
-      },
-    ];
-  },
+  // Note: API routes in pages/api/ take precedence over rewrites
+  // The API routes proxy requests using BACKEND_URL env var
 };
 
 module.exports = nextConfig;

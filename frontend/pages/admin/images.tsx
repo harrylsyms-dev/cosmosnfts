@@ -17,6 +17,7 @@ interface APIStatus {
     pinata: boolean;
   };
   message: string;
+  globalPrompt?: string;
 }
 
 export default function AdminImages() {
@@ -28,6 +29,9 @@ export default function AdminImages() {
   const [selectedPhase, setSelectedPhase] = useState('1');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [verifyResult, setVerifyResult] = useState<{ verified: number; failed: number[] } | null>(null);
+  const [globalPrompt, setGlobalPrompt] = useState('');
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -64,9 +68,38 @@ export default function AdminImages() {
       if (res.ok) {
         const data = await res.json();
         setApiStatus(data);
+        setGlobalPrompt(data.globalPrompt || '');
       }
     } catch (error) {
       console.error('Failed to fetch API status:', error);
+    }
+  }
+
+  async function handleSavePrompt() {
+    setIsSavingPrompt(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/site-settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ leonardoPrompt: globalPrompt }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'Global prompt saved successfully' });
+        setIsEditingPrompt(false);
+      } else {
+        const data = await res.json();
+        setMessage({ type: 'error', text: data.error || 'Failed to save prompt' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save prompt' });
+    } finally {
+      setIsSavingPrompt(false);
     }
   }
 
@@ -235,6 +268,64 @@ export default function AdminImages() {
               )}
             </div>
           )}
+
+          {/* Global Prompt */}
+          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold">Global Image Prompt</h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  This prompt is used as the base for all AI-generated NFT images
+                </p>
+              </div>
+              {!isEditingPrompt ? (
+                <button
+                  onClick={() => setIsEditingPrompt(true)}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+                >
+                  Edit Prompt
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setIsEditingPrompt(false);
+                      setGlobalPrompt(apiStatus?.globalPrompt || '');
+                    }}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+                    disabled={isSavingPrompt}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSavePrompt}
+                    disabled={isSavingPrompt}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm disabled:opacity-50"
+                  >
+                    {isSavingPrompt ? 'Saving...' : 'Save Prompt'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {isEditingPrompt ? (
+              <textarea
+                value={globalPrompt}
+                onChange={(e) => setGlobalPrompt(e.target.value)}
+                rows={6}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm"
+                placeholder="Enter the global prompt for AI image generation..."
+              />
+            ) : (
+              <div className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3">
+                {globalPrompt ? (
+                  <p className="text-gray-300 whitespace-pre-wrap font-mono text-sm">{globalPrompt}</p>
+                ) : (
+                  <p className="text-gray-500 italic">No global prompt configured. Click &quot;Edit Prompt&quot; to add one.</p>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Generate Form */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">

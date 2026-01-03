@@ -45,8 +45,13 @@ export function useCart(): UseCartReturn {
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string>('');
 
-  const userId = getUserId();
+  // Get userId only on client side
+  useEffect(() => {
+    const id = getUserId();
+    setUserId(id);
+  }, []);
 
   useEffect(() => {
     if (userId) {

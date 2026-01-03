@@ -21,6 +21,9 @@ interface SiteSettings {
   contractPaused: boolean;
   // Phase pricing configuration
   phaseIncreasePercent: number;
+  // Sandbox/Testing Mode
+  sandboxMode: boolean;
+  paymentsEnabled: boolean;
   // Wallet & Revenue Configuration
   ownerWalletAddress: string | null;
   benefactorWalletAddress: string | null;
@@ -68,6 +71,8 @@ class SiteSettingsService {
       pauseDurationMs: settings.pauseDurationMs,
       contractPaused: settings.contractPaused,
       phaseIncreasePercent: settings.phaseIncreasePercent,
+      sandboxMode: settings.sandboxMode,
+      paymentsEnabled: settings.paymentsEnabled,
       ownerWalletAddress: settings.ownerWalletAddress,
       benefactorWalletAddress: settings.benefactorWalletAddress,
       benefactorName: settings.benefactorName,
@@ -124,6 +129,8 @@ class SiteSettingsService {
       pauseDurationMs: settings.pauseDurationMs,
       contractPaused: settings.contractPaused,
       phaseIncreasePercent: settings.phaseIncreasePercent,
+      sandboxMode: settings.sandboxMode,
+      paymentsEnabled: settings.paymentsEnabled,
       ownerWalletAddress: settings.ownerWalletAddress,
       benefactorWalletAddress: settings.benefactorWalletAddress,
       benefactorName: settings.benefactorName,

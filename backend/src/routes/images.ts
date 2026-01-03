@@ -11,7 +11,14 @@ const router = express.Router();
  */
 router.get('/status', requireAdmin, async (req, res) => {
   try {
+    const { prisma } = await import('../config/database');
     const config = await leonardoService.isConfigured();
+
+    // Get global prompt from site settings
+    const siteSettings = await prisma.siteSettings.findUnique({
+      where: { id: 'main' },
+      select: { leonardoPrompt: true },
+    });
 
     res.json({
       success: true,
@@ -19,6 +26,7 @@ router.get('/status', requireAdmin, async (req, res) => {
       message: !config.leonardo ? 'Leonardo AI: Not Configured' :
                !config.pinata ? 'Pinata IPFS: Not Configured' :
                'All API keys configured',
+      globalPrompt: siteSettings?.leonardoPrompt || null,
     });
   } catch (error) {
     logger.error('Failed to check image generation config:', error);

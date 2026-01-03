@@ -369,7 +369,7 @@ router.get('/:nftId', async (req: Request, res: Response) => {
       nftId: nft.id,
       name: nft.name,
       description: nft.description,
-      image: nft.image || nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null,
+      image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
       score: totalScore,
       badge: getBadgeForScore(totalScore),
       fameVisibility: fameScore,
@@ -383,6 +383,7 @@ router.get('/:nftId', async (req: Request, res: Response) => {
       displayPrice: `$${currentPrice.toFixed(2)}`,
       priceFormula: `$0.10 × ${totalScore} × ${phaseMultiplier.toFixed(4)}`,
       status: nft.status,
+      availablePhases: projections,
       priceProjections: projections,
     });
   } catch (error) {
