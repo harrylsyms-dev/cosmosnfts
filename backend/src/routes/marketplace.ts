@@ -3,6 +3,7 @@ import { marketplaceService } from '../services/marketplace.service';
 import { requireAdmin } from '../middleware/adminAuth';
 import { verifyWalletOwnership } from '../middleware/walletAuth';
 import { logger } from '../utils/logger';
+import { getSafeErrorMessage } from '../utils/errorHandler';
 
 const router = Router();
 
@@ -150,7 +151,7 @@ router.post('/listings', verifyWalletOwnership, async (req: Request, res: Respon
     res.status(201).json({ listing });
   } catch (error: any) {
     logger.error('Error creating listing:', error);
-    res.status(400).json({ error: error.message || 'Failed to create listing' });
+    res.status(400).json({ error: getSafeErrorMessage(error, 'Failed to create listing') });
   }
 });
 
@@ -173,7 +174,7 @@ router.delete('/listings/:id', verifyWalletOwnership, async (req: Request, res: 
     res.json({ listing });
   } catch (error: any) {
     logger.error('Error cancelling listing:', error);
-    res.status(400).json({ error: error.message || 'Failed to cancel listing' });
+    res.status(400).json({ error: getSafeErrorMessage(error, 'Failed to cancel listing') });
   }
 });
 
@@ -203,7 +204,7 @@ router.post('/buy/:listingId', verifyWalletOwnership, async (req: Request, res: 
     res.json(result);
   } catch (error: any) {
     logger.error('Error processing purchase:', error);
-    res.status(400).json({ error: error.message || 'Failed to process purchase' });
+    res.status(400).json({ error: getSafeErrorMessage(error, 'Failed to process purchase') });
   }
 });
 
@@ -233,7 +234,7 @@ router.post('/offers', verifyWalletOwnership, async (req: Request, res: Response
     res.status(201).json({ offer });
   } catch (error: any) {
     logger.error('Error creating offer:', error);
-    res.status(400).json({ error: error.message || 'Failed to create offer' });
+    res.status(400).json({ error: getSafeErrorMessage(error, 'Failed to create offer') });
   }
 });
 
@@ -263,7 +264,7 @@ router.post('/offers/:id/accept', verifyWalletOwnership, async (req: Request, re
     res.json(result);
   } catch (error: any) {
     logger.error('Error accepting offer:', error);
-    res.status(400).json({ error: error.message || 'Failed to accept offer' });
+    res.status(400).json({ error: getSafeErrorMessage(error, 'Failed to accept offer') });
   }
 });
 
@@ -291,7 +292,7 @@ router.post('/offers/:id/counter', verifyWalletOwnership, async (req: Request, r
     res.json({ offer });
   } catch (error: any) {
     logger.error('Error countering offer:', error);
-    res.status(400).json({ error: error.message || 'Failed to counter offer' });
+    res.status(400).json({ error: getSafeErrorMessage(error, 'Failed to counter offer') });
   }
 });
 
@@ -314,7 +315,7 @@ router.post('/offers/:id/reject', verifyWalletOwnership, async (req: Request, re
     res.json({ offer });
   } catch (error: any) {
     logger.error('Error rejecting offer:', error);
-    res.status(400).json({ error: error.message || 'Failed to reject offer' });
+    res.status(400).json({ error: getSafeErrorMessage(error, 'Failed to reject offer') });
   }
 });
 

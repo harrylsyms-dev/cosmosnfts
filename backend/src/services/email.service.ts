@@ -1,5 +1,12 @@
 import sgMail from '@sendgrid/mail';
 import { logger } from '../utils/logger';
+import {
+  escapeHtml,
+  sanitizeWalletAddress,
+  formatPriceSafe,
+  formatTxHashSafe,
+  sanitizeUrl,
+} from '../utils/htmlSanitizer';
 
 // Initialize SendGrid
 if (process.env.SENDGRID_API_KEY) {
@@ -111,10 +118,10 @@ export async function sendMintedEmail(
     .map(
       (nft) => `
       <div style="margin: 10px 0; padding: 15px; background: #0f3460; border-radius: 8px; border-left: 4px solid #00ff88;">
-        <p style="margin: 0; font-size: 18px; font-weight: bold; color: #ffffff;">${nft.name}</p>
-        <p style="margin: 5px 0; color: #a0a0a0;">Cosmic Score: ${nft.cosmicScore}/500 | ${getBadgeForScore(nft.cosmicScore)}</p>
+        <p style="margin: 0; font-size: 18px; font-weight: bold; color: #ffffff;">${escapeHtml(nft.name)}</p>
+        <p style="margin: 5px 0; color: #a0a0a0;">Cosmic Score: ${escapeHtml(nft.cosmicScore)}/500 | ${escapeHtml(getBadgeForScore(nft.cosmicScore))}</p>
         <p style="margin: 5px 0;">
-          <a href="${process.env.FRONTEND_URL}/nft/${nft.tokenId}" style="color: #0066ff;">View NFT</a>
+          <a href="${sanitizeUrl(process.env.FRONTEND_URL)}/nft/${escapeHtml(nft.tokenId)}" style="color: #0066ff;">View NFT</a>
         </p>
       </div>
     `
@@ -157,13 +164,13 @@ export async function sendMintedEmail(
           <p style="margin: 5px 0; color: #00ff88;">Minted on Polygon</p>
 
           <p class="label" style="margin-top: 15px;">Transaction Hash</p>
-          <div class="hash">${transactionHash}</div>
+          <div class="hash">${formatTxHashSafe(transactionHash)}</div>
           <p style="margin: 10px 0;">
-            <a href="https://polygonscan.com/tx/${transactionHash}">View on PolygonScan</a>
+            <a href="https://polygonscan.com/tx/${formatTxHashSafe(transactionHash)}">View on PolygonScan</a>
           </p>
 
           <p class="label" style="margin-top: 15px;">Contract Address</p>
-          <div class="hash">${process.env.CONTRACT_ADDRESS}</div>
+          <div class="hash">${escapeHtml(process.env.CONTRACT_ADDRESS)}</div>
         </div>
 
         <div class="section">
@@ -289,8 +296,8 @@ export async function sendOutbidNotification(
           <h1>You've Been Outbid!</h1>
         </div>
         <div class="section">
-          <p>Someone has placed a higher bid on <strong>${nftName}</strong>.</p>
-          <p>New highest bid: <strong>$${(newBidCents / 100).toFixed(2)}</strong></p>
+          <p>Someone has placed a higher bid on <strong>${escapeHtml(nftName)}</strong>.</p>
+          <p>New highest bid: <strong>${formatPriceSafe(newBidCents)}</strong></p>
           <p>Visit the auction page to place a new bid!</p>
         </div>
         <div class="footer">
@@ -331,12 +338,12 @@ export async function sendAuctionWonNotification(
           <h1>Congratulations! You Won!</h1>
         </div>
         <div class="section">
-          <p>You won the auction for <strong>${nftName}</strong>!</p>
-          <p class="price">Final Price: $${(finalPriceCents / 100).toFixed(2)}</p>
+          <p>You won the auction for <strong>${escapeHtml(nftName)}</strong>!</p>
+          <p class="price">Final Price: ${formatPriceSafe(finalPriceCents)}</p>
         </div>
         <div class="section">
-          <p>Transaction Hash: <code>${txHash}</code></p>
-          <p><a href="https://polygonscan.com/tx/${txHash}">View on PolygonScan</a></p>
+          <p>Transaction Hash: <code>${formatTxHashSafe(txHash)}</code></p>
+          <p><a href="https://polygonscan.com/tx/${formatTxHashSafe(txHash)}">View on PolygonScan</a></p>
         </div>
         <div class="footer">
           <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
@@ -382,9 +389,9 @@ export async function sendOfferMadeNotification(
         </div>
         <div class="section">
           <p>You received an offer on your NFT:</p>
-          <p style="font-size: 20px; font-weight: bold; color: white;">${nftName}</p>
-          <p class="price">Offer: $${(offerAmountCents / 100).toFixed(2)}</p>
-          <p>From: <span class="address">${offererAddress.slice(0, 8)}...${offererAddress.slice(-6)}</span></p>
+          <p style="font-size: 20px; font-weight: bold; color: white;">${escapeHtml(nftName)}</p>
+          <p class="price">Offer: ${formatPriceSafe(offerAmountCents)}</p>
+          <p>From: <span class="address">${sanitizeWalletAddress(offererAddress).slice(0, 8)}...${sanitizeWalletAddress(offererAddress).slice(-6)}</span></p>
         </div>
         <div class="section">
           <p>You can accept, counter, or reject this offer from your account.</p>
@@ -431,14 +438,14 @@ export async function sendOfferAcceptedNotification(
           <h1>Offer Accepted!</h1>
         </div>
         <div class="section">
-          <p>Your offer on <strong>${nftName}</strong> has been accepted!</p>
-          <p class="price">$${(priceCents / 100).toFixed(2)}</p>
+          <p>Your offer on <strong>${escapeHtml(nftName)}</strong> has been accepted!</p>
+          <p class="price">${formatPriceSafe(priceCents)}</p>
           <p>The NFT is now in your wallet.</p>
         </div>
         <div class="section">
           <p style="color: #a0a0a0;">Transaction Hash:</p>
-          <div class="hash">${transactionHash}</div>
-          <p><a href="https://polygonscan.com/tx/${transactionHash}">View on PolygonScan</a></p>
+          <div class="hash">${formatTxHashSafe(transactionHash)}</div>
+          <p><a href="https://polygonscan.com/tx/${formatTxHashSafe(transactionHash)}">View on PolygonScan</a></p>
         </div>
         <div class="footer">
           <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
@@ -483,9 +490,9 @@ export async function sendOfferCounteredNotification(
           <h1>Counter Offer Received</h1>
         </div>
         <div class="section">
-          <p>The seller has countered your offer on <strong>${nftName}</strong>:</p>
-          <p class="price old-price">Your offer: $${(originalOfferCents / 100).toFixed(2)}</p>
-          <p class="price new-price">Counter offer: $${(counterOfferCents / 100).toFixed(2)}</p>
+          <p>The seller has countered your offer on <strong>${escapeHtml(nftName)}</strong>:</p>
+          <p class="price old-price">Your offer: ${formatPriceSafe(originalOfferCents)}</p>
+          <p class="price new-price">Counter offer: ${formatPriceSafe(counterOfferCents)}</p>
         </div>
         <div class="section">
           <p>You can accept the counter offer or make a new offer.</p>
@@ -530,7 +537,7 @@ export async function sendOfferRejectedNotification(
           <h1>Offer Declined</h1>
         </div>
         <div class="section">
-          <p>Your offer of <strong>$${(offerAmountCents / 100).toFixed(2)}</strong> on <strong>${nftName}</strong> was declined.</p>
+          <p>Your offer of <strong>${formatPriceSafe(offerAmountCents)}</strong> on <strong>${escapeHtml(nftName)}</strong> was declined.</p>
           <p>You can make a new offer or browse other listings.</p>
         </div>
         <div class="section">
@@ -581,30 +588,30 @@ export async function sendListingSoldNotification(
           <h1>Your NFT Sold!</h1>
         </div>
         <div class="section">
-          <p><strong>${nftName}</strong> has been sold!</p>
-          <p class="price">$${(salePriceCents / 100).toFixed(2)}</p>
+          <p><strong>${escapeHtml(nftName)}</strong> has been sold!</p>
+          <p class="price">${formatPriceSafe(salePriceCents)}</p>
         </div>
         <div class="section">
           <p style="color: #a0a0a0;">Payment Breakdown:</p>
           <div class="breakdown">
             <div class="breakdown-item">
               <span>Sale Price</span>
-              <span>$${(salePriceCents / 100).toFixed(2)}</span>
+              <span>${formatPriceSafe(salePriceCents)}</span>
             </div>
             <div class="breakdown-item">
               <span>Creator Royalty (20%)</span>
-              <span style="color: #e74c3c;">-$${(royaltyCents / 100).toFixed(2)}</span>
+              <span style="color: #e74c3c;">-${formatPriceSafe(royaltyCents)}</span>
             </div>
             <div class="breakdown-item" style="border-bottom: none; font-weight: bold;">
               <span>Your Proceeds</span>
-              <span style="color: #00ff88;">$${(proceedsCents / 100).toFixed(2)}</span>
+              <span style="color: #00ff88;">${formatPriceSafe(proceedsCents)}</span>
             </div>
           </div>
         </div>
         <div class="section">
           <p style="color: #a0a0a0;">Transaction Hash:</p>
-          <div class="hash">${transactionHash}</div>
-          <p><a href="https://polygonscan.com/tx/${transactionHash}">View on PolygonScan</a></p>
+          <div class="hash">${formatTxHashSafe(transactionHash)}</div>
+          <p><a href="https://polygonscan.com/tx/${formatTxHashSafe(transactionHash)}">View on PolygonScan</a></p>
         </div>
         <div class="footer">
           <p>Questions? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
@@ -648,9 +655,9 @@ export async function sendPriceAlertNotification(
           <h1>Price Alert!</h1>
         </div>
         <div class="section">
-          <p><strong>${nftName}</strong> has reached your target price!</p>
-          <p>Current Price: <span class="price">$${(currentPriceCents / 100).toFixed(2)}</span></p>
-          <p style="color: #a0a0a0;">Your alert: ${alertType === 'BELOW' ? 'Below' : 'Above'} $${(targetPriceCents / 100).toFixed(2)}</p>
+          <p><strong>${escapeHtml(nftName)}</strong> has reached your target price!</p>
+          <p>Current Price: <span class="price">${formatPriceSafe(currentPriceCents)}</span></p>
+          <p style="color: #a0a0a0;">Your alert: ${alertType === 'BELOW' ? 'Below' : 'Above'} ${formatPriceSafe(targetPriceCents)}</p>
         </div>
         <div class="section">
           <a href="${process.env.FRONTEND_URL}/marketplace/${tokenId}" class="button">View Listing</a>
