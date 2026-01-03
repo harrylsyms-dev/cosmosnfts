@@ -49,7 +49,7 @@ interface ImagePromptConfig {
 // Build prompt using the Advanced Prompt Editor configuration
 function buildPromptFromConfig(nft: any, config: ImagePromptConfig): string {
   // Parse object type configs
-  let objectTypeConfigs: Record<string, { description: string; visualFeatures: string; customPrompt?: string }> = defaultObjectTypeConfigs;
+  let objectTypeConfigs: Record<string, { description: string; visualFeatures: string; customPrompt?: string; negativePrompt?: string }> = defaultObjectTypeConfigs;
   try {
     const parsed = JSON.parse(config.objectTypeConfigs);
     if (Object.keys(parsed).length > 0) {
@@ -61,6 +61,12 @@ function buildPromptFromConfig(nft: any, config: ImagePromptConfig): string {
 
   // Get object type specific config
   const typeConfig = objectTypeConfigs[nft.objectType] || { description: '', visualFeatures: '' };
+
+  // Combine global and object-specific negative prompts
+  const objectNegative = (typeConfig as any).negativePrompt || '';
+  const combinedNegativePrompt = objectNegative
+    ? `${config.negativePrompt}, ${objectNegative}`
+    : config.negativePrompt;
 
   // Check for custom prompt override for this type
   if (typeConfig.customPrompt && typeConfig.customPrompt.trim()) {
@@ -113,7 +119,7 @@ function buildPromptFromConfig(nft: any, config: ImagePromptConfig): string {
       .replace(/\{qualityDescriptors\}/g, config.qualityDescriptors)
       .replace(/\{mediumDescriptors\}/g, config.mediumDescriptors)
       .replace(/\{scoreModifier\}/g, scoreModifier)
-      .replace(/\{negativePrompt\}/g, config.negativePrompt);
+      .replace(/\{negativePrompt\}/g, combinedNegativePrompt);
   }
 
   // Default template using configured styles
@@ -133,7 +139,7 @@ Medium: ${config.mediumDescriptors}
 ${scoreModifier ? `Quality tier: ${scoreModifier}` : ''}
 ${config.includeScoreInPrompt ? `Cosmic Score: ${totalScore}/500` : ''}
 
---no ${config.negativePrompt}`.trim();
+--no ${combinedNegativePrompt}`.trim();
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

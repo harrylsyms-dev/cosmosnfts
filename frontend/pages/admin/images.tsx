@@ -35,6 +35,7 @@ interface ObjectTypeConfig {
   description: string;
   visualFeatures: string;
   customPrompt?: string;
+  negativePrompt?: string;
 }
 
 interface ImagePromptConfig {
@@ -815,6 +816,28 @@ export default function AdminImages() {
                               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
                               placeholder="Complete custom prompt for this object type..."
                             />
+                          </div>
+
+                          <div>
+                            <label className="block text-white font-medium text-sm mb-2">
+                              Negative Prompt <span className="text-gray-500 font-normal">(Object-Specific)</span>
+                            </label>
+                            <p className="text-gray-500 text-xs mb-2">
+                              Additional terms to exclude for this object type. These are ADDED to the global negative prompt.
+                            </p>
+                            <textarea
+                              value={promptConfig.objectTypeConfigs[selectedObjectType]?.negativePrompt || ''}
+                              onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'negativePrompt', e.target.value)}
+                              rows={2}
+                              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                              placeholder="e.g., surface features, atmosphere (for stars)"
+                            />
+                            {promptConfig.negativePrompt && (
+                              <div className="mt-2 text-xs text-gray-500">
+                                <span className="text-gray-400">Global negative prompt: </span>
+                                <span className="text-red-400/70">{promptConfig.negativePrompt.slice(0, 80)}...</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

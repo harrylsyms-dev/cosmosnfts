@@ -47,9 +47,9 @@ interface ImagePromptConfig {
 }
 
 // Build prompt using the Advanced Prompt Editor configuration
-function buildPromptFromConfig(nft: any, config: ImagePromptConfig): string {
+function buildPromptFromConfig(nft: any, config: ImagePromptConfig): { prompt: string; combinedNegativePrompt: string } {
   // Parse object type configs
-  let objectTypeConfigs: Record<string, { description: string; visualFeatures: string; customPrompt?: string }> = defaultObjectTypeConfigs;
+  let objectTypeConfigs: Record<string, { description: string; visualFeatures: string; customPrompt?: string; negativePrompt?: string }> = defaultObjectTypeConfigs;
   try {
     const parsed = JSON.parse(config.objectTypeConfigs);
     if (Object.keys(parsed).length > 0) {
@@ -62,15 +62,22 @@ function buildPromptFromConfig(nft: any, config: ImagePromptConfig): string {
   // Get object type specific config
   const typeConfig = objectTypeConfigs[nft.objectType] || { description: '', visualFeatures: '' };
 
+  // Combine global and object-specific negative prompts
+  const objectNegative = (typeConfig as any).negativePrompt || '';
+  const combinedNegativePrompt = objectNegative
+    ? `${config.negativePrompt}, ${objectNegative}`
+    : config.negativePrompt;
+
   // Check for custom prompt override for this type
   if (typeConfig.customPrompt && typeConfig.customPrompt.trim()) {
-    return typeConfig.customPrompt
+    const prompt = typeConfig.customPrompt
       .replace(/\{name\}/g, nft.name || 'Unknown')
       .replace(/\{description\}/g, nft.description || typeConfig.description)
       .replace(/\{objectType\}/g, nft.objectType || 'Cosmic Object')
       .replace(/\{features\}/g, typeConfig.visualFeatures || '')
       .replace(/\{score\}/g, String(nft.totalScore || 0))
       .replace(/\{badge\}/g, nft.badgeTier || 'STANDARD');
+    return { prompt, combinedNegativePrompt };
   }
 
   // Use the NFT's actual description (not transformed)
@@ -99,7 +106,7 @@ function buildPromptFromConfig(nft: any, config: ImagePromptConfig): string {
 
   // If base template is configured, use it
   if (config.basePromptTemplate && config.basePromptTemplate.trim()) {
-    return config.basePromptTemplate
+    const prompt = config.basePromptTemplate
       .replace(/\{name\}/g, nft.name || 'Unknown')
       .replace(/\{description\}/g, description)
       .replace(/\{objectType\}/g, nft.objectType || 'Cosmic Object')
@@ -113,11 +120,12 @@ function buildPromptFromConfig(nft: any, config: ImagePromptConfig): string {
       .replace(/\{qualityDescriptors\}/g, config.qualityDescriptors)
       .replace(/\{mediumDescriptors\}/g, config.mediumDescriptors)
       .replace(/\{scoreModifier\}/g, scoreModifier)
-      .replace(/\{negativePrompt\}/g, config.negativePrompt);
+      .replace(/\{negativePrompt\}/g, combinedNegativePrompt);
+    return { prompt, combinedNegativePrompt };
   }
 
   // Default template using configured styles
-  return `${realismPrefix}${config.artStyle} of ${nft.name}, a ${nft.objectType || 'cosmic object'}.
+  const prompt = `${realismPrefix}${config.artStyle} of ${nft.name}, a ${nft.objectType || 'cosmic object'}.
 
 ${description}
 
@@ -133,7 +141,9 @@ Medium: ${config.mediumDescriptors}
 ${scoreModifier ? `Quality tier: ${scoreModifier}` : ''}
 ${config.includeScoreInPrompt ? `Cosmic Score: ${totalScore}/500` : ''}
 
---no ${config.negativePrompt}`.trim();
+--no ${combinedNegativePrompt}`.trim();
+
+  return { prompt, combinedNegativePrompt };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -191,7 +201,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    const prompt = buildPromptFromConfig(nft, promptConfig as ImagePromptConfig);
+    const { prompt, combinedNegativePrompt } = buildPromptFromConfig(nft, promptConfig as ImagePromptConfig);
 
     res.json({
       success: true,
@@ -200,7 +210,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       objectType: nft.objectType,
       totalScore: nft.totalScore,
       prompt,
-      negativePrompt: promptConfig.negativePrompt,
+      negativePrompt: combinedNegativePrompt,
+      globalNegativePrompt: promptConfig.negativePrompt,
     });
   } catch (error: any) {
     console.error('Failed to preview prompt:', error);
