@@ -8,6 +8,7 @@ import Layout from '../components/Layout';
 import NFTCard from '../components/NFTCard';
 import CountdownTimer from '../components/CountdownTimer';
 import PricingDisplay from '../components/PricingDisplay';
+import CosmicBackground from '../components/CosmicBackground';
 
 interface NFT {
   id: number;
@@ -53,6 +54,9 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Cosmic Background with Solar System and Black Hole */}
+        <CosmicBackground />
+
         {/* Gradient overlay at bottom for transition */}
         <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-gray-950 to-transparent z-[1]" />
 

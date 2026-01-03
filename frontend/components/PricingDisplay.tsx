@@ -26,9 +26,20 @@ export default function PricingDisplay({ pricing, isLoading }: PricingDisplayPro
 
   if (!pricing) {
     return (
-      <div className="bg-gray-900 rounded-xl p-8 border border-gray-800">
-        <div className="text-5xl font-bold text-white mb-2">$350</div>
-        <div className="text-gray-400">Starting price</div>
+      <div className="bg-gray-900/80 backdrop-blur-sm rounded-xl p-8 border border-purple-500/30">
+        {/* Phase Badge */}
+        <div className="inline-flex items-center gap-2 bg-purple-600/20 border border-purple-500/30 rounded-full px-4 py-1 mb-4">
+          <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+          <span className="text-purple-300 text-sm font-medium">Phase 1</span>
+        </div>
+
+        <div className="text-gray-400 text-sm mb-2">Current Price Formula</div>
+        <div className="text-4xl font-bold text-white mb-1">
+          $0.10 <span className="text-xl text-gray-400">× Score</span>
+        </div>
+        <div className="text-gray-500 text-sm">
+          Example: Score 400 = <span className="text-green-400 font-semibold">$40.00</span>
+        </div>
       </div>
     );
   }
@@ -39,10 +50,16 @@ export default function PricingDisplay({ pricing, isLoading }: PricingDisplayPro
   const examplePrice = basePrice * exampleScore;
 
   return (
-    <div className="bg-gray-900 rounded-xl p-8 border border-gray-800">
+    <div className="bg-gray-900/80 backdrop-blur-sm rounded-xl p-8 border border-purple-500/30">
+      {/* Phase Badge */}
+      <div className="inline-flex items-center gap-2 bg-purple-600/20 border border-purple-500/30 rounded-full px-4 py-1 mb-4">
+        <span className={`w-2 h-2 rounded-full ${pricing.isPaused ? 'bg-yellow-400' : 'bg-green-400 animate-pulse'}`} />
+        <span className="text-purple-300 text-sm font-medium">{pricing.phaseName} Active</span>
+      </div>
+
       {/* Current Phase Pricing Formula */}
       <div className="mb-6">
-        <div className="text-gray-400 text-sm mb-1">{pricing.phaseName} Base Rate</div>
+        <div className="text-gray-400 text-sm mb-2">Current Price Formula</div>
         <div className="text-4xl font-bold text-white">
           ${pricing.displayPrice} <span className="text-xl text-gray-400">× Score</span>
         </div>
