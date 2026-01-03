@@ -124,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       objectType: nft.objectType,
       totalScore: nft.totalScore,
       prompt,
-      negativePrompt: 'text, watermarks, signatures, logos, words, letters, blurry, low quality',
+      negativePrompt: 'text, watermarks, signatures, logos, words, letters, blurry, low quality, landscape, terrain, ground, horizon, mountains, sky, environment, planet surface, land',
     });
   } catch (error: any) {
     console.error('Failed to preview prompt:', error);
