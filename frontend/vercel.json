@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/tier-advancement",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cart-expiry",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/auction-check",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

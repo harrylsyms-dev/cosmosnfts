@@ -1,0 +1,757 @@
+// Prisma schema for CosmoNFT - Celestial NFT Marketplace
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NFT Model - Celestial objects (20,000 total)
+model NFT {
+  id                      Int       @id @default(autoincrement())
+  tokenId                 Int       @unique @map("token_id")
+  name                    String
+  description             String
+  image                   String?   // Direct image URL
+  imageIpfsHash           String?   @map("image_ipfs_hash")
+  metadataIpfsHash        String?   @map("metadata_ipfs_hash")
+
+  // Scoring categories (0-100 each) - original field names
+  fameScore               Int       @default(0) @map("fame_score")
+  significanceScore       Int       @default(0) @map("significance_score")
+  rarityScore             Int       @default(0) @map("rarity_score")
+  discoveryRecencyScore   Int       @default(0) @map("discovery_recency_score")
+  culturalImpactScore     Int       @default(0) @map("cultural_impact_score")
+
+  // Alternative score field names (used by code)
+  fameVisibility          Int       @default(0) @map("fame_visibility")
+  scientificSignificance  Int       @default(0) @map("scientific_significance")
+  rarity                  Int       @default(0)
+  discoveryRecency        Int       @default(0) @map("discovery_recency")
+  culturalImpact          Int       @default(0) @map("cultural_impact")
+  discoveryYear           Int?      @map("discovery_year")
+
+  // Calculated score (sum of categories, max 500)
+  totalScore              Int       @default(0) @map("total_score")
+  cosmicScore             Int       @default(0) @map("cosmic_score")
+
+  // Pricing
+  basePriceCents          Int       @default(0) @map("base_price_cents")
+  currentPrice            Float     @default(0) @map("current_price")
+  currentTier             Int       @default(1) @map("current_tier")
+
+  // Status: AVAILABLE, RESERVED, AUCTIONED, MINTED, SOLD
+  status                  String    @default("AVAILABLE")
+
+  // Badge tier: STANDARD, EXCEPTIONAL, PREMIUM, ELITE
+  badgeTier               String?   @map("badge_tier")
+
+  // Blockchain data (after minting)
+  transactionHash         String?   @map("transaction_hash")
+  ownerAddress            String?   @map("owner_address")
+
+  // Metadata
+  objectType              String?   @map("object_type")
+  constellation           String?   // Constellation location (e.g., "Orion", "Cygnus")
+  distance                String?   // Distance from Earth (e.g., "4.24 ly", "2.5M ly")
+
+  // Timestamps
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  mintedAt                DateTime? @map("minted_at")
+  soldAt                  DateTime? @map("sold_at")
+
+  // Relations
+  cartItems               CartItem[]
+  auctions                Auction[]
+  listings                Listing[]
+  trades                  Trade[]
+
+  @@index([status])
+  @@index([totalScore])
+  @@index([cosmicScore])
+  @@index([badgeTier])
+  @@index([currentTier])
+  @@map("nfts")
+}
+
+// Shopping Cart
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @map("user_id")
+  expiresAt DateTime   @map("expires_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  items     CartItem[]
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("carts")
+}
+
+// Cart Items
+model CartItem {
+  id         Int      @id @default(autoincrement())
+  cartId     String   @map("cart_id")
+  nftId      Int      @map("nft_id")
+  priceAtAdd Float    @map("price_at_add")
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  nft        NFT      @relation(fields: [nftId], references: [id])
+
+  @@unique([cartId, nftId])
+  @@map("cart_items")
+}
+
+// Purchase Records
+model Purchase {
+  id                  String    @id @default(uuid())
+  email               String
+  walletAddress       String?   @map("wallet_address")
+  totalAmountCents    Int       @map("total_amount_cents")
+
+  // Status: PENDING, PROCESSING, MINTED, FAILED, MINT_FAILED, DISPUTED, REFUNDED
+  status              String    @default("PENDING")
+
+  // Stripe data
+  stripeTransactionId String?   @map("stripe_transaction_id")
+
+  // Blockchain data
+  transactionHash     String?   @map("transaction_hash")
+
+  // NFT IDs (stored as JSON string for SQLite compatibility)
+  nftIds              String    @map("nft_ids")
+
+  // Error handling
+  failureReason       String?   @map("failure_reason")
+
+  // Timestamps
+  createdAt           DateTime  @default(now()) @map("created_at")
+  mintedAt            DateTime? @map("minted_at")
+
+  @@index([email])
+  @@index([status])
+  @@index([stripeTransactionId])
+  @@map("purchases")
+}
+
+// Pricing Tiers
+model Tier {
+  id                Int      @id @default(autoincrement())
+  phase             Int      @unique
+  price             Float    // Base price in USD
+  quantityAvailable Int      @map("quantity_available")
+  quantitySold      Int      @default(0) @map("quantity_sold")
+  startTime         DateTime @map("start_time")
+  duration          Int      // Duration in seconds
+  active            Boolean  @default(false)
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("tiers")
+}
+
+// Chargeback Evidence
+model ChargebackEvidence {
+  id           Int      @id @default(autoincrement())
+  disputeId    String   @unique @map("dispute_id")
+  purchaseId   String   @map("purchase_id")
+  evidenceJson String   @map("evidence_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("chargeback_evidence")
+}
+
+// Payment Failures (for monitoring)
+model PaymentFailure {
+  id                  Int      @id @default(autoincrement())
+  email               String
+  stripeTransactionId String?  @map("stripe_transaction_id")
+  errorMessage        String   @map("error_message")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@map("payment_failures")
+}
+
+// Auctions (High-profile objects - 20% of inventory)
+model Auction {
+  id                    String      @id @default(uuid())
+  tokenId               Int         @map("token_id")
+  nftName               String      @map("nft_name")
+  startingBidCents      Int         @map("starting_bid_cents")
+  currentBidCents       Int         @map("current_bid_cents")
+  highestBidderAddress  String?     @map("highest_bidder_address")
+
+  // Status: PENDING, ACTIVE, ENDED, FINALIZED
+  status                String      @default("PENDING")
+
+  startTime             DateTime    @map("start_time")
+  endTime               DateTime    @map("end_time")
+  createdAt             DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  nft                   NFT         @relation(fields: [tokenId], references: [tokenId])
+  bids                  AuctionBid[]
+
+  @@index([status])
+  @@index([endTime])
+  @@map("auctions")
+}
+
+// Auction Bids (Bid history)
+model AuctionBid {
+  id                String    @id @default(uuid())
+  auctionId         String    @map("auction_id")
+  bidderAddress     String    @map("bidder_address")
+  bidderEmail       String?   @map("bidder_email")
+  bidAmountCents    Int       @map("bid_amount_cents")
+  timestamp         DateTime  @default(now())
+  paymentIntentId   String?   @map("payment_intent_id")
+
+  // Status: PENDING, CONFIRMED, REFUNDED
+  status            String    @default("PENDING")
+
+  // Relations
+  auction           Auction   @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId])
+  @@index([bidderAddress])
+  @@map("auction_bids")
+}
+
+// Auction History (Past auctions)
+model AuctionHistory {
+  id                String    @id @default(uuid())
+  tokenId           Int       @map("token_id")
+  nftName           String    @map("nft_name")
+  finalPriceCents   Int       @map("final_price_cents")
+  winnerAddress     String    @map("winner_address")
+  winnerEmail       String?   @map("winner_email")
+  auctionDate       DateTime  @map("auction_date")
+  blockchainHash    String?   @map("blockchain_hash")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([tokenId])
+  @@map("auction_history")
+}
+
+// Royalty Splits (Track revenue distribution)
+model RoyaltySplit {
+  id                        Int       @id @default(autoincrement())
+  transactionId             String    @map("transaction_id")
+
+  // Type: PURCHASE, SECONDARY_SALE, AUCTION
+  transactionType           String    @map("transaction_type")
+
+  totalAmountCents          Int       @map("total_amount_cents")
+  creatorShareCents         Int       @map("creator_share_cents")
+  benefactorShareCents      Int       @map("benefactor_share_cents")
+  paidAt                    DateTime? @map("paid_at")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+
+  @@index([transactionId])
+  @@map("royalty_splits")
+}
+
+// Email Logs
+model EmailLog {
+  id          String    @id @default(uuid())
+  recipient   String
+
+  // Type: PURCHASE_RECEIPT, MINTED_NOTIFICATION, PAYMENT_FAILED, AUCTION_OUTBID, AUCTION_WON
+  emailType   String    @map("email_type")
+
+  // Status: SENT, FAILED, BOUNCED
+  status      String    @default("SENT")
+
+  sentAt      DateTime  @default(now()) @map("sent_at")
+
+  @@index([recipient])
+  @@map("email_logs")
+}
+
+// Admin Users
+model AdminUser {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String?
+  role          String    @default("ADMIN") // ADMIN, SUPER_ADMIN
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  privileges    String?   @default("[]") // JSON: section access privileges
+
+  sessions      AdminSession[]
+  dashboardPreference AdminDashboardPreference?
+
+  @@map("admin_users")
+}
+
+// Admin Dashboard Preferences
+model AdminDashboardPreference {
+  id              String    @id @default(uuid())
+  adminId         String    @unique @map("admin_id")
+  layout          String    @default("[]") @map("layout") // JSON: widget configs
+  starredWidgets  String    @default("[]") @map("starred_widgets") // JSON: starred widget IDs
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  admin           AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_dashboard_preferences")
+}
+
+// Admin Sessions
+model AdminSession {
+  id          String    @id @default(uuid())
+  adminId     String    @map("admin_id")
+  token       String    @unique
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @map("user_agent")
+
+  admin       AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([adminId])
+  @@map("admin_sessions")
+}
+
+// Site Settings (for maintenance mode, coming soon, etc.)
+model SiteSettings {
+  id              String    @id @default("main")
+  isLive          Boolean   @default(false) @map("is_live")
+  maintenanceMode Boolean   @default(false) @map("maintenance_mode")
+  comingSoonMode  Boolean   @default(true) @map("coming_soon_mode")
+  launchDate      DateTime? @map("launch_date")
+  comingSoonTitle String?   @map("coming_soon_title")
+  comingSoonMessage String? @map("coming_soon_message")
+  previewPassword String?   @map("preview_password")
+
+  // HTML Content for Coming Soon and Maintenance pages
+  comingSoonHtml      String?   @map("coming_soon_html")
+  comingSoonPassword  String?   @map("coming_soon_password")
+  maintenanceHtml     String?   @map("maintenance_html")
+
+  // Leonardo AI global prompt
+  leonardoPrompt      String?   @map("leonardo_prompt")
+
+  // Phase timer controls
+  phasePaused       Boolean   @default(false) @map("phase_paused")
+  pausedAt          DateTime? @map("paused_at")
+  pauseDurationMs   Int       @default(0) @map("pause_duration_ms")
+  contractPaused    Boolean   @default(false) @map("contract_paused")
+
+  // Phase pricing configuration
+  phaseIncreasePercent  Float     @default(7.5) @map("phase_increase_percent")
+
+  // Sandbox/Testing Mode
+  sandboxMode           Boolean   @default(false) @map("sandbox_mode")
+  paymentsEnabled       Boolean   @default(true) @map("payments_enabled")
+
+  // Wallet & Revenue Configuration
+  ownerWalletAddress      String?   @map("owner_wallet_address")
+  benefactorWalletAddress String?   @map("benefactor_wallet_address")
+  benefactorName          String?   @default("Space Exploration Fund") @map("benefactor_name")
+  ownerSharePercent       Int       @default(70) @map("owner_share_percent")
+  benefactorSharePercent  Int       @default(30) @map("benefactor_share_percent")
+
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
+
+// Encrypted API Keys Storage
+model ApiKey {
+  id            String    @id @default(uuid())
+  service       String    @unique  // e.g., "stripe", "pinata", "leonardo", "polygon_rpc"
+  encryptedKey  String    @map("encrypted_key")  // AES-256-GCM encrypted
+  description   String?   // Human-readable description
+  lastRotated   DateTime? @map("last_rotated")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdBy     String?   @map("created_by")  // Admin ID who created/updated
+
+  @@map("api_keys")
+}
+
+// User (Wallet-based authentication)
+model User {
+  id            String    @id @default(uuid())
+  walletAddress String    @unique @map("wallet_address")
+  nonce         String    // Random nonce for signature verification
+  email         String?   // Optional email for notifications
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  sessions      UserSession[]
+
+  @@map("users")
+}
+
+// User Sessions
+model UserSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+// Auction Schedule Overrides (for custom pricing)
+model AuctionScheduleOverride {
+  id                String   @id @default(uuid())
+  name              String   @unique  // Name of the celestial object
+  startingBidCents  Int      @map("starting_bid_cents")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("auction_schedule_overrides")
+}
+
+// ============================================
+// MARKETPLACE MODELS
+// ============================================
+
+// Marketplace Listings (Fixed Price Sales)
+model Listing {
+  id              String    @id @default(uuid())
+  tokenId         Int       @unique @map("token_id")
+  sellerAddress   String    @map("seller_address")
+  sellerEmail     String?   @map("seller_email")
+  priceCents      Int       @map("price_cents")
+
+  // Status: ACTIVE, SOLD, CANCELLED, EXPIRED
+  status          String    @default("ACTIVE")
+
+  // Smart contract data
+  escrowTxHash    String?   @map("escrow_tx_hash")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  expiresAt       DateTime? @map("expires_at")
+  soldAt          DateTime? @map("sold_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+
+  // Relations
+  nft             NFT       @relation(fields: [tokenId], references: [tokenId])
+  offers          Offer[]
+
+  @@index([status])
+  @@index([sellerAddress])
+  @@index([tokenId])
+  @@map("listings")
+}
+
+// Offers on NFTs
+model Offer {
+  id                String    @id @default(uuid())
+  listingId         String?   @map("listing_id")
+  tokenId           Int       @map("token_id")
+  offererAddress    String    @map("offerer_address")
+  offererEmail      String?   @map("offerer_email")
+  offerAmountCents  Int       @map("offer_amount_cents")
+
+  // Status: PENDING, ACCEPTED, COUNTERED, REJECTED, EXPIRED, CANCELLED
+  status            String    @default("PENDING")
+
+  // Counter offer tracking
+  counterOfferCents Int?      @map("counter_offer_cents")
+  parentOfferId     String?   @map("parent_offer_id")
+
+  expiresAt         DateTime  @map("expires_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  respondedAt       DateTime? @map("responded_at")
+
+  // Relations
+  listing           Listing?  @relation(fields: [listingId], references: [id])
+
+  @@index([tokenId])
+  @@index([offererAddress])
+  @@index([status])
+  @@index([listingId])
+  @@map("offers")
+}
+
+// Trade History (All Secondary Sales)
+model Trade {
+  id                   String   @id @default(uuid())
+  tokenId              Int      @map("token_id")
+
+  // Type: LISTING_SALE, OFFER_ACCEPTED, AUCTION_WON
+  tradeType            String   @map("trade_type")
+
+  sellerAddress        String   @map("seller_address")
+  buyerAddress         String   @map("buyer_address")
+  priceCents           Int      @map("price_cents")
+
+  // Royalty splits (20% to creator, 80% to seller, 0% platform)
+  creatorRoyaltyCents  Int      @map("creator_royalty_cents")
+  sellerProceedsCents  Int      @map("seller_proceeds_cents")
+
+  transactionHash      String?  @map("transaction_hash")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  // Relations
+  nft                  NFT      @relation(fields: [tokenId], references: [tokenId])
+
+  @@index([tokenId])
+  @@index([sellerAddress])
+  @@index([buyerAddress])
+  @@index([createdAt])
+  @@map("trades")
+}
+
+// Marketplace Settings
+model MarketplaceSettings {
+  id                      String   @id @default("main")
+  tradingEnabled          Boolean  @default(false) @map("trading_enabled")
+  listingsEnabled         Boolean  @default(false) @map("listings_enabled")
+  offersEnabled           Boolean  @default(false) @map("offers_enabled")
+  auctionsEnabled         Boolean  @default(true) @map("auctions_enabled")
+  creatorRoyaltyPercent   Int      @default(20) @map("creator_royalty_percent")
+  platformFeePercent      Int      @default(0) @map("platform_fee_percent")
+  minListingPriceCents    Int      @default(100) @map("min_listing_price_cents")
+  maxOfferExpireDays      Int      @default(30) @map("max_offer_expire_days")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("marketplace_settings")
+}
+
+// Price Alerts (User watchlist)
+model PriceAlert {
+  id               String    @id @default(uuid())
+  userAddress      String    @map("user_address")
+  userEmail        String    @map("user_email")
+  tokenId          Int       @map("token_id")
+  targetPriceCents Int       @map("target_price_cents")
+
+  // Type: BELOW, ABOVE
+  alertType        String    @map("alert_type")
+
+  triggered        Boolean   @default(false)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  triggeredAt      DateTime? @map("triggered_at")
+
+  @@index([userAddress])
+  @@index([tokenId])
+  @@index([triggered])
+  @@map("price_alerts")
+}
+
+// Banned Addresses
+model BannedAddress {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique @map("wallet_address")
+  reason        String?
+  bannedBy      String   @map("banned_by")
+  bannedAt      DateTime @default(now()) @map("banned_at")
+
+  @@map("banned_addresses")
+}
+
+// Whitelisted Addresses
+model WhitelistAddress {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique @map("wallet_address")
+  note          String?
+  addedBy       String   @map("added_by")
+  addedAt       DateTime @default(now()) @map("added_at")
+
+  @@map("whitelist_addresses")
+}
+
+// Admin Audit Log
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  adminId     String   @map("admin_id")
+  adminEmail  String?  @map("admin_email")
+  action      String   // LOGIN, LOGOUT, SETTING_CHANGE, PHASE_ADVANCE, BAN_USER, etc.
+  details     String?  // JSON details
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+// Email Broadcast History
+model EmailBroadcast {
+  id            String   @id @default(uuid())
+  subject       String
+  body          String
+  recipientType String   @map("recipient_type") // ALL, BUYERS, AUCTION_PARTICIPANTS
+  sentBy        String   @map("sent_by")
+  sentCount     Int      @default(0) @map("sent_count")
+  sentAt        DateTime @default(now()) @map("sent_at")
+
+  @@map("email_broadcasts")
+}
+
+// User Notification Preferences
+model NotificationPreference {
+  id              String   @id @default(uuid())
+  userAddress     String   @unique @map("user_address")
+  userEmail       String   @map("user_email")
+  offersEnabled   Boolean  @default(true) @map("offers_enabled")
+  auctionsEnabled Boolean  @default(true) @map("auctions_enabled")
+  salesEnabled    Boolean  @default(true) @map("sales_enabled")
+  priceAlerts     Boolean  @default(true) @map("price_alerts")
+  marketing       Boolean  @default(false)
+  quietHoursStart Int?     @map("quiet_hours_start") // Hour 0-23
+  quietHoursEnd   Int?     @map("quiet_hours_end")
+  unsubscribedAt  DateTime? @map("unsubscribed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_preferences")
+}
+
+// ============================================
+// BENEFACTOR TRACKING MODELS
+// ============================================
+
+// Benefactor Settings (Configuration)
+model BenefactorSettings {
+  id                    String   @id @default("main")
+  benefactorName        String   @default("Space Exploration Initiatives") @map("benefactor_name")
+  benefactorWallet      String?  @map("benefactor_wallet") // ETH wallet for crypto payments
+  creatorWallet         String?  @map("creator_wallet") // Your ETH wallet
+  benefactorSharePercent Int     @default(30) @map("benefactor_share_percent")
+  creatorSharePercent   Int      @default(70) @map("creator_share_percent")
+  adminEmail            String?  @map("admin_email") // For payment reminders
+  enableReminders       Boolean  @default(true) @map("enable_reminders")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("benefactor_settings")
+}
+
+// Benefactor Manual Payments (Primary Sales + USD Auctions)
+model BenefactorPayment {
+  id                    String    @id @default(uuid())
+  month                 Int       // 1-12
+  year                  Int
+
+  // Breakdown amounts (in cents)
+  primarySalesCents     Int       @map("primary_sales_cents")
+  auctionSalesCents     Int       @map("auction_sales_cents") // USD auctions only
+  totalOwedCents        Int       @map("total_owed_cents") // 30% of above
+
+  // Revenue totals for reference
+  primaryRevenueCents   Int       @map("primary_revenue_cents") // Total primary revenue
+  auctionRevenueCents   Int       @map("auction_revenue_cents") // Total USD auction revenue
+
+  // Payment details
+  paymentMethodId       String?   @map("payment_method_id")
+  paymentMethodName     String?   @map("payment_method_name")
+  referenceNumber       String?   @map("reference_number")
+  notes                 String?
+
+  // Status: UNPAID, PAID, LATE
+  status                String    @default("UNPAID")
+
+  // Dates
+  dueDate               DateTime  @map("due_date")
+  paidAt                DateTime? @map("paid_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@unique([month, year])
+  @@index([status])
+  @@index([year])
+  @@map("benefactor_payments")
+}
+
+// Saved Payment Methods
+model BenefactorPaymentMethod {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  isDefault   Boolean   @default(false) @map("is_default")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("benefactor_payment_methods")
+}
+
+// Smart Contract Payments (Crypto Auctions + Creator Royalties - Auto-paid)
+model SmartContractPayment {
+  id                  String    @id @default(uuid())
+
+  // Transaction type: AUCTION_SALE, CREATOR_ROYALTY
+  transactionType     String    @map("transaction_type")
+
+  // Amounts
+  ethAmount           Float     @map("eth_amount")
+  usdValueAtTime      Float     @map("usd_value_at_time") // USD value at transaction time
+  ethPriceAtTime      Float     @map("eth_price_at_time") // ETH price used for conversion
+
+  // Related data
+  tokenId             Int?      @map("token_id")
+  nftName             String?   @map("nft_name")
+  auctionId           String?   @map("auction_id")
+  tradeId             String?   @map("trade_id")
+
+  // Wallet addresses
+  fromWallet          String    @map("from_wallet")
+  toWallet            String    @map("to_wallet") // Benefactor wallet
+
+  // Blockchain data
+  transactionHash     String    @unique @map("transaction_hash")
+  blockNumber         Int?      @map("block_number")
+
+  // Status: PENDING, CONFIRMED, FAILED
+  status              String    @default("CONFIRMED")
+
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@index([transactionType])
+  @@index([toWallet])
+  @@index([createdAt])
+  @@map("smart_contract_payments")
+}
+
+// ETH Price History (For accurate reporting)
+model EthPriceHistory {
+  id          String    @id @default(uuid())
+  priceUsd    Float     @map("price_usd")
+  timestamp   DateTime  @default(now())
+  source      String    @default("coingecko") // API source
+
+  @@index([timestamp])
+  @@map("eth_price_history")
+}
+
+// Benefactor Payment Reminders (Track reminder status)
+model BenefactorReminder {
+  id              String    @id @default(uuid())
+  month           Int
+  year            Int
+  reminderType    String    @map("reminder_type") // DUE_TODAY, OVERDUE_5, OVERDUE_10, DAILY
+  daysSent        Int       @default(0) @map("days_sent") // For tracking which day reminders were sent
+  sentAt          DateTime  @default(now()) @map("sent_at")
+  acknowledged    Boolean   @default(false)
+  acknowledgedAt  DateTime? @map("acknowledged_at")
+
+  @@index([month, year])
+  @@map("benefactor_reminders")
+}
