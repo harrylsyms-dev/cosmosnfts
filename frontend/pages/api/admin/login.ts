@@ -10,10 +10,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     hasBody: !!req.body,
   });
 
-  // Set CORS headers for all requests
+  // Set CORS and cache headers for all requests
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {

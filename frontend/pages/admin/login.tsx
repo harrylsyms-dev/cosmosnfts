@@ -15,8 +15,8 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      // Debug: show the URL being called
-      const url = '/api/admin/login';
+      // Add cache-busting timestamp to prevent 404 caching
+      const url = `/api/admin/login?_t=${Date.now()}`;
       console.log('Fetching:', url);
 
       const res = await fetch(url, {
@@ -25,6 +25,7 @@ export default function AdminLogin() {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        cache: 'no-store',
         body: JSON.stringify({ email, password }),
       });
 
