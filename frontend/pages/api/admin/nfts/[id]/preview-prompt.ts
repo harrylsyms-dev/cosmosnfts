@@ -15,6 +15,14 @@ function buildPrompt(nft: any): string {
     'Star Cluster': 'A dazzling congregation of stars, born together in cosmic brotherhood',
     'Asteroid': 'A primordial rock, a remnant from the dawn of our solar system',
     'Comet': 'A wanderer of ice and dust, trailing a magnificent tail across the sky',
+    'Moon': 'A celestial companion, scarred with ancient craters and bathed in reflected starlight',
+    'Planet': 'A majestic world with swirling atmospheres and hidden mysteries',
+    'Dwarf Planet': 'A distant icy world at the edge of the solar system',
+    'Supernova': 'The spectacular death of a star, scattering elements across the cosmos',
+    'White Dwarf': 'The glowing ember of a dead star, slowly cooling for eternity',
+    'Neutron Star': 'An impossibly dense stellar corpse, spinning with immense energy',
+    'Brown Dwarf': 'A failed star, too small to ignite but still glowing with heat',
+    'Globular Cluster': 'An ancient sphere of stars, orbiting the galaxy for billions of years',
   };
 
   const typeFeatures: Record<string, string> = {
@@ -28,10 +36,19 @@ function buildPrompt(nft: any): string {
     'Star Cluster': '- Hundreds of stars in close proximity\n- Varied star colors and sizes',
     'Asteroid': '- Cratered rocky surface\n- Irregular shape with dramatic lighting',
     'Comet': '- Icy nucleus with glowing coma\n- Long dust and ion tails',
+    'Moon': '- Cratered surface with maria and highlands\n- Dramatic shadows and earth-shine',
+    'Planet': '- Atmospheric bands and cloud formations\n- Possible ring systems and moons',
+    'Dwarf Planet': '- Icy surface with complex geology\n- Distant and mysterious appearance',
+    'Supernova': '- Explosive shockwave and debris field\n- Brilliant multicolored remnant',
+    'White Dwarf': '- Compact glowing core\n- Fading stellar remnant',
+    'Neutron Star': '- Intense magnetic field lines\n- Rapid rotation and energy beams',
+    'Brown Dwarf': '- Dim reddish glow\n- Atmospheric bands like a giant planet',
+    'Globular Cluster': '- Dense central core of stars\n- Spherical ancient stellar population',
   };
 
-  const description = poeticDescriptions[nft.objectType] || poeticDescriptions['Star'];
-  const features = typeFeatures[nft.objectType] || typeFeatures['Star'];
+  // Use NFT's own description if available, otherwise fall back to type-based
+  const description = nft.description || poeticDescriptions[nft.objectType] || `A magnificent ${nft.objectType || 'cosmic object'} in the depths of space`;
+  const features = typeFeatures[nft.objectType] || '';
   const totalScore = nft.totalScore || nft.cosmicScore || 300;
   const isPremium = totalScore >= 400;
   const isElite = totalScore >= 450;
