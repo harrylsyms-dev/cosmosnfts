@@ -86,23 +86,14 @@ export async function loginAdmin(
 
   const validPassword = await bcrypt.compare(password, admin.passwordHash);
   if (!validPassword) {
-    // Update failed attempts
-    await prisma.adminUser.update({
-      where: { id: admin.id },
-      data: {
-        failedLoginAttempts: { increment: 1 },
-        lastFailedLogin: new Date(),
-      },
-    });
     return { success: false, error: 'Invalid credentials' };
   }
 
-  // Reset failed attempts and update last login
+  // Update last login
   await prisma.adminUser.update({
     where: { id: admin.id },
     data: {
-      failedLoginAttempts: 0,
-      lastLogin: new Date(),
+      lastLoginAt: new Date(),
     },
   });
 
