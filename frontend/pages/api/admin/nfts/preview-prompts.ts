@@ -131,7 +131,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const settings = await prisma.siteSettings.findFirst();
       const globalPrompt = settings?.leonardoPrompt || undefined;
 
-      const previews = nfts.map(nft => ({
+      const previews = nfts.map((nft: any) => ({
         id: nft.id,
         name: nft.name,
         objectType: nft.objectType,
@@ -167,7 +167,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      const previews = nfts.map(nft => ({
+      const previews = nfts.map((nft: any) => ({
         id: nft.id,
         name: nft.name,
         objectType: nft.objectType,
