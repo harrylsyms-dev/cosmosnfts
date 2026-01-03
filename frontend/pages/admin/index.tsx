@@ -130,10 +130,22 @@ export default function AdminDashboard() {
 
       if (res.ok) {
         const data = await res.json();
-        setLayout({
-          positions: data.preferences.layout || [],
-          starredWidgets: data.preferences.starredWidgets || DEFAULT_LAYOUT.starredWidgets,
-        });
+        // Parse JSON strings from API
+        let positions = [];
+        let starredWidgets = DEFAULT_LAYOUT.starredWidgets;
+
+        try {
+          positions = typeof data.preferences.layout === 'string'
+            ? JSON.parse(data.preferences.layout)
+            : (data.preferences.layout || []);
+          starredWidgets = typeof data.preferences.starredWidgets === 'string'
+            ? JSON.parse(data.preferences.starredWidgets)
+            : (data.preferences.starredWidgets || DEFAULT_LAYOUT.starredWidgets);
+        } catch (e) {
+          console.error('Failed to parse preferences:', e);
+        }
+
+        setLayout({ positions, starredWidgets });
       }
     } catch (error) {
       console.error('Failed to fetch dashboard preferences:', error);
