@@ -711,11 +711,15 @@ export default function AdminSettings() {
                 <h3 className="font-bold text-white mb-4">API Endpoints</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
-                    <span className="text-gray-400">Backend API</span>
-                    <code className="text-purple-400 text-sm">{apiUrl || 'http://localhost:3001'}</code>
+                    <span className="text-gray-400">API</span>
+                    <code className="text-purple-400 text-sm">{typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api'}</code>
                   </div>
                   <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
-                    <span className="text-gray-400">Frontend URL</span>
+                    <span className="text-gray-400">Platform</span>
+                    <code className="text-green-400 text-sm">Vercel Serverless</code>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
+                    <span className="text-gray-400">Site URL</span>
                     <code className="text-purple-400 text-sm">{typeof window !== 'undefined' ? window.location.origin : ''}</code>
                   </div>
                 </div>

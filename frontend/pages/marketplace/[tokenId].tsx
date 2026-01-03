@@ -219,9 +219,14 @@ export default function ListingDetail() {
               <p className="text-gray-400 mb-4">{listing.nft.objectType}</p>
 
               <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-6">
-                <div className="text-gray-400 text-sm mb-1">Current Price</div>
-                <div className="text-4xl font-bold text-green-400 mb-4">
+                <div className="text-gray-400 text-sm mb-1">Listing Price</div>
+                <div className="text-4xl font-bold text-green-400 mb-2">
                   {formatPrice(listing.priceCents)}
+                </div>
+
+                <div className="text-gray-500 text-sm mb-4">
+                  Original mint price: <span className="text-blue-400 font-mono">${(0.10 * listing.nft.cosmicScore).toFixed(2)}</span>
+                  <span className="text-gray-600 ml-1">($0.10 × {listing.nft.cosmicScore})</span>
                 </div>
 
                 <div className="text-gray-400 text-sm">

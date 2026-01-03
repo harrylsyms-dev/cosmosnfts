@@ -11,8 +11,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { email, password, setupKey } = req.body;
 
-  // Require a setup key for security
-  if (setupKey !== process.env.ADMIN_SETUP_KEY && setupKey !== 'cosmo-initial-setup-2024') {
+  // Require a setup key for security - MUST be set in environment
+  if (!process.env.ADMIN_SETUP_KEY || setupKey !== process.env.ADMIN_SETUP_KEY) {
     return res.status(403).json({ error: 'Invalid setup key' });
   }
 
@@ -27,17 +27,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (existing) {
-      // Update password for existing admin
+      // Update password for existing admin and ensure SUPER_ADMIN role
       const passwordHash = await bcrypt.hash(password, 12);
       await prisma.adminUser.update({
         where: { email },
         data: {
           passwordHash,
           isActive: true,
-          failedLoginAttempts: 0,
+          role: 'SUPER_ADMIN',
         },
       });
-      return res.json({ success: true, message: 'Admin password updated' });
+      return res.json({ success: true, message: 'Admin password updated and role set to SUPER_ADMIN' });
     }
 
     // Create new admin user

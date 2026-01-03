@@ -30,31 +30,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    // Get current phase multiplier with dynamic percentage
-    const [activeTier, siteSettings] = await Promise.all([
+    // Get current phase multiplier with dynamic percentage and scoring config
+    const [activeTier, siteSettings, scoringConfig] = await Promise.all([
       prisma.tier.findFirst({ where: { active: true } }),
       prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+      prisma.scoringConfig.findUnique({ where: { id: 'main' } }),
     ]);
+
     const currentPhase = activeTier?.phase || 1;
     const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
     const multiplierBase = 1 + (increasePercent / 100);
     const phaseMultiplier = Math.pow(multiplierBase, currentPhase - 1);
+    const basePricePerPoint = scoringConfig?.basePricePerPoint ?? 0.10;
 
-    // Use the correct score fields
-    const fameScore = nft.fameScore || nft.fameVisibility || 0;
-    const significanceScore = nft.significanceScore || nft.scientificSignificance || 0;
-    const rarityScore = nft.rarityScore || nft.rarity || 0;
-    const discoveryScore = nft.discoveryRecencyScore || nft.discoveryRecency || 0;
-    const culturalScore = nft.culturalImpactScore || nft.culturalImpact || 0;
-
-    // Calculate total score and price
-    const totalScore = nft.totalScore || (fameScore + significanceScore + rarityScore + discoveryScore + culturalScore);
-    const currentPrice = 0.10 * totalScore * phaseMultiplier;
+    // Use scientific scores if available, fall back to legacy scores
+    const totalScore = nft.totalScore || nft.cosmicScore || 0;
+    const currentPrice = basePricePerPoint * totalScore * phaseMultiplier;
 
     // Calculate price projections for future phases (77 total phases)
     const projections = [1, 2, 5, 10, 20, 30, 50, 77].map((phase) => {
       const mult = Math.pow(multiplierBase, phase - 1);
-      const price = 0.10 * totalScore * mult;
+      const price = basePricePerPoint * totalScore * mult;
       return {
         phase,
         price: `$${price.toFixed(2)}`,
@@ -72,16 +68,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       distance: nft.distance,
       score: totalScore,
       badge: nft.badgeTier || getBadgeForScore(totalScore),
-      fameVisibility: fameScore,
-      scientificSignificance: significanceScore,
-      rarity: rarityScore,
-      discoveryRecency: discoveryScore,
-      culturalImpact: culturalScore,
+
+      // Scientific data (objective measurements)
+      scientificData: {
+        distanceLy: nft.distanceLy,
+        massSolar: nft.massSolar,
+        ageYears: nft.ageYears,
+        luminosity: nft.luminosity,
+        sizeKm: nft.sizeKm,
+        temperatureK: nft.temperatureK,
+        discoveryYear: nft.discoveryYear,
+        paperCount: nft.paperCount,
+      },
+
+      // Scientific score breakdown (0-100 each)
+      scoreBreakdown: {
+        distance: nft.distanceScore,
+        mass: nft.massScore,
+        age: nft.ageScore,
+        luminosity: nft.luminosityScore,
+        size: nft.sizeScore,
+        temperature: nft.temperatureScore,
+        discovery: nft.discoveryScore,
+        papers: nft.papersScore,
+      },
+
+      // Pricing info
       currentPhase,
       phaseMultiplier: phaseMultiplier.toFixed(4),
+      basePricePerPoint,
       currentPrice,
       displayPrice: `$${currentPrice.toFixed(2)}`,
-      priceFormula: `$0.10 × ${totalScore} × ${phaseMultiplier.toFixed(4)}`,
+      priceFormula: `$${basePricePerPoint.toFixed(2)} × ${totalScore} × ${phaseMultiplier.toFixed(4)}`,
       status: nft.status,
       availablePhases: projections,
       priceProjections: projections,

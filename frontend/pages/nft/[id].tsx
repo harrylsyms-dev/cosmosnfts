@@ -3,9 +3,30 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import ScoreBreakdown from '../../components/ScoreBreakdown';
 import { useCart } from '../../hooks/useCart';
 import { useMetaMask } from '../../hooks/useMetaMask';
+
+interface ScientificData {
+  distanceLy?: number | null;
+  massSolar?: number | null;
+  ageYears?: number | null;
+  luminosity?: number | null;
+  sizeKm?: number | null;
+  temperatureK?: number | null;
+  discoveryYear?: number | null;
+  paperCount?: number | null;
+}
+
+interface ScoreBreakdownData {
+  distance?: number | null;
+  mass?: number | null;
+  age?: number | null;
+  luminosity?: number | null;
+  size?: number | null;
+  temperature?: number | null;
+  discovery?: number | null;
+  papers?: number | null;
+}
 
 interface NFTDetail {
   nftId: number;
@@ -17,13 +38,11 @@ interface NFTDetail {
   distance?: string;
   score: number;
   badge: string;
-  fameVisibility: number;
-  scientificSignificance: number;
-  rarity: number;
-  discoveryRecency: number;
-  culturalImpact: number;
   displayPrice: string;
+  basePricePerPoint: number;
   status: string;
+  scientificData?: ScientificData;
+  scoreBreakdown?: ScoreBreakdownData;
   availablePhases: { phase: number; price: string }[];
 }
 
@@ -134,7 +153,7 @@ export default function NFTDetail() {
           <div className="relative">
             <div className="aspect-square bg-gray-900 rounded-2xl overflow-hidden">
               <img
-                src={nft.image || '/images/placeholder.jpg'}
+                src={nft.image || '/images/placeholder.svg'}
                 alt={nft.name}
                 className="w-full h-full object-cover"
               />
@@ -174,8 +193,11 @@ export default function NFTDetail() {
             {/* Price */}
             <div className="bg-gray-900 rounded-xl p-6 mb-6">
               <div className="text-gray-400 text-sm mb-1">Current Price</div>
-              <div className="text-4xl font-bold text-white mb-2">
+              <div className="text-4xl font-bold text-white mb-1">
                 {nft.displayPrice}
+              </div>
+              <div className="text-blue-400 text-sm mb-2 font-mono">
+                ${nft.basePricePerPoint?.toFixed(2) || '0.10'} × {nft.score} = {nft.displayPrice}
               </div>
               <div className="text-gray-400 text-sm">
                 Cosmic Score: {nft.score}/500
@@ -219,17 +241,112 @@ export default function NFTDetail() {
               )}
             </div>
 
+            {/* Scientific Data */}
+            {nft.scientificData && (
+              <div className="bg-gray-900 rounded-xl p-6 mb-6">
+                <h3 className="text-xl font-semibold mb-4">Scientific Properties</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {nft.scientificData.distanceLy != null && (
+                    <div className="bg-gray-800 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs uppercase">Distance</div>
+                      <div className="text-white font-semibold">
+                        {nft.scientificData.distanceLy.toLocaleString()} ly
+                      </div>
+                    </div>
+                  )}
+                  {nft.scientificData.massSolar != null && (
+                    <div className="bg-gray-800 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs uppercase">Mass</div>
+                      <div className="text-white font-semibold">
+                        {nft.scientificData.massSolar.toLocaleString()} M☉
+                      </div>
+                    </div>
+                  )}
+                  {nft.scientificData.ageYears != null && (
+                    <div className="bg-gray-800 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs uppercase">Age</div>
+                      <div className="text-white font-semibold">
+                        {(nft.scientificData.ageYears / 1e9).toFixed(2)} billion years
+                      </div>
+                    </div>
+                  )}
+                  {nft.scientificData.sizeKm != null && (
+                    <div className="bg-gray-800 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs uppercase">Size</div>
+                      <div className="text-white font-semibold">
+                        {nft.scientificData.sizeKm.toLocaleString()} km
+                      </div>
+                    </div>
+                  )}
+                  {nft.scientificData.temperatureK != null && (
+                    <div className="bg-gray-800 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs uppercase">Temperature</div>
+                      <div className="text-white font-semibold">
+                        {nft.scientificData.temperatureK.toLocaleString()} K
+                      </div>
+                    </div>
+                  )}
+                  {nft.scientificData.discoveryYear != null && (
+                    <div className="bg-gray-800 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs uppercase">Discovered</div>
+                      <div className="text-white font-semibold">
+                        {nft.scientificData.discoveryYear}
+                      </div>
+                    </div>
+                  )}
+                  {nft.scientificData.paperCount != null && (
+                    <div className="bg-gray-800 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs uppercase">Scientific Papers</div>
+                      <div className="text-white font-semibold">
+                        {nft.scientificData.paperCount.toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                  {nft.scientificData.luminosity != null && (
+                    <div className="bg-gray-800 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs uppercase">Luminosity</div>
+                      <div className="text-white font-semibold">
+                        {nft.scientificData.luminosity.toLocaleString()} L☉
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Score Breakdown */}
-            <div className="bg-gray-900 rounded-xl p-6 mb-6">
-              <h3 className="text-xl font-semibold mb-4">Cosmic Score Breakdown</h3>
-              <ScoreBreakdown
-                fameVisibility={nft.fameVisibility}
-                scientificSignificance={nft.scientificSignificance}
-                rarity={nft.rarity}
-                discoveryRecency={nft.discoveryRecency}
-                culturalImpact={nft.culturalImpact}
-              />
-            </div>
+            {nft.scoreBreakdown && (
+              <div className="bg-gray-900 rounded-xl p-6 mb-6">
+                <h3 className="text-xl font-semibold mb-4">Score Breakdown</h3>
+                <div className="space-y-3">
+                  {[
+                    { key: 'distance', label: 'Distance', score: nft.scoreBreakdown.distance },
+                    { key: 'mass', label: 'Mass', score: nft.scoreBreakdown.mass },
+                    { key: 'age', label: 'Age', score: nft.scoreBreakdown.age },
+                    { key: 'luminosity', label: 'Luminosity', score: nft.scoreBreakdown.luminosity },
+                    { key: 'size', label: 'Size', score: nft.scoreBreakdown.size },
+                    { key: 'temperature', label: 'Temperature', score: nft.scoreBreakdown.temperature },
+                    { key: 'discovery', label: 'Discovery Year', score: nft.scoreBreakdown.discovery },
+                    { key: 'papers', label: 'Scientific Papers', score: nft.scoreBreakdown.papers },
+                  ]
+                    .filter(item => item.score != null)
+                    .map(({ key, label, score }) => (
+                      <div key={key} className="flex items-center gap-3">
+                        <div className="w-28 text-gray-400 text-sm">{label}</div>
+                        <div className="flex-1 bg-gray-800 rounded-full h-3 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-full transition-all"
+                            style={{ width: `${score}%` }}
+                          />
+                        </div>
+                        <div className="w-12 text-right text-white font-semibold text-sm">
+                          {score?.toFixed(0)}/100
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Price Projection */}
             {nft.availablePhases && nft.availablePhases.length > 0 && (

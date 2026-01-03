@@ -36,20 +36,26 @@ export default function MyListings() {
 
   useEffect(() => {
     const wallet = localStorage.getItem('walletAddress');
-    if (!wallet) {
+    const token = localStorage.getItem('userToken');
+    if (!wallet || !token) {
       router.push('/account/login');
       return;
     }
     setWalletAddress(wallet);
-    fetchData(wallet);
+    fetchData(token);
   }, []);
 
-  async function fetchData(wallet: string) {
+  async function fetchData(token: string) {
     setIsLoading(true);
     try {
       // Fetch user's listings
       const listingsRes = await fetch(
-        `${apiUrl}/api/marketplace/my-listings?walletAddress=${wallet}`
+        `${apiUrl}/api/marketplace/my-listings`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
       );
       if (listingsRes.ok) {
         const data = await listingsRes.json();
@@ -57,7 +63,11 @@ export default function MyListings() {
       }
 
       // Fetch user's owned NFTs
-      const nftsRes = await fetch(`${apiUrl}/api/nfts?ownerAddress=${wallet}`);
+      const nftsRes = await fetch(`${apiUrl}/api/auth/nfts`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (nftsRes.ok) {
         const data = await nftsRes.json();
         setMyNFTs(data.nfts || []);
@@ -75,14 +85,23 @@ export default function MyListings() {
       return;
     }
 
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      alert('Please log in first');
+      router.push('/account/login');
+      return;
+    }
+
     setActionLoading('create');
     try {
-      const res = await fetch(`${apiUrl}/api/marketplace/listings`, {
+      const res = await fetch(`${apiUrl}/api/marketplace/list`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           tokenId: selectedNFT.tokenId,
-          sellerAddress: walletAddress,
           priceCents: Math.round(parseFloat(listPrice) * 100),
         }),
       });
@@ -92,7 +111,7 @@ export default function MyListings() {
         setShowListModal(false);
         setSelectedNFT(null);
         setListPrice('');
-        fetchData(walletAddress!);
+        fetchData(token);
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to create listing');
@@ -108,17 +127,26 @@ export default function MyListings() {
   async function handleCancelListing(listingId: string) {
     if (!confirm('Cancel this listing?')) return;
 
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      alert('Please log in first');
+      router.push('/account/login');
+      return;
+    }
+
     setActionLoading(`cancel-${listingId}`);
     try {
-      const res = await fetch(`${apiUrl}/api/marketplace/listings/${listingId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sellerAddress: walletAddress }),
+      const res = await fetch(`${apiUrl}/api/marketplace/${listingId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
       if (res.ok) {
         alert('Listing cancelled');
-        fetchData(walletAddress!);
+        fetchData(token);
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to cancel listing');

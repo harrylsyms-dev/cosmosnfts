@@ -330,6 +330,15 @@ export const DEFAULT_WIDGETS: Widget[] = [
     defaultSize: { cols: 1, rows: 1 },
   },
   {
+    id: 'scoring',
+    title: 'Scoring System',
+    description: 'Scientific scoring & base price',
+    icon: '🔬',
+    href: '/admin/scoring',
+    color: 'border-cyan-800 hover:border-cyan-500',
+    defaultSize: { cols: 1, rows: 1 },
+  },
+  {
     id: 'benefactor',
     title: 'Benefactor',
     description: 'Donation tracking',

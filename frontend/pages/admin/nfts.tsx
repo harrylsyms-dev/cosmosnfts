@@ -64,6 +64,9 @@ export default function AdminNFTs() {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generateMessage, setGenerateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [promptData, setPromptData] = useState<{ prompt: string; negativePrompt: string } | null>(null);
+  const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
   const limit = 50;
 
   useEffect(() => {
@@ -123,6 +126,9 @@ export default function AdminNFTs() {
 
   async function handleViewNft(id: number) {
     setIsLoadingDetail(true);
+    setShowPrompt(false);
+    setPromptData(null);
+    setGenerateMessage(null);
     try {
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${apiUrl}/api/admin/nfts/${id}`, {
@@ -176,6 +182,29 @@ export default function AdminNFTs() {
       setGenerateMessage({ type: 'error', text: 'Failed to generate image' });
     } finally {
       setIsGeneratingImage(false);
+    }
+  }
+
+  async function handlePreviewPrompt(nftId: number) {
+    setIsLoadingPrompt(true);
+    setShowPrompt(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/nfts/${nftId}/preview-prompt`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPromptData({
+          prompt: data.prompt,
+          negativePrompt: data.negativePrompt,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch prompt:', error);
+    } finally {
+      setIsLoadingPrompt(false);
     }
   }
 
@@ -522,6 +551,60 @@ export default function AdminNFTs() {
                             </span>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Leonardo AI Prompt */}
+                      <div className="bg-gray-800 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold text-white">Leonardo AI Prompt</h3>
+                          <button
+                            onClick={() => {
+                              if (!showPrompt) {
+                                handlePreviewPrompt(selectedNft.id);
+                              } else {
+                                setShowPrompt(false);
+                                setPromptData(null);
+                              }
+                            }}
+                            className="text-purple-400 hover:text-purple-300 text-sm"
+                          >
+                            {showPrompt ? 'Hide' : 'View Prompt'}
+                          </button>
+                        </div>
+                        {showPrompt && (
+                          <div className="space-y-3">
+                            {isLoadingPrompt ? (
+                              <div className="text-gray-400 text-sm">Loading prompt...</div>
+                            ) : promptData ? (
+                              <>
+                                <div>
+                                  <div className="text-xs text-gray-500 mb-1">Positive Prompt:</div>
+                                  <div className="bg-gray-900 rounded p-3 text-xs text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                    {promptData.prompt}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-gray-500 mb-1">Negative Prompt:</div>
+                                  <div className="bg-gray-900 rounded p-2 text-xs text-red-400">
+                                    {promptData.negativePrompt}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(promptData.prompt);
+                                    setGenerateMessage({ type: 'success', text: 'Prompt copied to clipboard!' });
+                                    setTimeout(() => setGenerateMessage(null), 2000);
+                                  }}
+                                  className="text-xs text-blue-400 hover:text-blue-300"
+                                >
+                                  Copy Prompt
+                                </button>
+                              </>
+                            ) : (
+                              <div className="text-gray-400 text-sm">Failed to load prompt</div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Timestamps */}

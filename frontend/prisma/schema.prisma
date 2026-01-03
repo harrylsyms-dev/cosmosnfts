@@ -58,6 +58,25 @@ model NFT {
   constellation           String?   // Constellation location (e.g., "Orion", "Cygnus")
   distance                String?   // Distance from Earth (e.g., "4.24 ly", "2.5M ly")
 
+  // Scientific Data (for objective scoring)
+  distanceLy              Float?    @map("distance_ly")        // Distance in light years
+  massSolar               Float?    @map("mass_solar")         // Mass in solar masses
+  ageYears                Float?    @map("age_years")          // Age in years
+  luminosity              Float?    @map("luminosity")         // Absolute magnitude
+  sizeKm                  Float?    @map("size_km")            // Size/radius in km
+  temperatureK            Float?    @map("temperature_k")      // Temperature in Kelvin
+  paperCount              Int?      @map("paper_count")        // Number of scientific papers
+
+  // Calculated objective scores (0-100 each)
+  distanceScore           Float?    @map("distance_score")
+  massScore               Float?    @map("mass_score")
+  ageScore                Float?    @map("age_score")
+  luminosityScore         Float?    @map("luminosity_score")
+  sizeScore               Float?    @map("size_score")
+  temperatureScore        Float?    @map("temperature_score")
+  discoveryScore          Float?    @map("discovery_score")
+  papersScore             Float?    @map("papers_score")
+
   // Timestamps
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
@@ -754,4 +773,89 @@ model BenefactorReminder {
 
   @@index([month, year])
   @@map("benefactor_reminders")
+}
+
+// ============================================
+// SCIENTIFIC SCORING SYSTEM
+// ============================================
+
+// Scoring Configuration (Admin-selectable scoring system)
+model ScoringConfig {
+  id                    String    @id @default("main")
+
+  // Active scoring system: EQUAL, PRIMARY_FIVE, WEIGHTED
+  activeSystem          String    @default("EQUAL") @map("active_system")
+
+  // Base price per score point (e.g., $0.10)
+  basePricePerPoint     Float     @default(0.10) @map("base_price_per_point")
+
+  // Weights for WEIGHTED system (must sum to 500)
+  distanceWeight        Float     @default(62.5) @map("distance_weight")
+  massWeight            Float     @default(62.5) @map("mass_weight")
+  ageWeight             Float     @default(62.5) @map("age_weight")
+  luminosityWeight      Float     @default(62.5) @map("luminosity_weight")
+  sizeWeight            Float     @default(62.5) @map("size_weight")
+  temperatureWeight     Float     @default(62.5) @map("temperature_weight")
+  discoveryWeight       Float     @default(62.5) @map("discovery_weight")
+  papersWeight          Float     @default(62.5) @map("papers_weight")
+
+  // For PRIMARY_FIVE system - which 5 metrics are primary (JSON array)
+  primaryMetrics        String    @default("[\"distance\",\"mass\",\"age\",\"luminosity\",\"size\"]") @map("primary_metrics")
+
+  // Global log scale parameters (can be overridden per object type)
+  distanceLogMin        Float     @default(1) @map("distance_log_min")           // 1 light year
+  distanceLogMax        Float     @default(13000000000) @map("distance_log_max") // 13 billion ly (observable universe)
+  massLogMin            Float     @default(0.00000001) @map("mass_log_min")      // Asteroid mass
+  massLogMax            Float     @default(100000000000) @map("mass_log_max")    // 100 billion solar masses
+  ageLogMin             Float     @default(1) @map("age_log_min")                // 1 year
+  ageLogMax             Float     @default(14000000000) @map("age_log_max")      // 14 billion years
+  sizeLogMin            Float     @default(1) @map("size_log_min")               // 1 km
+  sizeLogMax            Float     @default(100000000000000) @map("size_log_max") // 100 trillion km
+  temperatureLogMin     Float     @default(3) @map("temperature_log_min")        // 3 K (cosmic background)
+  temperatureLogMax     Float     @default(1000000000) @map("temperature_log_max") // 1 billion K
+  papersLogMin          Float     @default(1) @map("papers_log_min")             // 1 paper
+  papersLogMax          Float     @default(100000) @map("papers_log_max")        // 100k papers
+  discoveryYearMin      Int       @default(1600) @map("discovery_year_min")      // Galileo era
+  discoveryYearMax      Int       @default(2025) @map("discovery_year_max")      // Current year
+
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("scoring_config")
+}
+
+// Object Type Scoring Rules (Per-type formula adjustments)
+model ObjectTypeScoringRule {
+  id                    String    @id @default(uuid())
+  objectType            String    @unique @map("object_type") // "Star", "Black Hole", "Galaxy", etc.
+
+  // Which metrics apply to this object type
+  hasDistance           Boolean   @default(true) @map("has_distance")
+  hasMass               Boolean   @default(true) @map("has_mass")
+  hasAge                Boolean   @default(true) @map("has_age")
+  hasLuminosity         Boolean   @default(true) @map("has_luminosity")
+  hasSize               Boolean   @default(true) @map("has_size")
+  hasTemperature        Boolean   @default(true) @map("has_temperature")
+  hasDiscovery          Boolean   @default(true) @map("has_discovery")
+  hasPapers             Boolean   @default(true) @map("has_papers")
+
+  // Override log scale parameters for this object type (null = use global)
+  distanceLogMin        Float?    @map("distance_log_min")
+  distanceLogMax        Float?    @map("distance_log_max")
+  massLogMin            Float?    @map("mass_log_min")
+  massLogMax            Float?    @map("mass_log_max")
+  ageLogMin             Float?    @map("age_log_min")
+  ageLogMax             Float?    @map("age_log_max")
+  sizeLogMin            Float?    @map("size_log_min")
+  sizeLogMax            Float?    @map("size_log_max")
+  temperatureLogMin     Float?    @map("temperature_log_min")
+  temperatureLogMax     Float?    @map("temperature_log_max")
+
+  // Default value for missing metrics (0-100, used when metric not available)
+  defaultMissingScore   Float     @default(50) @map("default_missing_score")
+
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("object_type_scoring_rules")
 }

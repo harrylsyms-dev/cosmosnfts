@@ -9,8 +9,11 @@ interface AdminUser {
   role: string;
 }
 
-// Simple JWT-like token (in production, use proper JWT)
-const TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET || 'cosmo-admin-secret-key';
+// Token secret for admin authentication - MUST be set in environment
+const TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET;
+if (!TOKEN_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('CRITICAL: ADMIN_TOKEN_SECRET environment variable is not set!');
+}
 
 export function generateToken(adminId: string): string {
   const payload = {
@@ -30,6 +33,35 @@ export function verifyToken(token: string): { id: string } | null {
   } catch {
     return null;
   }
+}
+
+export async function verifyAdminToken(token: string): Promise<AdminUser | null> {
+  const payload = verifyToken(token);
+  if (!payload) {
+    return null;
+  }
+
+  const admin = await prisma.adminUser.findUnique({
+    where: { id: payload.id },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+    },
+  });
+
+  if (!admin || !admin.isActive) {
+    return null;
+  }
+
+  return {
+    id: admin.id,
+    email: admin.email,
+    name: admin.name,
+    role: admin.role,
+  };
 }
 
 export async function validateAdmin(req: NextApiRequest): Promise<AdminUser | null> {

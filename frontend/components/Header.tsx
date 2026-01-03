@@ -39,14 +39,6 @@ export default function Header() {
 
           {/* Right Side */}
           <div className="flex items-center gap-4">
-            {/* Account */}
-            <Link
-              href={isAuthenticated ? '/account' : '/account/login'}
-              className="text-gray-300 hover:text-white transition-colors"
-            >
-              {isAuthenticated ? 'My Account' : 'Sign In'}
-            </Link>
-
             {/* Cart */}
             <Link
               href="/cart"
@@ -72,32 +64,31 @@ export default function Header() {
               )}
             </Link>
 
-            {/* Wallet Connection */}
-            {isConnected ? (
-              <div className="flex items-center gap-2">
-                {!isPolygon && (
-                  <span className="text-yellow-400 text-sm">Wrong Network</span>
-                )}
-                <div
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                    isPolygon ? 'bg-green-900/50' : 'bg-yellow-900/50'
-                  }`}
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      isPolygon ? 'bg-green-400' : 'bg-yellow-400'
-                    }`}
-                  />
-                  <span
-                    className={`text-sm ${
-                      isPolygon ? 'text-green-300' : 'text-yellow-300'
-                    }`}
-                  >
-                    {address?.slice(0, 6)}...{address?.slice(-4)}
-                  </span>
-                </div>
-              </div>
+            {/* Wallet & Auth */}
+            {isAuthenticated ? (
+              // Authenticated: Show account link with wallet address
+              <Link
+                href="/account"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-900/50 hover:bg-green-900/70 transition-colors"
+              >
+                <div className="w-2 h-2 rounded-full bg-green-400" />
+                <span className="text-green-300 text-sm">
+                  {user?.walletAddress?.slice(0, 6)}...{user?.walletAddress?.slice(-4)}
+                </span>
+              </Link>
+            ) : isConnected ? (
+              // Connected but not signed in: Show sign in button with wallet info
+              <Link
+                href="/account/login"
+                className="flex items-center gap-3 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors"
+              >
+                <span className="text-white font-medium">Sign In</span>
+                <span className="text-blue-200 text-sm border-l border-blue-400 pl-3">
+                  {address?.slice(0, 6)}...{address?.slice(-4)}
+                </span>
+              </Link>
             ) : (
+              // Not connected: Show connect button
               <button
                 onClick={connect}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"

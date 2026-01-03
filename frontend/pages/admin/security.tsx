@@ -372,7 +372,7 @@ export default function AdminSecurity() {
     );
   }
 
-  const isSuperAdmin = currentAdmin?.role === 'super_admin';
+  const isSuperAdmin = currentAdmin?.role?.toUpperCase() === 'SUPER_ADMIN';
 
   return (
     <>

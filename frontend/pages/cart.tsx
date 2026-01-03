@@ -86,7 +86,7 @@ export default function Cart() {
                 >
                   <div className="w-20 h-20 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
                     <img
-                      src={item.image || '/images/placeholder.jpg'}
+                      src={item.image || '/images/placeholder.svg'}
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />

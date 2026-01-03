@@ -263,7 +263,7 @@ export default function AdminImages() {
               </div>
               {(!apiStatus.configured.leonardo || !apiStatus.configured.pinata) && (
                 <p className="text-yellow-400 text-sm mt-2">
-                  Add the missing API keys to your Render environment variables to enable image generation.
+                  Add the missing API keys in Settings &gt; API Keys to enable image generation.
                 </p>
               )}
             </div>
@@ -364,17 +364,17 @@ export default function AdminImages() {
             {apiStatus && (!apiStatus.configured.leonardo || !apiStatus.configured.pinata) && (
               <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
                 <p className="text-yellow-200 text-sm">
-                  <strong>Required Environment Variables (add to Render):</strong>
+                  <strong>Required API Keys (add in Settings &gt; API Keys):</strong>
                 </p>
                 <ul className="text-yellow-200 text-sm mt-2 list-disc list-inside">
                   <li className={apiStatus.configured.leonardo ? 'line-through opacity-50' : ''}>
-                    LEONARDO_AI_API_KEY - Your Leonardo AI API key
+                    Leonardo AI Key - Your Leonardo AI API key
                   </li>
                   <li className={apiStatus.configured.pinata ? 'line-through opacity-50' : ''}>
-                    PINATA_API_KEY - Pinata IPFS API key
+                    Pinata API Key - Pinata IPFS API key
                   </li>
                   <li className={apiStatus.configured.pinata ? 'line-through opacity-50' : ''}>
-                    PINATA_API_SECRET - Pinata IPFS secret
+                    Pinata Secret Key - Pinata IPFS secret
                   </li>
                 </ul>
               </div>

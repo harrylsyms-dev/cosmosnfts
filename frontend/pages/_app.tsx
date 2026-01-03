@@ -1,5 +1,6 @@
 import type { AppProps } from 'next/app';
 import dynamic from 'next/dynamic';
+import Head from 'next/head';
 import React, { useEffect, useState } from 'react';
 import '../styles/globals.css';
 
@@ -106,6 +107,9 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <ErrorBoundary>
+      <Head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+      </Head>
       {mounted && isHomePage && <CosmicBackground />}
       <StripeProvider>
         <Component {...pageProps} />
