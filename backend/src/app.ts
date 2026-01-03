@@ -37,8 +37,41 @@ app.get('/health', (req, res) => {
   res.status(200).json({ alive: true });
 });
 
-// Middleware
-app.use(helmet());
+// Security Headers with enhanced configuration
+app.use(helmet({
+  // Content Security Policy - restrict resource loading
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "https://api.stripe.com", "wss:", "https:"],
+      frameSrc: ["'self'", "https://js.stripe.com"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+    },
+  },
+  // Strict-Transport-Security - enforce HTTPS
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
+  // X-Content-Type-Options - prevent MIME type sniffing
+  noSniff: true,
+  // X-Frame-Options - prevent clickjacking
+  frameguard: { action: 'deny' },
+  // X-XSS-Protection - enable browser XSS filter
+  xssFilter: true,
+  // Referrer-Policy - control referrer information
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  // X-DNS-Prefetch-Control - disable DNS prefetching
+  dnsPrefetchControl: { allow: false },
+  // X-Permitted-Cross-Domain-Policies - restrict Adobe Flash/PDF
+  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+}));
 
 // CORS - allow multiple origins
 const allowedOrigins = [

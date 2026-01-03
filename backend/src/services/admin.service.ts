@@ -6,6 +6,25 @@ import { logger } from '../utils/logger';
 const SESSION_DURATION_HOURS = 24;
 const SALT_ROUNDS = 12;
 
+/**
+ * Masks an email address for safe logging.
+ * Example: "user@example.com" -> "u***@e***.com"
+ */
+function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) {
+    return '***@***.***';
+  }
+
+  const [localPart, domain] = email.split('@');
+  const [domainName, ...tldParts] = domain.split('.');
+  const tld = tldParts.join('.');
+
+  const maskedLocal = localPart.charAt(0) + '***';
+  const maskedDomain = domainName.charAt(0) + '***';
+
+  return `${maskedLocal}@${maskedDomain}.${tld}`;
+}
+
 interface LoginResult {
   success: boolean;
   token?: string;
@@ -95,12 +114,13 @@ class AdminService {
       });
 
       if (!admin) {
-        logger.warn(`Login attempt for non-existent email: ${email}`);
+        // Mask email in logs to prevent sensitive data exposure
+        logger.warn(`Login attempt for non-existent email: ${maskEmail(email)}`);
         return { success: false, error: 'Invalid email or password' };
       }
 
       if (!admin.isActive) {
-        logger.warn(`Login attempt for inactive admin: ${email}`);
+        logger.warn(`Login attempt for inactive admin: ${maskEmail(email)}`);
         return { success: false, error: 'Account is disabled' };
       }
 
@@ -108,7 +128,7 @@ class AdminService {
       const isValid = await bcrypt.compare(password, admin.passwordHash);
 
       if (!isValid) {
-        logger.warn(`Invalid password attempt for: ${email}`);
+        logger.warn(`Invalid password attempt for: ${maskEmail(email)}`);
         return { success: false, error: 'Invalid email or password' };
       }
 
