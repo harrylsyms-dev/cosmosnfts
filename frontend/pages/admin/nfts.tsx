@@ -51,6 +51,14 @@ interface NFTDetail {
   soldAt: string | null;
 }
 
+const MAX_NFTS = 20000;
+
+const OBJECT_TYPES = [
+  'Star', 'Exoplanet', 'Galaxy', 'Nebula', 'Asteroid', 'Comet', 'Black Hole',
+  'Pulsar', 'Quasar', 'Star Cluster', 'Moon', 'Planet', 'Dwarf Planet',
+  'Supernova', 'White Dwarf', 'Neutron Star', 'Brown Dwarf', 'Globular Cluster'
+];
+
 export default function AdminNFTs() {
   const router = useRouter();
   const [nfts, setNfts] = useState<NFT[]>([]);
@@ -67,6 +75,15 @@ export default function AdminNFTs() {
   const [promptData, setPromptData] = useState<{ prompt: string; negativePrompt: string } | null>(null);
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
+
+  // NFT Generation state
+  const [capacity, setCapacity] = useState({ current: 0, max: MAX_NFTS, remaining: MAX_NFTS });
+  const [isGeneratingNft, setIsGeneratingNft] = useState(false);
+  const [generateNftCount, setGenerateNftCount] = useState(1);
+  const [generateNftType, setGenerateNftType] = useState('');
+  const [generateNftMessage, setGenerateNftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showGeneratePanel, setShowGeneratePanel] = useState(false);
+
   const limit = 50;
 
   useEffect(() => {
@@ -92,11 +109,77 @@ export default function AdminNFTs() {
         return;
       }
 
-      await fetchNFTs();
+      await Promise.all([fetchNFTs(), fetchCapacity()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchCapacity() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/nfts/generate`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCapacity({
+          current: data.currentCount,
+          max: data.maxNfts,
+          remaining: data.remainingCapacity,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch capacity:', error);
+    }
+  }
+
+  async function handleGenerateNft() {
+    if (capacity.remaining <= 0) {
+      setGenerateNftMessage({ type: 'error', text: 'Maximum NFT limit reached (20,000)' });
+      return;
+    }
+
+    setIsGeneratingNft(true);
+    setGenerateNftMessage(null);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/nfts/generate`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          count: generateNftCount,
+          objectType: generateNftType || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const nftNames = data.nfts.map((n: any) => n.name).join(', ');
+        setGenerateNftMessage({
+          type: 'success',
+          text: `Generated ${data.generated} NFT(s): ${nftNames}`
+        });
+        setCapacity({
+          current: data.newTotal,
+          max: MAX_NFTS,
+          remaining: MAX_NFTS - data.newTotal,
+        });
+        // Refresh the list
+        await fetchNFTs();
+      } else {
+        setGenerateNftMessage({ type: 'error', text: data.error || 'Failed to generate NFTs' });
+      }
+    } catch (error) {
+      setGenerateNftMessage({ type: 'error', text: 'Failed to generate NFTs' });
+    } finally {
+      setIsGeneratingNft(false);
     }
   }
 
@@ -236,7 +319,110 @@ export default function AdminNFTs() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 py-8">
-          <h1 className="text-2xl font-bold mb-6">Browse NFTs</h1>
+          {/* Header with Capacity Display */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 className="text-2xl font-bold">Browse NFTs</h1>
+            <div className="flex items-center gap-4">
+              {/* Capacity Bar */}
+              <div className="bg-gray-800 rounded-lg px-4 py-2">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-gray-400">
+                    <span className="text-white font-bold">{capacity.current.toLocaleString()}</span>
+                    <span className="mx-1">/</span>
+                    <span>{capacity.max.toLocaleString()}</span>
+                  </div>
+                  <div className="w-32 bg-gray-700 rounded-full h-2.5">
+                    <div
+                      className={`h-2.5 rounded-full ${
+                        capacity.remaining === 0 ? 'bg-red-500' :
+                        capacity.remaining < 1000 ? 'bg-yellow-500' : 'bg-green-500'
+                      }`}
+                      style={{ width: `${(capacity.current / capacity.max) * 100}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-xs text-gray-500">{capacity.remaining.toLocaleString()} left</span>
+                </div>
+              </div>
+              {/* Generate Button */}
+              <button
+                onClick={() => setShowGeneratePanel(!showGeneratePanel)}
+                disabled={capacity.remaining === 0}
+                className="bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                <span>+</span>
+                <span>Generate NFT</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Generate Panel */}
+          {showGeneratePanel && (
+            <div className="bg-gray-900 border border-purple-600/50 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-purple-400">Generate New NFTs</h2>
+                <button
+                  onClick={() => setShowGeneratePanel(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {generateNftMessage && (
+                <div className={`mb-4 p-3 rounded-lg ${
+                  generateNftMessage.type === 'success'
+                    ? 'bg-green-900/30 border border-green-600 text-green-400'
+                    : 'bg-red-900/30 border border-red-600 text-red-400'
+                }`}>
+                  {generateNftMessage.text}
+                </div>
+              )}
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Number to Generate</label>
+                  <select
+                    value={generateNftCount}
+                    onChange={(e) => setGenerateNftCount(parseInt(e.target.value))}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                  >
+                    {[1, 5, 10, 25, 50, 100].map(n => (
+                      <option key={n} value={n} disabled={n > capacity.remaining}>
+                        {n} {n > capacity.remaining ? '(exceeds capacity)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Object Type (Optional)</label>
+                  <select
+                    value={generateNftType}
+                    onChange={(e) => setGenerateNftType(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                  >
+                    <option value="">Random (weighted)</option>
+                    {OBJECT_TYPES.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={handleGenerateNft}
+                    disabled={isGeneratingNft || capacity.remaining === 0}
+                    className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-lg"
+                  >
+                    {isGeneratingNft ? 'Generating...' : `Generate ${generateNftCount} NFT(s)`}
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500 mt-3">
+                NFTs are generated with unique catalog-style names and cannot be duplicated.
+                Each NFT receives randomized scores and appropriate badge tiers.
+              </p>
+            </div>
+          )}
 
           {/* Filters */}
           <div className="bg-gray-900 rounded-lg p-4 mb-6">
