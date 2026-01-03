@@ -43,17 +43,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const unavailable = nfts.filter(
-      (nft) => nft.status !== 'AVAILABLE' && nft.status !== 'RESERVED'
+      (nft: { status: string }) => nft.status !== 'AVAILABLE' && nft.status !== 'RESERVED'
     );
     if (unavailable.length > 0) {
       return res.status(400).json({
         error: 'Some NFTs are no longer available',
-        unavailable: unavailable.map((n) => n.id),
+        unavailable: unavailable.map((n: { id: number }) => n.id),
       });
     }
 
     // Calculate total (in cents for Stripe)
-    const totalDollars = nfts.reduce((sum, nft) => sum + nft.currentPrice, 0);
+    const totalDollars = nfts.reduce((sum: number, nft: { currentPrice: number }) => sum + nft.currentPrice, 0);
     const totalCents = Math.round(totalDollars * 100);
 
     // Create purchase record

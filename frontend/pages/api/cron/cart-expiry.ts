@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     for (const cart of expiredCarts) {
       // Get NFT IDs from cart items
-      const nftIds = cart.items.map((item) => item.nftId);
+      const nftIds = cart.items.map((item: { nftId: number }) => item.nftId);
 
       // Transaction: release NFTs and delete cart
       await prisma.$transaction([

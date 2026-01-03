@@ -87,7 +87,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         for (let i = 0; i < nfts.length; i += 500) {
           const batch = nfts.slice(i, i + 500);
           await Promise.all(
-            batch.map((nft) => {
+            batch.map((nft: { id: number; totalScore: number | null; cosmicScore: number | null }) => {
               const score = nft.totalScore || nft.cosmicScore || 0;
               const newPrice = 0.10 * score * multiplier;
               return prisma.nFT.update({

@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Release all NFTs and delete cart items
-    const nftIds = cart.items.map((item) => item.nftId);
+    const nftIds = cart.items.map((item: { nftId: number }) => item.nftId);
 
     await prisma.$transaction([
       prisma.cartItem.deleteMany({

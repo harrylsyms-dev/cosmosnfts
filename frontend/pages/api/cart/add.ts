@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if NFT already in cart
-    const existingItem = cart.items.find((item) => item.nftId === parseInt(nftId));
+    const existingItem = cart.items.find((item: { nftId: number }) => item.nftId === parseInt(nftId));
     if (existingItem) {
       return res.status(400).json({ error: 'NFT already in cart' });
     }
@@ -104,13 +104,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const totalPrice = updatedCart!.items.reduce(
-      (sum, item) => sum + item.priceAtAdd,
+      (sum: number, item: { priceAtAdd: number }) => sum + item.priceAtAdd,
       0
     );
 
     res.json({
       cartId: updatedCart!.id,
-      items: updatedCart!.items.map((item) => ({
+      items: updatedCart!.items.map((item: { nftId: number; nft: { name: string }; priceAtAdd: number }) => ({
         nftId: item.nftId,
         name: item.nft.name,
         price: item.priceAtAdd,

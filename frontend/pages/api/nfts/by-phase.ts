@@ -69,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       total,
       limit: limitNum,
       offset: offsetNum,
-      items: nfts.map((nft) => {
+      items: nfts.map((nft: { id: number; name: string; image: string | null; imageIpfsHash: string | null; totalScore: number | null; cosmicScore: number | null; badgeTier: string | null; objectType: string | null; constellation: string | null; distance: string | null; status: string }) => {
         const score = nft.totalScore || nft.cosmicScore || 0;
         const price = 0.10 * score * phaseMultiplier;
         return {

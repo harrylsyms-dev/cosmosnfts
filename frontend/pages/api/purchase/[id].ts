@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status: purchase.status.toLowerCase(),
       email: purchase.email,
       totalAmount: purchase.totalAmountCents / 100,
-      nfts: nfts.map((nft) => ({
+      nfts: nfts.map((nft: { tokenId: number; name: string; transactionHash: string | null }) => ({
         tokenId: nft.tokenId,
         name: nft.name,
         contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,

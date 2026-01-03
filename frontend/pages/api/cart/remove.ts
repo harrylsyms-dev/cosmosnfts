@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Cart not found' });
     }
 
-    const item = cart.items.find((i) => i.nftId === parseInt(nftId));
+    const item = cart.items.find((i: { nftId: number; id: number }) => i.nftId === parseInt(nftId));
     if (!item) {
       return res.status(404).json({ error: 'Item not in cart' });
     }

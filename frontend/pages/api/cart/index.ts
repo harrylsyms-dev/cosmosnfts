@@ -36,13 +36,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const totalPrice = cart.items.reduce(
-      (sum, item) => sum + item.priceAtAdd,
+      (sum: number, item: { priceAtAdd: number }) => sum + item.priceAtAdd,
       0
     );
 
     res.json({
       cartId: cart.id,
-      items: cart.items.map((item) => ({
+      items: cart.items.map((item: { nftId: number; nft: { name: string; image: string | null; cosmicScore: number | null }; priceAtAdd: number }) => ({
         nftId: item.nftId,
         name: item.nft.name,
         price: item.priceAtAdd,

@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       query: q,
       count: nfts.length,
       currentPhase,
-      items: nfts.map((nft) => {
+      items: nfts.map((nft: { id: number; name: string; image: string | null; imageIpfsHash: string | null; totalScore: number | null; cosmicScore: number | null; badgeTier: string | null }) => {
         const score = nft.totalScore || nft.cosmicScore || 0;
         const price = 0.10 * score * phaseMultiplier;
         return {

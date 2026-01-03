@@ -55,3 +55,4 @@ backend/nul
 backend/typechain-types/
 backend/dist/
 backend/logs/
+.env*.local
