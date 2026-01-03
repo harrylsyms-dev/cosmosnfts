@@ -479,7 +479,7 @@ export default function AdminScoring() {
 
               <button
                 onClick={handleRecalculateAll}
-                disabled={isRecalculating || hasChanges}
+                disabled={isRecalculating || !!hasChanges}
                 className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isRecalculating ? 'Recalculating...' : 'Recalculate All NFT Scores'}
