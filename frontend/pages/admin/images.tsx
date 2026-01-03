@@ -776,71 +776,69 @@ export default function AdminImages() {
                         ))}
                       </div>
 
-                      {promptConfig.objectTypeConfigs[selectedObjectType] && (
-                        <div className="space-y-4 p-4 bg-gray-800 rounded-lg">
-                          <h3 className="text-lg font-bold text-white">{selectedObjectType}</h3>
+                      <div className="space-y-4 p-4 bg-gray-800 rounded-lg">
+                        <h3 className="text-lg font-bold text-white">{selectedObjectType}</h3>
 
-                          <div>
-                            <label className="block text-gray-400 text-sm mb-2">
-                              Description <span className="text-gray-600">(fallback if NFT has no description)</span>
-                            </label>
-                            <textarea
-                              value={promptConfig.objectTypeConfigs[selectedObjectType]?.description || ''}
-                              onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'description', e.target.value)}
-                              rows={2}
-                              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
-                              placeholder="A brief description of this object type..."
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-white font-medium text-sm mb-2">
-                              Visual Features <code className="text-blue-400 text-xs ml-2">{'{features}'}</code>
-                            </label>
-                            <textarea
-                              value={promptConfig.objectTypeConfigs[selectedObjectType]?.visualFeatures || ''}
-                              onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'visualFeatures', e.target.value)}
-                              rows={3}
-                              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
-                              placeholder="Visual characteristics to include in prompts..."
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-gray-400 text-sm mb-2">Custom Prompt Override (Optional)</label>
-                            <p className="text-gray-500 text-xs mb-2">Leave empty to use base template. Enter a complete prompt to override for this type only.</p>
-                            <textarea
-                              value={promptConfig.objectTypeConfigs[selectedObjectType]?.customPrompt || ''}
-                              onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'customPrompt', e.target.value)}
-                              rows={4}
-                              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
-                              placeholder="Complete custom prompt for this object type..."
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-white font-medium text-sm mb-2">
-                              Negative Prompt <span className="text-gray-500 font-normal">(Object-Specific)</span>
-                            </label>
-                            <p className="text-gray-500 text-xs mb-2">
-                              Additional terms to exclude for this object type. These are ADDED to the global negative prompt.
-                            </p>
-                            <textarea
-                              value={promptConfig.objectTypeConfigs[selectedObjectType]?.negativePrompt || ''}
-                              onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'negativePrompt', e.target.value)}
-                              rows={2}
-                              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
-                              placeholder="e.g., surface features, atmosphere (for stars)"
-                            />
-                            {promptConfig.negativePrompt && (
-                              <div className="mt-2 text-xs text-gray-500">
-                                <span className="text-gray-400">Global negative prompt: </span>
-                                <span className="text-red-400/70">{promptConfig.negativePrompt.slice(0, 80)}...</span>
-                              </div>
-                            )}
-                          </div>
+                        <div>
+                          <label className="block text-gray-400 text-sm mb-2">
+                            Description <span className="text-gray-600">(fallback if NFT has no description)</span>
+                          </label>
+                          <textarea
+                            value={promptConfig.objectTypeConfigs[selectedObjectType]?.description || ''}
+                            onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'description', e.target.value)}
+                            rows={2}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                            placeholder="A brief description of this object type..."
+                          />
                         </div>
-                      )}
+
+                        <div>
+                          <label className="block text-white font-medium text-sm mb-2">
+                            Visual Features <code className="text-blue-400 text-xs ml-2">{'{features}'}</code>
+                          </label>
+                          <textarea
+                            value={promptConfig.objectTypeConfigs[selectedObjectType]?.visualFeatures || ''}
+                            onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'visualFeatures', e.target.value)}
+                            rows={3}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                            placeholder="Visual characteristics to include in prompts..."
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-gray-400 text-sm mb-2">Custom Prompt Override (Optional)</label>
+                          <p className="text-gray-500 text-xs mb-2">Leave empty to use base template. Enter a complete prompt to override for this type only.</p>
+                          <textarea
+                            value={promptConfig.objectTypeConfigs[selectedObjectType]?.customPrompt || ''}
+                            onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'customPrompt', e.target.value)}
+                            rows={4}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                            placeholder="Complete custom prompt for this object type..."
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-white font-medium text-sm mb-2">
+                            Negative Prompt <span className="text-gray-500 font-normal">(Object-Specific)</span>
+                          </label>
+                          <p className="text-gray-500 text-xs mb-2">
+                            Additional terms to exclude for this object type. These are ADDED to the global negative prompt.
+                          </p>
+                          <textarea
+                            value={promptConfig.objectTypeConfigs[selectedObjectType]?.negativePrompt || ''}
+                            onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'negativePrompt', e.target.value)}
+                            rows={2}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                            placeholder="e.g., surface features, atmosphere (for stars)"
+                          />
+                          {promptConfig.negativePrompt && (
+                            <div className="mt-2 text-xs text-gray-500">
+                              <span className="text-gray-400">Global negative prompt: </span>
+                              <span className="text-red-400/70">{promptConfig.negativePrompt.slice(0, 80)}...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 
