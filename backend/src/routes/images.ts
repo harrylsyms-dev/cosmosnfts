@@ -7,24 +7,23 @@ const router = express.Router();
 
 /**
  * GET /api/images/status
- * Check if image generation is properly configured
+ * Check if image generation is properly configured (database or env vars)
  */
 router.get('/status', requireAdmin, async (req, res) => {
-  const leonardoKey = process.env.LEONARDO_AI_API_KEY;
-  const pinataKey = process.env.PINATA_API_KEY;
-  const pinataSecret = process.env.PINATA_API_SECRET;
+  try {
+    const config = await leonardoService.isConfigured();
 
-  res.json({
-    success: true,
-    configured: {
-      leonardo: !!leonardoKey && leonardoKey.length > 10,
-      pinata: !!pinataKey && !!pinataSecret,
-    },
-    message: !leonardoKey ? 'LEONARDO_AI_API_KEY not configured' :
-             !pinataKey ? 'PINATA_API_KEY not configured' :
-             !pinataSecret ? 'PINATA_API_SECRET not configured' :
-             'All API keys configured',
-  });
+    res.json({
+      success: true,
+      configured: config,
+      message: !config.leonardo ? 'Leonardo AI: Not Configured' :
+               !config.pinata ? 'Pinata IPFS: Not Configured' :
+               'All API keys configured',
+    });
+  } catch (error) {
+    logger.error('Failed to check image generation config:', error);
+    res.status(500).json({ error: 'Failed to check configuration' });
+  }
 });
 
 /**

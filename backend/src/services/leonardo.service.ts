@@ -23,15 +23,44 @@ interface GenerationResult {
 }
 
 class LeonardoImageService {
-  private apiKey: string;
   private apiUrl = 'https://cloud.leonardo.ai/api/rest/v1';
-  private pinataApiKey: string;
-  private pinataApiSecret: string;
+  private cachedLeonardoKey: string | null = null;
+  private cachedPinataApiKey: string | null = null;
+  private cachedPinataSecretKey: string | null = null;
 
-  constructor() {
-    this.apiKey = process.env.LEONARDO_AI_API_KEY || '';
-    this.pinataApiKey = process.env.PINATA_API_KEY || '';
-    this.pinataApiSecret = process.env.PINATA_API_SECRET || '';
+  /**
+   * Get Leonardo API key from database or env var
+   */
+  private async getLeonardoKey(): Promise<string> {
+    if (this.cachedLeonardoKey) return this.cachedLeonardoKey;
+    const { getApiKey } = await import('../utils/apiKeys');
+    this.cachedLeonardoKey = await getApiKey('leonardo') || '';
+    return this.cachedLeonardoKey;
+  }
+
+  /**
+   * Get Pinata API keys from database or env vars
+   */
+  private async getPinataKeys(): Promise<{ apiKey: string; secretKey: string }> {
+    if (this.cachedPinataApiKey && this.cachedPinataSecretKey) {
+      return { apiKey: this.cachedPinataApiKey, secretKey: this.cachedPinataSecretKey };
+    }
+    const { getApiKey } = await import('../utils/apiKeys');
+    this.cachedPinataApiKey = await getApiKey('pinata_api') || '';
+    this.cachedPinataSecretKey = await getApiKey('pinata_secret') || '';
+    return { apiKey: this.cachedPinataApiKey, secretKey: this.cachedPinataSecretKey };
+  }
+
+  /**
+   * Check if service is properly configured
+   */
+  async isConfigured(): Promise<{ leonardo: boolean; pinata: boolean }> {
+    const leonardoKey = await this.getLeonardoKey();
+    const pinata = await this.getPinataKeys();
+    return {
+      leonardo: !!leonardoKey,
+      pinata: !!(pinata.apiKey && pinata.secretKey),
+    };
   }
 
   /**
@@ -136,6 +165,11 @@ Fame: ${nft.fameScore} | Significance: ${nft.significanceScore} | Rarity: ${nft.
     try {
       logger.info(`Generating image for: ${nft.name} (Token #${nft.tokenId})`);
 
+      const apiKey = await this.getLeonardoKey();
+      if (!apiKey) {
+        throw new Error('Leonardo AI API key not configured');
+      }
+
       const prompt = this.generatePrompt(nft);
 
       // Create generation request
@@ -152,7 +186,7 @@ Fame: ${nft.fameScore} | Significance: ${nft.significanceScore} | Rarity: ${nft.
         },
         {
           headers: {
-            Authorization: `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
           },
         }
@@ -172,7 +206,7 @@ Fame: ${nft.fameScore} | Significance: ${nft.significanceScore} | Rarity: ${nft.
           `${this.apiUrl}/generations/${generationId}`,
           {
             headers: {
-              Authorization: `Bearer ${this.apiKey}`,
+              Authorization: `Bearer ${apiKey}`,
             },
           }
         );
@@ -395,6 +429,11 @@ Fame: ${nft.fameScore} | Significance: ${nft.significanceScore} | Rarity: ${nft.
    * Upload to Pinata IPFS
    */
   private async uploadToPinata(buffer: Buffer, fileName: string): Promise<string> {
+    const pinata = await this.getPinataKeys();
+    if (!pinata.apiKey || !pinata.secretKey) {
+      throw new Error('Pinata IPFS credentials not configured');
+    }
+
     const formData = new FormData();
     formData.append('file', buffer, fileName);
 
@@ -403,8 +442,8 @@ Fame: ${nft.fameScore} | Significance: ${nft.significanceScore} | Rarity: ${nft.
       formData,
       {
         headers: {
-          pinata_api_key: this.pinataApiKey,
-          pinata_secret_api_key: this.pinataApiSecret,
+          pinata_api_key: pinata.apiKey,
+          pinata_secret_api_key: pinata.secretKey,
           ...formData.getHeaders(),
         },
         maxContentLength: Infinity,

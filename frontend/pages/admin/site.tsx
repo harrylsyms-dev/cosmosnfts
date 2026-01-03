@@ -65,6 +65,8 @@ export default function AdminSiteManagement() {
   });
   const [sandboxMode, setSandboxMode] = useState(false);
   const [isToggingSandbox, setIsToggingSandbox] = useState(false);
+  const [paymentsEnabled, setPaymentsEnabled] = useState(true);
+  const [isToggingPayments, setIsToggingPayments] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -124,6 +126,7 @@ export default function AdminSiteManagement() {
         setSystemStatus(data.status);
         setSystemDetails(data.details || {});
         setSandboxMode(data.sandboxMode || false);
+        setPaymentsEnabled(data.paymentsEnabled !== false);
       }
     } catch (error) {
       // Silently fail - status display will show defaults
@@ -156,6 +159,34 @@ export default function AdminSiteManagement() {
       alert('Failed to toggle sandbox mode');
     } finally {
       setIsToggingSandbox(false);
+    }
+  }
+
+  async function togglePaymentsEnabled() {
+    setIsToggingPayments(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/site-settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ paymentsEnabled: !paymentsEnabled }),
+      });
+
+      if (res.ok) {
+        setPaymentsEnabled(!paymentsEnabled);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to toggle payments');
+      }
+    } catch (error) {
+      console.error('Failed to toggle payments:', error);
+      alert('Failed to toggle payments');
+    } finally {
+      setIsToggingPayments(false);
     }
   }
 
@@ -418,6 +449,36 @@ export default function AdminSiteManagement() {
                   <p className="text-gray-500 text-xs mt-1">{systemDetails.blockchain}</p>
                 )}
               </div>
+            </div>
+
+            {/* Payments Toggle */}
+            <div className="mt-4 pt-4 border-t border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-white font-medium">Payments</span>
+                  <p className="text-gray-500 text-sm">
+                    {paymentsEnabled ? 'Live payments via Stripe' : 'Payments disabled - checkouts simulate success'}
+                  </p>
+                </div>
+                <button
+                  onClick={togglePaymentsEnabled}
+                  disabled={isToggingPayments}
+                  className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 ${
+                    paymentsEnabled ? 'bg-green-600' : 'bg-red-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                      paymentsEnabled ? 'translate-x-9' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              {!paymentsEnabled && (
+                <div className="mt-2 p-2 bg-yellow-900/30 border border-yellow-600 rounded text-yellow-400 text-sm">
+                  Test mode active - no real charges will be made
+                </div>
+              )}
             </div>
 
             {/* Sandbox Mode Toggle */}

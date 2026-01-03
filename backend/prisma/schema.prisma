@@ -354,6 +354,7 @@ model SiteSettings {
 
   // Sandbox/Testing Mode
   sandboxMode           Boolean   @default(false) @map("sandbox_mode")
+  paymentsEnabled       Boolean   @default(true) @map("payments_enabled")
 
   // Wallet & Revenue Configuration
   ownerWalletAddress      String?   @map("owner_wallet_address")

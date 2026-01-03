@@ -1647,9 +1647,13 @@ router.post('/nfts/:id/generate-image', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    // Check if Leonardo API key is configured
-    if (!process.env.LEONARDO_AI_API_KEY) {
-      return res.status(400).json({ error: 'Leonardo AI API key not configured' });
+    // Check if Leonardo and Pinata are configured
+    const config = await leonardoService.isConfigured();
+    if (!config.leonardo) {
+      return res.status(400).json({ error: 'Leonardo AI API key not configured. Add it in Settings → API Keys.' });
+    }
+    if (!config.pinata) {
+      return res.status(400).json({ error: 'Pinata IPFS credentials not configured. Add them in Settings → API Keys.' });
     }
 
     // Start generation in background (don't wait for completion)
@@ -2246,6 +2250,7 @@ router.get('/system-status', requireAdmin, async (req, res) => {
       status,
       details,
       sandboxMode: siteSettings?.sandboxMode || false,
+      paymentsEnabled: siteSettings?.paymentsEnabled !== false,
     });
   } catch (error) {
     logger.error('Error fetching system status:', error);
