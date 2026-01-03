@@ -67,6 +67,7 @@ interface ImagePromptConfig {
   includeScoreInPrompt: boolean;
   includeMetadataInPrompt: boolean;
   useDescriptionTransform: boolean;
+  useNftDescription: boolean;
 }
 
 interface LeonardoModel {
@@ -657,6 +658,19 @@ export default function AdminImages() {
                           <div>
                             <p className="text-white font-medium">Poetic Description Transform</p>
                             <p className="text-gray-400 text-xs">Convert to artistic language</p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg cursor-pointer border-2 border-yellow-600/50">
+                          <input
+                            type="checkbox"
+                            checked={promptConfig.useNftDescription ?? true}
+                            onChange={(e) => updateConfig('useNftDescription', e.target.checked)}
+                            className="w-5 h-5 rounded bg-gray-700 border-gray-600"
+                          />
+                          <div>
+                            <p className="text-white font-medium">Use NFT Description</p>
+                            <p className="text-gray-400 text-xs">Include the NFT&apos;s stored description in prompts. Turn OFF to only use Object Type descriptions.</p>
                           </div>
                         </label>
                       </div>

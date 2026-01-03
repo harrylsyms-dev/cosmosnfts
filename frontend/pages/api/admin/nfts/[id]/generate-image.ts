@@ -90,6 +90,7 @@ interface ImagePromptConfig {
   legendaryModifier: string;
   includeScoreInPrompt: boolean;
   useDescriptionTransform: boolean;
+  useNftDescription: boolean;
   leonardoModelId: string;
   imageWidth: number;
   imageHeight: number;
@@ -131,8 +132,11 @@ function buildPromptFromConfig(nft: any, config: ImagePromptConfig): { prompt: s
     return { prompt, negativePrompt: combinedNegativePrompt };
   }
 
-  // Use the NFT's actual description (not transformed)
-  const description = nft.description || typeConfig.description || `A ${nft.objectType || 'cosmic object'}`;
+  // Use NFT description only if enabled, otherwise use type description
+  const useNftDesc = config.useNftDescription ?? true;
+  const description = useNftDesc
+    ? (nft.description || typeConfig.description || `A ${nft.objectType || 'cosmic object'}`)
+    : (typeConfig.description || `A ${nft.objectType || 'cosmic object'}`);
   const features = typeConfig.visualFeatures || '';
   const totalScore = nft.totalScore || 0;
 
