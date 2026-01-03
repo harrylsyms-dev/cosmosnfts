@@ -59,9 +59,17 @@ export default function Home() {
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-4 text-center py-20">
           {/* Floating badge */}
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-8 animate-pulse">
-            <span className="w-2 h-2 bg-green-400 rounded-full" />
-            <span className="text-sm text-gray-300">Phase 1 Now Live</span>
+          <div className={`inline-flex items-center gap-2 backdrop-blur-sm border rounded-full px-4 py-2 mb-8 ${
+            pricing?.isPaused
+              ? 'bg-yellow-900/30 border-yellow-500/30'
+              : 'bg-white/10 border-white/20 animate-pulse'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${pricing?.isPaused ? 'bg-yellow-400' : 'bg-green-400'}`} />
+            <span className="text-sm text-gray-300">
+              {pricing?.isPaused
+                ? 'Timer Paused - Price Locked'
+                : `Phase ${pricing?.tierIndex || 1} Now Live`}
+            </span>
           </div>
 
           <h1 className="text-6xl md:text-8xl font-bold mb-6 leading-tight">
@@ -269,15 +277,26 @@ export default function Home() {
             Prices Go Up Every Phase
           </h2>
           <p className="text-xl text-gray-300 mb-8">
-            Don't miss Phase 1 pricing. Once it ends, prices increase {pricing?.phaseIncreasePercent || 7.5}%.
+            {pricing?.isPaused
+              ? 'Timer is paused. Prices are locked until resumed.'
+              : `Don't miss Phase ${pricing?.tierIndex || 1} pricing. Once it ends, prices increase ${pricing?.phaseIncreasePercent || 7.5}%.`}
           </p>
 
           {pricing && (
             <div className="mb-8">
-              <CountdownTimer
-                targetTime={Date.now() + pricing.timeUntilNextTier * 1000}
-                onComplete={() => window.location.reload()}
-              />
+              {pricing.isPaused ? (
+                <div className="inline-flex items-center gap-3 bg-yellow-900/30 border border-yellow-500/30 px-6 py-4 rounded-xl">
+                  <span className="text-yellow-400 text-2xl">⏸️</span>
+                  <span className="text-yellow-300 font-medium">
+                    Timer paused - price will not increase until resumed
+                  </span>
+                </div>
+              ) : (
+                <CountdownTimer
+                  targetTime={Date.now() + pricing.timeUntilNextTier * 1000}
+                  onComplete={() => window.location.reload()}
+                />
+              )}
             </div>
           )}
 

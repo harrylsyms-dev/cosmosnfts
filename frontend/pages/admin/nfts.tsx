@@ -62,6 +62,8 @@ export default function AdminNFTs() {
   const [filterBadge, setFilterBadge] = useState('all');
   const [selectedNft, setSelectedNft] = useState<NFTDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [generateMessage, setGenerateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const limit = 50;
 
   useEffect(() => {
@@ -147,6 +149,34 @@ export default function AdminNFTs() {
   function formatAddress(address: string | null): string {
     if (!address) return 'N/A';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }
+
+  async function handleGenerateImage(nftId: number) {
+    setIsGeneratingImage(true);
+    setGenerateMessage(null);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/nfts/${nftId}/generate-image`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setGenerateMessage({ type: 'success', text: data.message || 'Image generation started!' });
+        // Refresh NFT details after a short delay
+        setTimeout(() => handleViewNft(nftId), 3000);
+      } else {
+        setGenerateMessage({ type: 'error', text: data.error || 'Failed to generate image' });
+      }
+    } catch (error) {
+      setGenerateMessage({ type: 'error', text: 'Failed to generate image' });
+    } finally {
+      setIsGeneratingImage(false);
+    }
   }
 
   if (isLoading) {
@@ -516,6 +546,44 @@ export default function AdminNFTs() {
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Footer */}
+                  <div className="p-6 border-t border-gray-800">
+                    {generateMessage && (
+                      <div className={`mb-4 p-3 rounded-lg ${
+                        generateMessage.type === 'success'
+                          ? 'bg-green-900/30 border border-green-600 text-green-400'
+                          : 'bg-red-900/30 border border-red-600 text-red-400'
+                      }`}>
+                        {generateMessage.text}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => handleGenerateImage(selectedNft.id)}
+                        disabled={isGeneratingImage}
+                        className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg"
+                      >
+                        {isGeneratingImage ? 'Generating...' : 'Generate Image'}
+                      </button>
+                      <Link
+                        href={`/nft/${selectedNft.tokenId}`}
+                        target="_blank"
+                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2 rounded-lg text-center"
+                      >
+                        View Public Page
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setSelectedNft(null);
+                          setGenerateMessage(null);
+                        }}
+                        className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-lg"
+                      >
+                        Close
+                      </button>
                     </div>
                   </div>
                 </>

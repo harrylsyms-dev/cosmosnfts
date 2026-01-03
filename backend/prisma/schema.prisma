@@ -352,6 +352,9 @@ model SiteSettings {
   // Phase pricing configuration
   phaseIncreasePercent  Float     @default(7.5) @map("phase_increase_percent")
 
+  // Sandbox/Testing Mode
+  sandboxMode           Boolean   @default(false) @map("sandbox_mode")
+
   // Wallet & Revenue Configuration
   ownerWalletAddress      String?   @map("owner_wallet_address")
   benefactorWalletAddress String?   @map("benefactor_wallet_address")

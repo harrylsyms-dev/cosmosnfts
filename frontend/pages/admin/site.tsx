@@ -28,6 +28,13 @@ interface SystemStatus {
   blockchain: 'online' | 'offline' | 'error';
 }
 
+interface SystemDetails {
+  database: string;
+  stripe: string;
+  ipfs: string;
+  blockchain: string;
+}
+
 export default function AdminSiteManagement() {
   const router = useRouter();
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
@@ -46,10 +53,18 @@ export default function AdminSiteManagement() {
   // System status
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({
     database: 'online',
-    stripe: 'online',
-    ipfs: 'online',
-    blockchain: 'online',
+    stripe: 'offline',
+    ipfs: 'offline',
+    blockchain: 'offline',
   });
+  const [systemDetails, setSystemDetails] = useState<SystemDetails>({
+    database: '',
+    stripe: '',
+    ipfs: '',
+    blockchain: '',
+  });
+  const [sandboxMode, setSandboxMode] = useState(false);
+  const [isToggingSandbox, setIsToggingSandbox] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -107,10 +122,40 @@ export default function AdminSiteManagement() {
       if (res.ok) {
         const data = await res.json();
         setSystemStatus(data.status);
+        setSystemDetails(data.details || {});
+        setSandboxMode(data.sandboxMode || false);
       }
     } catch (error) {
       // Silently fail - status display will show defaults
       console.error('Failed to fetch system status:', error);
+    }
+  }
+
+  async function toggleSandboxMode() {
+    setIsToggingSandbox(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/site-settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ sandboxMode: !sandboxMode }),
+      });
+
+      if (res.ok) {
+        setSandboxMode(!sandboxMode);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to toggle sandbox mode');
+      }
+    } catch (error) {
+      console.error('Failed to toggle sandbox mode:', error);
+      alert('Failed to toggle sandbox mode');
+    } finally {
+      setIsToggingSandbox(false);
     }
   }
 
@@ -317,8 +362,15 @@ export default function AdminSiteManagement() {
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white">System Status</h2>
-              <div className={`px-3 py-1 rounded-full ${currentMode.bg}`}>
-                <span className={`font-semibold ${currentMode.color}`}>{currentMode.label}</span>
+              <div className="flex items-center gap-4">
+                {sandboxMode && (
+                  <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 font-semibold text-sm">
+                    SANDBOX MODE
+                  </span>
+                )}
+                <div className={`px-3 py-1 rounded-full ${currentMode.bg}`}>
+                  <span className={`font-semibold ${currentMode.color}`}>{currentMode.label}</span>
+                </div>
               </div>
             </div>
 
@@ -329,6 +381,9 @@ export default function AdminSiteManagement() {
                   <span className="text-gray-400 text-sm">Database</span>
                 </div>
                 <span className="text-white font-semibold">{getStatusText(systemStatus.database)}</span>
+                {systemDetails.database && (
+                  <p className="text-gray-500 text-xs mt-1">{systemDetails.database}</p>
+                )}
               </div>
 
               <div className="bg-gray-800 rounded-lg p-4">
@@ -337,14 +392,20 @@ export default function AdminSiteManagement() {
                   <span className="text-gray-400 text-sm">Stripe</span>
                 </div>
                 <span className="text-white font-semibold">{getStatusText(systemStatus.stripe)}</span>
+                {systemDetails.stripe && (
+                  <p className="text-gray-500 text-xs mt-1">{systemDetails.stripe}</p>
+                )}
               </div>
 
               <div className="bg-gray-800 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className={`w-2 h-2 rounded-full ${getStatusColor(systemStatus.ipfs)}`}></div>
-                  <span className="text-gray-400 text-sm">IPFS</span>
+                  <span className="text-gray-400 text-sm">IPFS (Pinata)</span>
                 </div>
                 <span className="text-white font-semibold">{getStatusText(systemStatus.ipfs)}</span>
+                {systemDetails.ipfs && (
+                  <p className="text-gray-500 text-xs mt-1">{systemDetails.ipfs}</p>
+                )}
               </div>
 
               <div className="bg-gray-800 rounded-lg p-4">
@@ -353,6 +414,34 @@ export default function AdminSiteManagement() {
                   <span className="text-gray-400 text-sm">Blockchain</span>
                 </div>
                 <span className="text-white font-semibold">{getStatusText(systemStatus.blockchain)}</span>
+                {systemDetails.blockchain && (
+                  <p className="text-gray-500 text-xs mt-1">{systemDetails.blockchain}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Sandbox Mode Toggle */}
+            <div className="mt-4 pt-4 border-t border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-white font-medium">Sandbox Mode</span>
+                  <p className="text-gray-500 text-sm">
+                    Enable to test payments and minting without real transactions
+                  </p>
+                </div>
+                <button
+                  onClick={toggleSandboxMode}
+                  disabled={isToggingSandbox}
+                  className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 ${
+                    sandboxMode ? 'bg-orange-600' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                      sandboxMode ? 'translate-x-9' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 

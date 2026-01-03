@@ -58,6 +58,10 @@ export default function AdminSecurity() {
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<'admin' | 'super_admin'>('admin');
 
+  // Contract address editing
+  const [editContractAddress, setEditContractAddress] = useState('');
+  const [showEditContract, setShowEditContract] = useState(false);
+
   useEffect(() => {
     checkAuthAndFetch();
   }, []);
@@ -487,62 +491,72 @@ export default function AdminSecurity() {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              {/* Emergency Controls */}
+              {/* Quick Access */}
               <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-                <h3 className="text-lg font-bold text-white mb-4">Emergency Controls</h3>
+                <h3 className="text-lg font-bold text-white mb-4">Quick Access</h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-800 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-white font-semibold">Contract Pause</div>
-                        <div className="text-gray-400 text-sm">
-                          Pause all smart contract operations
-                        </div>
-                      </div>
-                      <button
-                        onClick={toggleEmergencyPause}
-                        disabled={!!actionLoading}
-                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                          siteSettings?.contractPaused
-                            ? 'bg-green-600 hover:bg-green-700 text-white'
-                            : 'bg-red-600 hover:bg-red-700 text-white'
-                        }`}
-                      >
-                        {actionLoading === 'emergency'
-                          ? 'Processing...'
-                          : siteSettings?.contractPaused
-                          ? 'Resume'
-                          : 'PAUSE'}
-                      </button>
-                    </div>
-                    {siteSettings?.contractPaused && (
-                      <div className="mt-2 text-red-400 text-sm">
-                        Contract is currently PAUSED
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-gray-800 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Link
+                    href="/admin/phases"
+                    className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${siteSettings?.phasePaused ? 'bg-yellow-500' : 'bg-green-500'}`} />
                       <div>
                         <div className="text-white font-semibold">Phase Timer</div>
                         <div className="text-gray-400 text-sm">
-                          Current phase timer status
+                          {siteSettings?.phasePaused ? 'Paused' : 'Running'}
                         </div>
                       </div>
-                      <Link
-                        href="/admin/phases"
-                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                          siteSettings?.phasePaused
-                            ? 'bg-yellow-600 text-white'
-                            : 'bg-gray-700 text-gray-300'
-                        }`}
-                      >
-                        {siteSettings?.phasePaused ? 'PAUSED' : 'Running'}
-                      </Link>
                     </div>
-                  </div>
+                  </Link>
+
+                  <Link
+                    href="/admin/site"
+                    className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${siteSettings?.maintenanceMode ? 'bg-red-500' : 'bg-green-500'}`} />
+                      <div>
+                        <div className="text-white font-semibold">Site Status</div>
+                        <div className="text-gray-400 text-sm">
+                          {siteSettings?.maintenanceMode ? 'Maintenance' : 'Online'}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+
+                  <button
+                    onClick={() => setActiveTab('contract')}
+                    className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${siteSettings?.contractPaused ? 'bg-red-500' : 'bg-green-500'}`} />
+                      <div>
+                        <div className="text-white font-semibold">Contract</div>
+                        <div className="text-gray-400 text-sm">
+                          {siteSettings?.contractPaused ? 'Paused' : 'Active'}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => setActiveTab('admins')}
+                      className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full bg-purple-500" />
+                        <div>
+                          <div className="text-white font-semibold">Admin Users</div>
+                          <div className="text-gray-400 text-sm">
+                            {adminUsers.length} users
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -610,8 +624,52 @@ export default function AdminSecurity() {
                   </div>
 
                   <div className="bg-gray-800 rounded-lg p-4">
-                    <div className="text-gray-400 text-sm mb-1">Contract Address</div>
-                    {contractInfo?.address ? (
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-gray-400 text-sm">Contract Address</div>
+                      {!showEditContract && (
+                        <button
+                          onClick={() => {
+                            setEditContractAddress(contractInfo?.address || '');
+                            setShowEditContract(true);
+                          }}
+                          className="text-blue-400 hover:text-blue-300 text-sm"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                    {showEditContract ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={editContractAddress}
+                          onChange={(e) => setEditContractAddress(e.target.value)}
+                          placeholder="0x..."
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              // Save to environment - this would need a backend endpoint
+                              alert('Contract address is configured via environment variables (CONTRACT_ADDRESS). Update this in your Render dashboard.');
+                              setShowEditContract(false);
+                            }}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setShowEditContract(false)}
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <p className="text-gray-500 text-xs">
+                          Note: Contract address is set via the CONTRACT_ADDRESS environment variable in Render.
+                        </p>
+                      </div>
+                    ) : contractInfo?.address ? (
                       <div className="flex items-center gap-3">
                         <code className="text-purple-400 font-mono text-sm break-all">
                           {contractInfo.address}
@@ -627,7 +685,9 @@ export default function AdminSecurity() {
                         </button>
                       </div>
                     ) : (
-                      <div className="text-gray-500">Not deployed yet</div>
+                      <div className="text-gray-500">
+                        Not configured yet. Set the CONTRACT_ADDRESS environment variable in Render.
+                      </div>
                     )}
                   </div>
 
@@ -679,8 +739,19 @@ export default function AdminSecurity() {
           )}
 
           {/* Admin Users Tab */}
-          {activeTab === 'admins' && isSuperAdmin && (
+          {activeTab === 'admins' && (
             <div className="space-y-6">
+              {!isSuperAdmin && (
+                <div className="bg-yellow-900/20 border border-yellow-600 rounded-lg p-4">
+                  <p className="text-yellow-400">
+                    You need Super Admin privileges to manage other admin users.
+                    Contact the system administrator if you need access.
+                  </p>
+                </div>
+              )}
+
+              {isSuperAdmin && (
+              <>
               {/* Create Admin Form */}
               <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
                 <h3 className="text-lg font-bold text-white mb-4">Create Admin User</h3>
@@ -804,6 +875,8 @@ export default function AdminSecurity() {
                   </table>
                 </div>
               </div>
+              </>
+              )}
             </div>
           )}
 

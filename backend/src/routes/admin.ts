@@ -1631,6 +1631,73 @@ router.get('/nfts/:id', requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/nfts/:id/generate-image
+ * Generate image for a single NFT using Leonardo AI
+ */
+router.post('/nfts/:id/generate-image', requireAdmin, async (req, res) => {
+  try {
+    const { prisma } = await import('../config/database');
+    const { leonardoService } = await import('../services/leonardo.service');
+    const id = parseInt(req.params.id);
+
+    const nft = await prisma.nFT.findUnique({ where: { id } });
+
+    if (!nft) {
+      return res.status(404).json({ error: 'NFT not found' });
+    }
+
+    // Check if Leonardo API key is configured
+    if (!process.env.LEONARDO_AI_API_KEY) {
+      return res.status(400).json({ error: 'Leonardo AI API key not configured' });
+    }
+
+    // Start generation in background (don't wait for completion)
+    const nftData = {
+      tokenId: nft.tokenId,
+      name: nft.name,
+      description: nft.description,
+      fameScore: nft.fameScore,
+      significanceScore: nft.significanceScore,
+      rarityScore: nft.rarityScore,
+      discoveryRecencyScore: nft.discoveryRecencyScore,
+      culturalImpactScore: nft.culturalImpactScore,
+      totalScore: nft.totalScore,
+      objectType: nft.objectType || undefined,
+    };
+
+    // Start generation asynchronously
+    leonardoService.generateImage(nftData)
+      .then(async (imageIpfsHash) => {
+        // Generate metadata
+        const metadataIpfsHash = await leonardoService.generateMetadata(nftData, imageIpfsHash);
+
+        // Update database
+        await prisma.nFT.update({
+          where: { id },
+          data: {
+            imageIpfsHash,
+            metadataIpfsHash,
+            image: `https://gateway.pinata.cloud/ipfs/${imageIpfsHash}`,
+          },
+        });
+
+        logger.info(`Generated image for NFT #${nft.tokenId}: ${imageIpfsHash}`);
+      })
+      .catch((error) => {
+        logger.error(`Failed to generate image for NFT #${nft.tokenId}:`, error);
+      });
+
+    res.json({
+      success: true,
+      message: `Image generation started for "${nft.name}". This may take 1-2 minutes.`,
+    });
+  } catch (error) {
+    logger.error('Error starting image generation:', error);
+    res.status(500).json({ error: 'Failed to start image generation' });
+  }
+});
+
 // ==================== ADMIN USER MANAGEMENT ====================
 
 /**
@@ -2078,36 +2145,103 @@ router.put('/dashboard-preferences', requireAdmin, async (req, res) => {
 router.get('/system-status', requireAdmin, async (req, res) => {
   try {
     const { prisma } = await import('../config/database');
+    const axios = (await import('axios')).default;
+
     const status = {
       database: 'online' as 'online' | 'offline' | 'error',
-      stripe: 'online' as 'online' | 'offline' | 'error',
-      ipfs: 'online' as 'online' | 'offline' | 'error',
-      blockchain: 'online' as 'online' | 'offline' | 'error',
+      stripe: 'offline' as 'online' | 'offline' | 'error',
+      ipfs: 'offline' as 'online' | 'offline' | 'error',
+      blockchain: 'offline' as 'online' | 'offline' | 'error',
+    };
+
+    const details = {
+      database: '',
+      stripe: '',
+      ipfs: '',
+      blockchain: '',
     };
 
     // Check database
     try {
       await prisma.$queryRaw`SELECT 1`;
+      details.database = 'Connected';
     } catch (e) {
       status.database = 'error';
+      details.database = 'Connection failed';
     }
 
-    // Check Stripe (verify key is set)
-    if (!process.env.STRIPE_SECRET_KEY) {
-      status.stripe = 'offline';
+    // Check Stripe - actually verify the key works
+    if (process.env.STRIPE_SECRET_KEY) {
+      try {
+        const Stripe = (await import('stripe')).default;
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+        await stripe.balance.retrieve();
+        status.stripe = 'online';
+        details.stripe = 'Connected';
+      } catch (e: any) {
+        status.stripe = 'error';
+        details.stripe = e.message || 'API error';
+      }
+    } else {
+      details.stripe = 'API key not configured';
     }
 
-    // Check IPFS (verify Pinata credentials are set)
-    if (!process.env.PINATA_API_KEY || !process.env.PINATA_SECRET_KEY) {
-      status.ipfs = 'offline';
+    // Check IPFS/Pinata - actually verify connectivity
+    if (process.env.PINATA_API_KEY && process.env.PINATA_SECRET_KEY) {
+      try {
+        const response = await axios.get('https://api.pinata.cloud/data/testAuthentication', {
+          headers: {
+            pinata_api_key: process.env.PINATA_API_KEY,
+            pinata_secret_api_key: process.env.PINATA_SECRET_KEY,
+          },
+          timeout: 5000,
+        });
+        if (response.status === 200) {
+          status.ipfs = 'online';
+          details.ipfs = 'Pinata connected';
+        }
+      } catch (e: any) {
+        status.ipfs = 'error';
+        details.ipfs = e.message || 'Connection failed';
+      }
+    } else {
+      details.ipfs = 'Pinata credentials not configured';
     }
 
-    // Check blockchain (verify RPC URL is set)
-    if (!process.env.POLYGON_RPC_URL) {
-      status.blockchain = 'offline';
+    // Check blockchain - verify RPC connection
+    if (process.env.POLYGON_RPC_URL) {
+      try {
+        const response = await axios.post(
+          process.env.POLYGON_RPC_URL,
+          {
+            jsonrpc: '2.0',
+            method: 'eth_blockNumber',
+            params: [],
+            id: 1,
+          },
+          { timeout: 5000 }
+        );
+        if (response.data?.result) {
+          status.blockchain = 'online';
+          const blockNumber = parseInt(response.data.result, 16);
+          details.blockchain = `Block #${blockNumber.toLocaleString()}`;
+        }
+      } catch (e: any) {
+        status.blockchain = 'error';
+        details.blockchain = e.message || 'RPC connection failed';
+      }
+    } else {
+      details.blockchain = 'RPC URL not configured';
     }
 
-    res.json({ status });
+    // Get sandbox mode from site settings
+    const siteSettings = await prisma.siteSettings.findUnique({ where: { id: 'main' } });
+
+    res.json({
+      status,
+      details,
+      sandboxMode: siteSettings?.sandboxMode || false,
+    });
   } catch (error) {
     logger.error('Error fetching system status:', error);
     res.status(500).json({ error: 'Failed to fetch system status' });

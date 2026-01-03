@@ -14,14 +14,6 @@ interface AuctionStats {
   totalRevenue: number;
 }
 
-interface ReservedNFT {
-  id: number;
-  tokenId: number;
-  name: string;
-  totalScore: number;
-  badgeTier: string;
-}
-
 interface ScheduledAuction {
   name: string;
   week: number;
@@ -59,15 +51,10 @@ interface MarketplaceSettings {
 export default function AdminAuctions() {
   const router = useRouter();
   const [stats, setStats] = useState<AuctionStats | null>(null);
-  const [reservedNFTs, setReservedNFTs] = useState<ReservedNFT[]>([]);
   const [scheduledAuctions, setScheduledAuctions] = useState<ScheduledAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [autoPopulatePhase, setAutoPopulatePhase] = useState('1');
-  const [autoPopulateCount, setAutoPopulateCount] = useState('5');
-  const [isAutoPopulating, setIsAutoPopulating] = useState(false);
-  const [previewPhase, setPreviewPhase] = useState('1');
   const [selectedAuction, setSelectedAuction] = useState<ScheduledAuction | null>(null);
   const [currentWeek, setCurrentWeek] = useState(0);
   const [editingPrice, setEditingPrice] = useState(false);
@@ -93,7 +80,7 @@ export default function AdminAuctions() {
         return;
       }
 
-      await Promise.all([fetchStats(), fetchReservedNFTs('1'), fetchScheduledAuctions(), fetchMarketplaceSettings()]);
+      await Promise.all([fetchStats(), fetchScheduledAuctions(), fetchMarketplaceSettings()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
@@ -269,65 +256,6 @@ export default function AdminAuctions() {
     } catch (error) {
       console.error('Failed to fetch auction stats:', error);
     }
-  }
-
-  async function fetchReservedNFTs(phase: string) {
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/auctions/admin/reserved/${phase}?count=5`, {
-        credentials: 'include',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setReservedNFTs(data.reserved || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch reserved NFTs:', error);
-    }
-  }
-
-
-  async function handleAutoPopulate(e: React.FormEvent) {
-    e.preventDefault();
-    setIsAutoPopulating(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/auctions/admin/auto-populate`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          phase: parseInt(autoPopulatePhase),
-          count: parseInt(autoPopulateCount),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setSuccess(data.message || `Created ${data.auctionsCreated} auctions`);
-        await Promise.all([fetchStats(), fetchReservedNFTs(autoPopulatePhase), fetchScheduledAuctions()]);
-      } else {
-        setError(data.error || 'Failed to auto-populate auctions');
-      }
-    } catch (error) {
-      setError('Failed to auto-populate auctions');
-    } finally {
-      setIsAutoPopulating(false);
-    }
-  }
-
-  function handlePreviewPhaseChange(phase: string) {
-    setPreviewPhase(phase);
-    fetchReservedNFTs(phase);
   }
 
   if (isLoading) {
@@ -676,93 +604,6 @@ export default function AdminAuctions() {
                 <p>Loading scheduled auctions...</p>
               </div>
             )}
-          </div>
-
-          {/* Auto-Populate Section */}
-          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
-            <h2 className="text-xl font-bold mb-4">Auto-Populate Auctions</h2>
-            <p className="text-gray-400 mb-4">
-              Automatically create auctions for the top-scoring NFTs in a phase. Auctions run on odd-numbered phases (1, 3, 5, etc.).
-            </p>
-
-            <form onSubmit={handleAutoPopulate} className="grid md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Phase Number</label>
-                <select
-                  value={autoPopulatePhase}
-                  onChange={(e) => setAutoPopulatePhase(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                >
-                  {Array.from({ length: 41 }, (_, i) => i * 2 + 1).map((phase) => (
-                    <option key={phase} value={phase.toString()}>
-                      Phase {phase}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Number of Auctions</label>
-                <select
-                  value={autoPopulateCount}
-                  onChange={(e) => setAutoPopulateCount(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                >
-                  <option value="3">3 NFTs</option>
-                  <option value="5">5 NFTs</option>
-                  <option value="7">7 NFTs</option>
-                  <option value="10">10 NFTs</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  disabled={isAutoPopulating}
-                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg disabled:opacity-50"
-                >
-                  {isAutoPopulating ? 'Creating...' : 'Auto-Populate'}
-                </button>
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={() => handlePreviewPhaseChange(autoPopulatePhase)}
-                  className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
-                >
-                  Preview NFTs
-                </button>
-              </div>
-            </form>
-
-            <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium">Reserved for Phase {previewPhase} Auctions</h3>
-                <span className="text-sm text-gray-400">
-                  {parseInt(previewPhase) % 2 === 1 ? 'Auction Phase' : 'Not an Auction Phase'}
-                </span>
-              </div>
-              {reservedNFTs.length > 0 ? (
-                <div className="grid md:grid-cols-5 gap-2">
-                  {reservedNFTs.map((nft) => (
-                    <div key={nft.tokenId} className="bg-gray-900 rounded p-3 text-sm">
-                      <p className="font-medium truncate">{nft.name}</p>
-                      <p className="text-gray-400">#{nft.tokenId}</p>
-                      <p className="text-xs">
-                        Score: <span className="text-green-400">{nft.totalScore}</span>
-                        {' | '}
-                        <span className={`${
-                          nft.badgeTier === 'ELITE' ? 'text-purple-400' :
-                          nft.badgeTier === 'PREMIUM' ? 'text-yellow-400' :
-                          nft.badgeTier === 'EXCEPTIONAL' ? 'text-blue-400' :
-                          'text-gray-400'
-                        }`}>{nft.badgeTier}</span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">No NFTs available for auction in this phase</p>
-              )}
-            </div>
           </div>
 
           <div className="mt-8">
