@@ -13,6 +13,7 @@ interface Phase {
   quantitySold: number;
   startTime: string;
   duration: number;
+  durationDays?: number;
   active: boolean;
 }
 
@@ -33,6 +34,8 @@ export default function AdminPhases() {
   const [countdown, setCountdown] = useState<string>('');
   const [increasePercent, setIncreasePercent] = useState<string>('7.5');
   const [isEditingPercent, setIsEditingPercent] = useState(false);
+  const [isEditingCurrentDuration, setIsEditingCurrentDuration] = useState(false);
+  const [currentPhaseDuration, setCurrentPhaseDuration] = useState('');
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -285,6 +288,58 @@ export default function AdminPhases() {
     return new Date(start.getTime() + phase.duration * 1000);
   }
 
+  function calculateEndDateFromDuration(durationDays: number): Date {
+    // Calculate end date from now + duration
+    return new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+  }
+
+  function getCalculatedEndDatePreview(durationStr: string): string {
+    const days = parseFloat(durationStr);
+    if (isNaN(days) || days <= 0) return '';
+    const endDate = calculateEndDateFromDuration(days);
+    return endDate.toLocaleString();
+  }
+
+  async function handleUpdateCurrentPhaseDuration() {
+    if (!currentPhase) return;
+
+    const days = parseFloat(currentPhaseDuration);
+    if (!currentPhaseDuration || isNaN(days) || days <= 0) {
+      alert('Please enter a valid duration in days (e.g., 7, 14, 30)');
+      return;
+    }
+
+    setActionLoading('update-current');
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/phases/${currentPhase.phase}/duration`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ durationDays: days }),
+      });
+
+      if (res.ok) {
+        await fetchPhases();
+        setIsEditingCurrentDuration(false);
+        setCurrentPhaseDuration('');
+        alert(`Phase duration updated to ${days} days! End date will be recalculated.`);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to update phase duration');
+      }
+    } catch (error) {
+      console.error('Failed to update duration:', error);
+      alert('Failed to update phase duration');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -326,6 +381,7 @@ export default function AdminPhases() {
             <h2 className="text-2xl font-bold text-white mb-6">Current Phase</h2>
 
             {currentPhase ? (
+              <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="bg-gray-800 rounded-lg p-4">
                   <div className="text-gray-400 text-sm mb-1">Phase</div>
@@ -362,6 +418,98 @@ export default function AdminPhases() {
                   )}
                 </div>
               </div>
+
+              {/* Pause Status Banner */}
+              {phaseData?.currentPhase?.isPaused && (
+                <div className="mt-6 bg-yellow-900/30 border border-yellow-600 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                    <div>
+                      <h3 className="text-yellow-400 font-semibold">Phase Timer is Paused</h3>
+                      <p className="text-yellow-200/70 text-sm">
+                        The countdown is frozen. Time spent paused will be added to the phase duration when resumed.
+                        {phaseData.currentPhase.pausedAt && (
+                          <span className="ml-1">Paused since: {formatDate(phaseData.currentPhase.pausedAt)}</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Phase Duration Editor */}
+              <div className="mt-6 bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-white font-semibold">Phase Duration</h3>
+                    <p className="text-gray-400 text-sm">Set how long this phase lasts. End date is calculated automatically from the start time.</p>
+                  </div>
+                </div>
+
+                {isEditingCurrentDuration ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <label className="block text-gray-400 text-sm mb-1">Duration (days)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0.5"
+                          value={currentPhaseDuration}
+                          onChange={(e) => setCurrentPhaseDuration(e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-lg"
+                          placeholder="e.g., 7, 14, 30"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-gray-400 text-sm mb-1">Calculated End Date</label>
+                        <div className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-green-400 text-lg">
+                          {getCalculatedEndDatePreview(currentPhaseDuration) || 'Enter duration...'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleUpdateCurrentPhaseDuration}
+                        disabled={!!actionLoading}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold disabled:opacity-50"
+                      >
+                        {actionLoading === 'update-current' ? 'Saving...' : 'Save Duration'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsEditingCurrentDuration(false);
+                          setCurrentPhaseDuration('');
+                        }}
+                        className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-2xl font-bold text-white">
+                        {(currentPhase.duration / 86400).toFixed(1)} days
+                      </span>
+                      <span className="text-gray-500 ml-3">
+                        (ends {formatDate(getPhaseEndTime(currentPhase).toISOString())})
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsEditingCurrentDuration(true);
+                        setCurrentPhaseDuration((currentPhase.duration / 86400).toString());
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
+                    >
+                      Edit Duration
+                    </button>
+                  </div>
+                )}
+              </div>
+              </>
             ) : (
               <div className="text-gray-400">No active phase</div>
             )}
@@ -544,33 +692,40 @@ export default function AdminPhases() {
                         </td>
                         <td className="px-4 py-3 text-gray-400 text-sm">
                           {editingPhase === phase.phase ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0.5"
-                                value={newDuration}
-                                onChange={(e) => setNewDuration(e.target.value)}
-                                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-sm w-20"
-                                placeholder="Days"
-                              />
-                              <span className="text-gray-500">days</span>
-                              <button
-                                onClick={() => handleUpdateDuration(phase.phase)}
-                                disabled={!!actionLoading}
-                                className="px-2 py-1 bg-green-600 text-white rounded text-sm"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingPhase(null);
-                                  setNewDuration('');
-                                }}
-                                className="px-2 py-1 bg-gray-600 text-white rounded text-sm"
-                              >
-                                Cancel
-                              </button>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  min="0.5"
+                                  value={newDuration}
+                                  onChange={(e) => setNewDuration(e.target.value)}
+                                  className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-sm w-20"
+                                  placeholder="Days"
+                                />
+                                <span className="text-gray-500">days</span>
+                                <button
+                                  onClick={() => handleUpdateDuration(phase.phase)}
+                                  disabled={!!actionLoading}
+                                  className="px-2 py-1 bg-green-600 text-white rounded text-sm"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingPhase(null);
+                                    setNewDuration('');
+                                  }}
+                                  className="px-2 py-1 bg-gray-600 text-white rounded text-sm"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              {getCalculatedEndDatePreview(newDuration) && (
+                                <div className="text-xs text-green-400">
+                                  New end date: {getCalculatedEndDatePreview(newDuration)}
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span>
