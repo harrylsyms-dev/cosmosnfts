@@ -53,6 +53,15 @@ interface NFTDetail {
   soldAt: string | null;
 }
 
+interface ImageGenJob {
+  id: number;
+  nftId: number;
+  nftName: string;
+  status: 'queued' | 'generating' | 'success' | 'error';
+  message?: string;
+  startedAt: Date;
+}
+
 const MAX_NFTS = 20000;
 
 const OBJECT_TYPES = [
@@ -77,6 +86,11 @@ export default function AdminNFTs() {
   const [promptData, setPromptData] = useState<{ prompt: string; negativePrompt: string } | null>(null);
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
+
+  // Image Generation Queue
+  const [imageGenQueue, setImageGenQueue] = useState<ImageGenJob[]>([]);
+  const [showGenQueue, setShowGenQueue] = useState(false);
+  const [nextJobId, setNextJobId] = useState(1);
 
   // NFT Generation state
   const [capacity, setCapacity] = useState({ current: 0, max: MAX_NFTS, remaining: MAX_NFTS });
@@ -242,9 +256,30 @@ export default function AdminNFTs() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }
 
-  async function handleGenerateImage(nftId: number) {
-    setIsGeneratingImage(true);
-    setGenerateMessage(null);
+  async function handleGenerateImage(nftId: number, nftName?: string) {
+    // Check if this NFT is already in the queue
+    if (imageGenQueue.some(job => job.nftId === nftId && (job.status === 'queued' || job.status === 'generating'))) {
+      setGenerateMessage({ type: 'error', text: 'This NFT is already in the generation queue' });
+      return;
+    }
+
+    const jobId = nextJobId;
+    setNextJobId(prev => prev + 1);
+
+    // Add to queue
+    const newJob: ImageGenJob = {
+      id: jobId,
+      nftId,
+      nftName: nftName || selectedNft?.name || `NFT #${nftId}`,
+      status: 'generating',
+      startedAt: new Date(),
+    };
+
+    setImageGenQueue(prev => [...prev, newJob]);
+    setShowGenQueue(true);
+    setGenerateMessage({ type: 'success', text: 'Added to generation queue!' });
+
+    // Make the API call in the background
     try {
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${apiUrl}/api/admin/nfts/${nftId}/generate-image`, {
@@ -256,18 +291,37 @@ export default function AdminNFTs() {
         },
       });
       const data = await res.json();
+
       if (res.ok) {
-        setGenerateMessage({ type: 'success', text: data.message || 'Image generation started!' });
-        // Refresh NFT details after a short delay
-        setTimeout(() => handleViewNft(nftId), 3000);
+        // Update job status to success
+        setImageGenQueue(prev => prev.map(job =>
+          job.id === jobId
+            ? { ...job, status: 'success' as const, message: data.message || 'Image generation started!' }
+            : job
+        ));
       } else {
-        setGenerateMessage({ type: 'error', text: data.error || 'Failed to generate image' });
+        // Update job status to error
+        setImageGenQueue(prev => prev.map(job =>
+          job.id === jobId
+            ? { ...job, status: 'error' as const, message: data.error || 'Failed to generate image' }
+            : job
+        ));
       }
     } catch (error) {
-      setGenerateMessage({ type: 'error', text: 'Failed to generate image' });
-    } finally {
-      setIsGeneratingImage(false);
+      setImageGenQueue(prev => prev.map(job =>
+        job.id === jobId
+          ? { ...job, status: 'error' as const, message: 'Failed to generate image' }
+          : job
+      ));
     }
+  }
+
+  function removeFromQueue(jobId: number) {
+    setImageGenQueue(prev => prev.filter(job => job.id !== jobId));
+  }
+
+  function clearCompletedJobs() {
+    setImageGenQueue(prev => prev.filter(job => job.status === 'queued' || job.status === 'generating'));
   }
 
   async function handlePreviewPrompt(nftId: number) {
@@ -524,12 +578,27 @@ export default function AdminNFTs() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleViewNft(nft.id); }}
-                          className="text-blue-400 hover:text-blue-300 text-sm"
-                        >
-                          View Details
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerateImage(nft.id, nft.name);
+                            }}
+                            disabled={imageGenQueue.some(j => j.nftId === nft.id && (j.status === 'queued' || j.status === 'generating'))}
+                            className="text-purple-400 hover:text-purple-300 disabled:text-gray-600 text-sm"
+                            title="Generate Image"
+                          >
+                            {imageGenQueue.some(j => j.nftId === nft.id && j.status === 'generating')
+                              ? '...'
+                              : '🎨'}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleViewNft(nft.id); }}
+                            className="text-blue-400 hover:text-blue-300 text-sm"
+                          >
+                            View
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -565,6 +634,96 @@ export default function AdminNFTs() {
             </Link>
           </div>
         </main>
+
+        {/* Image Generation Queue Panel */}
+        {imageGenQueue.length > 0 && (
+          <div className="fixed bottom-4 right-4 z-40">
+            <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden" style={{ width: showGenQueue ? '320px' : 'auto' }}>
+              {/* Header */}
+              <div
+                className="flex items-center justify-between px-4 py-3 bg-gray-800 cursor-pointer"
+                onClick={() => setShowGenQueue(!showGenQueue)}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    imageGenQueue.some(j => j.status === 'generating') ? 'bg-yellow-500 animate-pulse' :
+                    imageGenQueue.some(j => j.status === 'error') ? 'bg-red-500' :
+                    'bg-green-500'
+                  }`} />
+                  <span className="font-medium text-white">
+                    Image Queue ({imageGenQueue.length})
+                  </span>
+                </div>
+                <span className="text-gray-400">{showGenQueue ? '−' : '+'}</span>
+              </div>
+
+              {/* Queue List */}
+              {showGenQueue && (
+                <div className="max-h-64 overflow-y-auto">
+                  {imageGenQueue.map(job => (
+                    <div
+                      key={job.id}
+                      className={`px-4 py-3 border-t border-gray-800 flex items-center justify-between ${
+                        job.status === 'error' ? 'bg-red-900/20' :
+                        job.status === 'success' ? 'bg-green-900/20' :
+                        ''
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {job.status === 'generating' && (
+                            <svg className="w-4 h-4 text-yellow-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          )}
+                          {job.status === 'success' && (
+                            <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          {job.status === 'error' && (
+                            <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                          <span className="text-white text-sm truncate">{job.nftName}</span>
+                        </div>
+                        {job.message && (
+                          <p className={`text-xs mt-1 truncate ${
+                            job.status === 'error' ? 'text-red-400' : 'text-gray-400'
+                          }`}>
+                            {job.message}
+                          </p>
+                        )}
+                      </div>
+                      {(job.status === 'success' || job.status === 'error') && (
+                        <button
+                          onClick={() => removeFromQueue(job.id)}
+                          className="ml-2 text-gray-500 hover:text-white text-lg"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Clear All Button */}
+                  {imageGenQueue.some(j => j.status === 'success' || j.status === 'error') && (
+                    <div className="px-4 py-2 border-t border-gray-800 bg-gray-800/50">
+                      <button
+                        onClick={clearCompletedJobs}
+                        className="text-xs text-gray-400 hover:text-white"
+                      >
+                        Clear completed
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* NFT Detail Modal */}
         {(selectedNft || isLoadingDetail) && (
@@ -835,11 +994,13 @@ export default function AdminNFTs() {
                     )}
                     <div className="flex flex-wrap gap-3">
                       <button
-                        onClick={() => handleGenerateImage(selectedNft.id)}
-                        disabled={isGeneratingImage}
+                        onClick={() => handleGenerateImage(selectedNft.id, selectedNft.name)}
+                        disabled={imageGenQueue.some(j => j.nftId === selectedNft.id && (j.status === 'queued' || j.status === 'generating'))}
                         className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg"
                       >
-                        {isGeneratingImage ? 'Generating...' : 'Generate Image'}
+                        {imageGenQueue.some(j => j.nftId === selectedNft.id && j.status === 'generating')
+                          ? 'In Queue...'
+                          : 'Generate Image'}
                       </button>
                       <Link
                         href={`/nft/${selectedNft.tokenId}`}
