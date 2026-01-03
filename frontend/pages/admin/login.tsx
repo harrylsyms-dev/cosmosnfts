@@ -15,8 +15,8 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      // Add cache-busting timestamp to prevent 404 caching
-      const url = `/api/admin/login?_t=${Date.now()}`;
+      // Use alternative auth endpoint path
+      const url = `/api/auth/admin-login`;
       console.log('Fetching:', url);
 
       const res = await fetch(url, {
