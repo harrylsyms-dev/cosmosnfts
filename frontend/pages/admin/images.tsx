@@ -453,32 +453,33 @@ export default function AdminImages() {
 
                       <div className="bg-gray-800 rounded-lg p-4">
                         <p className="text-gray-400 text-sm font-semibold mb-3">Available Placeholders:</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                           {[
-                            ['{name}', 'NFT name'],
-                            ['{objectType}', 'Object type'],
-                            ['{description}', 'NFT description'],
-                            ['{features}', 'Visual features'],
-                            ['{score}', 'Cosmic score'],
-                            ['{badge}', 'Badge tier'],
-                            ['{artStyle}', 'Art style setting'],
-                            ['{colorPalette}', 'Color palette'],
-                            ['{lightingStyle}', 'Lighting style'],
-                            ['{qualityDescriptors}', 'Quality text'],
-                            ['{mediumDescriptors}', 'Medium text'],
-                            ['{scoreModifier}', 'Score-based text'],
-                            ['{negativePrompt}', 'Negative prompt'],
-                          ].map(([key, desc]) => (
-                            <div key={key} className="flex items-start gap-2">
-                              <code className="text-blue-400 bg-gray-900 px-2 py-0.5 rounded">{key}</code>
-                              <span className="text-gray-500 text-xs">{desc}</span>
+                            ['{name}', 'NFT name', 'From NFT database'],
+                            ['{objectType}', 'Object type', 'From NFT database'],
+                            ['{description}', 'NFT description', 'From NFT database'],
+                            ['{score}', 'Cosmic score (0-500)', 'From NFT database'],
+                            ['{badge}', 'Badge tier', 'From NFT database'],
+                            ['{features}', 'Visual Features', 'Object Types tab'],
+                            ['{artStyle}', 'Art Style', 'Style & Colors tab'],
+                            ['{colorPalette}', 'Color Palette', 'Style & Colors tab'],
+                            ['{lightingStyle}', 'Lighting Style', 'Style & Colors tab'],
+                            ['{qualityDescriptors}', 'Quality Descriptors', 'Style & Colors tab'],
+                            ['{mediumDescriptors}', 'Medium Descriptors', 'Style & Colors tab'],
+                            ['{scoreModifier}', 'Score Modifier Text', 'Score Modifiers tab'],
+                            ['{negativePrompt}', 'Negative Prompt', 'Below on this tab'],
+                          ].map(([key, desc, source]) => (
+                            <div key={key} className="flex items-center gap-2 py-1">
+                              <code className="text-blue-400 bg-gray-900 px-2 py-0.5 rounded text-xs">{key}</code>
+                              <span className="text-white text-xs">{desc}</span>
+                              <span className="text-gray-500 text-xs">← {source}</span>
                             </div>
                           ))}
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-white font-medium mb-2">Negative Prompt</label>
+                        <label className="block text-white font-medium mb-1">Negative Prompt <code className="text-blue-400 text-xs ml-2">{'{negativePrompt}'}</code></label>
                         <p className="text-gray-400 text-sm mb-3">
                           What to exclude from generated images
                         </p>
@@ -498,7 +499,7 @@ export default function AdminImages() {
                     <div className="space-y-6">
                       <div className="grid md:grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-white font-medium mb-2">Art Style</label>
+                          <label className="block text-white font-medium mb-1">Art Style <code className="text-blue-400 text-xs ml-2">{'{artStyle}'}</code></label>
                           <input
                             type="text"
                             value={promptConfig.artStyle}
@@ -508,7 +509,7 @@ export default function AdminImages() {
                           />
                         </div>
                         <div>
-                          <label className="block text-white font-medium mb-2">Color Palette</label>
+                          <label className="block text-white font-medium mb-1">Color Palette <code className="text-blue-400 text-xs ml-2">{'{colorPalette}'}</code></label>
                           <input
                             type="text"
                             value={promptConfig.colorPalette}
@@ -518,7 +519,7 @@ export default function AdminImages() {
                           />
                         </div>
                         <div>
-                          <label className="block text-white font-medium mb-2">Lighting Style</label>
+                          <label className="block text-white font-medium mb-1">Lighting Style <code className="text-blue-400 text-xs ml-2">{'{lightingStyle}'}</code></label>
                           <input
                             type="text"
                             value={promptConfig.lightingStyle}
@@ -528,7 +529,7 @@ export default function AdminImages() {
                           />
                         </div>
                         <div>
-                          <label className="block text-white font-medium mb-2">Composition Style</label>
+                          <label className="block text-white font-medium mb-1">Composition Style <code className="text-gray-500 text-xs ml-2">(no placeholder)</code></label>
                           <input
                             type="text"
                             value={promptConfig.compositionStyle}
@@ -538,7 +539,7 @@ export default function AdminImages() {
                           />
                         </div>
                         <div>
-                          <label className="block text-white font-medium mb-2">Quality Descriptors</label>
+                          <label className="block text-white font-medium mb-1">Quality Descriptors <code className="text-blue-400 text-xs ml-2">{'{qualityDescriptors}'}</code></label>
                           <input
                             type="text"
                             value={promptConfig.qualityDescriptors}
@@ -548,7 +549,7 @@ export default function AdminImages() {
                           />
                         </div>
                         <div>
-                          <label className="block text-white font-medium mb-2">Medium Descriptors</label>
+                          <label className="block text-white font-medium mb-1">Medium Descriptors <code className="text-blue-400 text-xs ml-2">{'{mediumDescriptors}'}</code></label>
                           <input
                             type="text"
                             value={promptConfig.mediumDescriptors}
@@ -779,7 +780,9 @@ export default function AdminImages() {
                           <h3 className="text-lg font-bold text-white">{selectedObjectType}</h3>
 
                           <div>
-                            <label className="block text-gray-400 text-sm mb-2">Description</label>
+                            <label className="block text-gray-400 text-sm mb-2">
+                              Description <span className="text-gray-600">(fallback if NFT has no description)</span>
+                            </label>
                             <textarea
                               value={promptConfig.objectTypeConfigs[selectedObjectType]?.description || ''}
                               onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'description', e.target.value)}
@@ -790,7 +793,9 @@ export default function AdminImages() {
                           </div>
 
                           <div>
-                            <label className="block text-gray-400 text-sm mb-2">Visual Features</label>
+                            <label className="block text-white font-medium text-sm mb-2">
+                              Visual Features <code className="text-blue-400 text-xs ml-2">{'{features}'}</code>
+                            </label>
                             <textarea
                               value={promptConfig.objectTypeConfigs[selectedObjectType]?.visualFeatures || ''}
                               onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'visualFeatures', e.target.value)}
@@ -802,12 +807,13 @@ export default function AdminImages() {
 
                           <div>
                             <label className="block text-gray-400 text-sm mb-2">Custom Prompt Override (Optional)</label>
+                            <p className="text-gray-500 text-xs mb-2">Leave empty to use base template. Enter a complete prompt to override for this type only.</p>
                             <textarea
                               value={promptConfig.objectTypeConfigs[selectedObjectType]?.customPrompt || ''}
                               onChange={(e) => updateObjectTypeConfig(selectedObjectType, 'customPrompt', e.target.value)}
                               rows={4}
                               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
-                              placeholder="Leave empty to use base template. Enter a complete prompt to override for this type only..."
+                              placeholder="Complete custom prompt for this object type..."
                             />
                           </div>
                         </div>
@@ -855,9 +861,18 @@ export default function AdminImages() {
                         </div>
                       </div>
 
+                      <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-3 mb-4">
+                        <p className="text-blue-300 text-sm">
+                          These values are inserted into the <code className="text-blue-400">{'{scoreModifier}'}</code> placeholder based on the NFT&apos;s score.
+                        </p>
+                      </div>
+
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-white font-medium mb-2">Premium Modifier Text</label>
+                          <label className="block text-white font-medium mb-1">
+                            Premium Modifier Text <code className="text-blue-400 text-xs ml-2">{'{scoreModifier}'}</code>
+                          </label>
+                          <p className="text-gray-500 text-xs mb-2">Used when score &gt; Premium Threshold</p>
                           <input
                             type="text"
                             value={promptConfig.premiumModifier}
@@ -867,7 +882,10 @@ export default function AdminImages() {
                           />
                         </div>
                         <div>
-                          <label className="block text-white font-medium mb-2">Elite Modifier Text</label>
+                          <label className="block text-white font-medium mb-1">
+                            Elite Modifier Text <code className="text-blue-400 text-xs ml-2">{'{scoreModifier}'}</code>
+                          </label>
+                          <p className="text-gray-500 text-xs mb-2">Used when score &gt; Elite Threshold</p>
                           <input
                             type="text"
                             value={promptConfig.eliteModifier}
@@ -877,7 +895,10 @@ export default function AdminImages() {
                           />
                         </div>
                         <div>
-                          <label className="block text-white font-medium mb-2">Legendary Modifier Text</label>
+                          <label className="block text-white font-medium mb-1">
+                            Legendary Modifier Text <code className="text-blue-400 text-xs ml-2">{'{scoreModifier}'}</code>
+                          </label>
+                          <p className="text-gray-500 text-xs mb-2">Used when score &gt; Legendary Threshold</p>
                           <input
                             type="text"
                             value={promptConfig.legendaryModifier}
