@@ -15,9 +15,11 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      // Use full URL to avoid any routing issues
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-      const res = await fetch(`${baseUrl}/api/admin/login`, {
+      // Debug: show the URL being called
+      const url = '/api/admin/login';
+      console.log('Fetching:', url);
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
