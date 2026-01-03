@@ -106,7 +106,7 @@ export default function AdminSettings() {
       setAdmin(data.admin);
 
       const fetchPromises = [fetchWalletConfig(), fetchConfigInfo()];
-      if (data.admin?.role === 'super_admin') {
+      if (data.admin?.role === 'SUPER_ADMIN') {
         fetchPromises.push(fetchApiKeys());
       }
       await Promise.all(fetchPromises);
@@ -488,7 +488,7 @@ export default function AdminSettings() {
             >
               Export / Import
             </button>
-            {admin?.role === 'super_admin' && (
+            {admin?.role === 'SUPER_ADMIN' && (
               <button
                 onClick={() => setActiveTab('apikeys')}
                 className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
@@ -793,7 +793,7 @@ export default function AdminSettings() {
           )}
 
           {/* API Keys Tab - Super Admin Only */}
-          {activeTab === 'apikeys' && admin?.role === 'super_admin' && (
+          {activeTab === 'apikeys' && admin?.role === 'SUPER_ADMIN' && (
             <div className="space-y-6">
               {/* Encryption Warning */}
               {!isEncryptionConfigured && (
