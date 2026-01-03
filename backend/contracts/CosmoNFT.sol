@@ -5,13 +5,14 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title CosmoNFT
  * @dev ERC-721 NFT contract with dynamic pricing and tier management
  * Deployed on Polygon PoS
  */
-contract CosmoNFT is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
+contract CosmoNFT is ERC721, ERC721Enumerable, ERC721Royalty, Ownable, ReentrancyGuard {
 
     // Tier structure for dynamic pricing
     struct Tier {
@@ -253,21 +254,28 @@ contract CosmoNFT is ERC721, ERC721Enumerable, ERC721Royalty, Ownable {
 
     /**
      * @dev Withdraw royalties (70% owner, 30% benefactor)
+     * Protected against reentrancy attacks and restricted to owner
      */
-    function withdrawRoyalties() external {
+    function withdrawRoyalties() external onlyOwner nonReentrant {
         uint256 balance = address(this).balance;
         require(balance > 0, "No royalties");
 
+        // Calculate shares before any external calls (checks-effects-interactions pattern)
         uint256 ownerShare = (balance * 70) / 100;
         uint256 benefactorShareAmount = balance - ownerShare;
 
-        (bool success1, ) = owner().call{value: ownerShare}("");
+        // Cache addresses to prevent TOCTOU issues
+        address ownerAddr = owner();
+        address benefactorAddr = benefactorAddress;
+
+        // External calls last (interactions)
+        (bool success1, ) = ownerAddr.call{value: ownerShare}("");
         require(success1, "Owner withdrawal failed");
 
-        (bool success2, ) = benefactorAddress.call{value: benefactorShareAmount}("");
+        (bool success2, ) = benefactorAddr.call{value: benefactorShareAmount}("");
         require(success2, "Benefactor withdrawal failed");
 
-        emit RoyaltiesWithdrawn(owner(), ownerShare);
+        emit RoyaltiesWithdrawn(ownerAddr, ownerShare);
     }
 
     // ============ AUCTION FUNCTIONS ============

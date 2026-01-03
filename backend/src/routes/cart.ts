@@ -2,19 +2,22 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../config/database';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
+import { verifyWalletOwnership } from '../middleware/walletAuth';
 
 const router = Router();
 
 const CART_EXPIRY_MINUTES = 30;
 const MAX_CART_ITEMS = 5;
 
-// POST /api/cart/add - Add NFT to cart
-router.post('/add', async (req: Request, res: Response) => {
+// POST /api/cart/add - Add NFT to cart (requires wallet auth)
+router.post('/add', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
-    const { nftId, userId } = req.body;
+    const { nftId } = req.body;
+    // Use authenticated wallet address instead of client-provided userId
+    const userId = req.verifiedWallet!;
 
-    if (!nftId || !userId) {
-      return res.status(400).json({ error: 'nftId and userId are required' });
+    if (!nftId) {
+      return res.status(400).json({ error: 'nftId is required' });
     }
 
     // Check if NFT exists and is available
@@ -113,18 +116,15 @@ router.post('/add', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/cart - Get current cart
-router.get('/', async (req: Request, res: Response) => {
+// GET /api/cart - Get current cart (requires wallet auth)
+router.get('/', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
+    // Use authenticated wallet address instead of client-provided userId
+    const userId = req.verifiedWallet!;
 
     const cart = await prisma.cart.findFirst({
       where: {
-        userId: userId as string,
+        userId: userId,
         expiresAt: { gt: new Date() },
       },
       include: {
@@ -168,13 +168,15 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/cart/remove - Remove NFT from cart
-router.post('/remove', async (req: Request, res: Response) => {
+// POST /api/cart/remove - Remove NFT from cart (requires wallet auth)
+router.post('/remove', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
-    const { nftId, userId } = req.body;
+    const { nftId } = req.body;
+    // Use authenticated wallet address instead of client-provided userId
+    const userId = req.verifiedWallet!;
 
-    if (!nftId || !userId) {
-      return res.status(400).json({ error: 'nftId and userId are required' });
+    if (!nftId) {
+      return res.status(400).json({ error: 'nftId is required' });
     }
 
     const cart = await prisma.cart.findFirst({
@@ -212,14 +214,11 @@ router.post('/remove', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/cart/clear - Clear entire cart
-router.post('/clear', async (req: Request, res: Response) => {
+// POST /api/cart/clear - Clear entire cart (requires wallet auth)
+router.post('/clear', verifyWalletOwnership, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
+    // Use authenticated wallet address instead of client-provided userId
+    const userId = req.verifiedWallet!;
 
     const cart = await prisma.cart.findFirst({
       where: {
