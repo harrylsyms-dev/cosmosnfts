@@ -166,15 +166,11 @@ async function generateWithLeonardo(
     promptMagic: false,
   };
 
-  // Add style reference if available
+  // Note: Style reference via controlnets is not supported by all models
+  // For now, we skip it to ensure generation works
+  // The reference image is still stored for display purposes
   if (styleReferenceId) {
-    requestBody.controlnets = [{
-      initImageId: styleReferenceId,
-      initImageType: 'UPLOADED',
-      preprocessorId: 67, // Style Reference
-      strengthType: 'Mid',
-    }];
-    console.log(`Using style reference: ${styleReferenceId}`);
+    console.log(`Reference image available: ${styleReferenceId} (not used in generation - model compatibility)`);
   }
 
   // Create generation
