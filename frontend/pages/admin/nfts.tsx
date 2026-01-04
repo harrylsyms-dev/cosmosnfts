@@ -248,20 +248,35 @@ export default function AdminNFTs() {
     setGenerateMessage(null);
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/nfts/${id}`, {
+      const fetchUrl = `${apiUrl}/api/admin/nfts/${id}`;
+      console.log('[Modal] Fetching:', fetchUrl);
+
+      const res = await fetch(fetchUrl, {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+
+      console.log('[Modal] Response status:', res.status, res.ok);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[Modal] HTTP Error:', res.status, errorText.substring(0, 300));
+        alert(`HTTP Error ${res.status}: Unable to load NFT`);
+        return;
+      }
+
       const data = await res.json();
-      if (data.success) {
+      console.log('[Modal] Response:', { success: data.success, hasNft: !!data.nft, error: data.error });
+
+      if (data.success && data.nft) {
         setSelectedNft(data.nft);
       } else {
-        console.error('API error:', data.error || 'Unknown error');
-        alert('Failed to load NFT: ' + (data.error || 'Unknown error'));
+        console.error('[Modal] API returned error:', data);
+        alert('Failed: ' + (data.error || 'No NFT data returned'));
       }
     } catch (error) {
-      console.error('Failed to fetch NFT details:', error);
-      alert('Network error loading NFT details');
+      console.error('[Modal] Exception caught:', error);
+      alert('Network error: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsLoadingDetail(false);
     }
