@@ -45,6 +45,10 @@ interface NFTDetail {
   image: string | null;
   imageIpfsHash: string | null;
   metadataIpfsHash: string | null;
+  // Reference images from NASA/ESA
+  referenceImageUrl: string | null;
+  referenceImageSource: string | null;
+  leonardoRefImageId: string | null;
   ownerAddress: string | null;
   transactionHash: string | null;
   createdAt: string;
@@ -1025,6 +1029,25 @@ export default function AdminNFTs() {
                       <div className="bg-gray-800 rounded-lg p-4">
                         <h3 className="font-semibold text-white mb-2">Description</h3>
                         <p className="text-gray-400 text-sm">{selectedNft.description || 'No description'}</p>
+                      </div>
+
+                      {/* Reference Image from NASA/ESA */}
+                      <div className="bg-gray-800 rounded-lg p-4 mt-4">
+                        <h3 className="font-semibold text-white mb-2">Reference Image</h3>
+                        {selectedNft.referenceImageUrl ? (
+                          <div>
+                            <img
+                              src={selectedNft.referenceImageUrl}
+                              alt={`${selectedNft.name} reference`}
+                              className="w-full rounded-lg mb-2"
+                            />
+                            <p className="text-xs text-gray-400">
+                              Source: {selectedNft.referenceImageSource || 'NASA'}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-sm">No reference image available</p>
+                        )}
                       </div>
                     </div>
 

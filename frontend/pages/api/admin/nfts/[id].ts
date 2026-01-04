@@ -214,6 +214,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       image: nft.image,
       imageIpfsHash: nft.imageIpfsHash,
       metadataIpfsHash: nft.metadataIpfsHash,
+      // Reference images from NASA/ESA
+      referenceImageUrl: nft.referenceImageUrl,
+      referenceImageSource: nft.referenceImageSource,
+      leonardoRefImageId: nft.leonardoRefImageId,
       ownerAddress: nft.ownerAddress,
       transactionHash: nft.transactionHash,
       createdAt: nft.createdAt.toISOString(),
