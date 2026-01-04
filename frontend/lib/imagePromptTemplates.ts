@@ -234,112 +234,185 @@ export const UNIVERSAL_NEGATIVES = [
   'diagram', 'visualization', 'infographic', 'schematic',
 ];
 
-// Object-specific negatives (absolute terms - no "excessive" or "oversaturated")
-// Common anti-artistic terms added to all: glass, transparent, orb, crystal ball, mystical, ethereal
+// Object-specific negatives - tailored to each object type's common AI rendering failures
+// Each list targets what Leonardo AI specifically gets wrong for that object type
 export const OBJECT_TYPE_NEGATIVES: Record<string, string[]> = {
+  // STARS: Main failures are glass balls, cosmic orbs, eclipses, coronas
+  // Want: Solid incandescent plasma sphere like SDO solar images
   'Star': [
-    'glass', 'transparent', 'sphere inside sphere', 'portal', 'orb', 'marble',
-    'crystal ball', 'galaxy', 'nebula', 'ring', 'halo', 'corona', 'eclipse',
-    'universe', 'cosmic', 'mystical', 'ethereal', 'dark center', 'planet',
-    'crescent', 'moon', 'sunset', 'sunrise',
+    'glass', 'crystal ball', 'orb', 'marble', 'sphere inside sphere',
+    'transparent', 'translucent', 'see-through',
+    'eclipse', 'corona', 'crescent', 'dark center',
+    'lens flare', 'god rays', 'light beams',
+    'galaxy', 'nebula', 'planet', 'moon',
+    'sunset', 'sunrise', 'horizon',
+    'portal', 'universe inside',
   ],
+
+  // GALAXIES: Main failures are nebula overlays, multiple galaxies, portal swirls
+  // Want: Clean Hubble-style single galaxy with visible structure
   'Galaxy': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'nebula overlay', 'lens flare', 'planets in foreground', 'moon', 'satellite',
-    'multiple galaxies', 'swirl effect', 'cosmic art',
+    'nebula overlay', 'gas cloud overlay',
+    'multiple galaxies', 'galaxy cluster', 'colliding galaxies',
+    'planets in foreground', 'moon', 'asteroid',
+    'lens flare', 'light rays',
+    'swirl effect', 'portal', 'vortex',
+    'edge-on only', // unless specifically requested
   ],
+
+  // BARRED SPIRAL: Same as galaxy plus wrong spiral type
   'Barred Spiral Galaxy': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'nebula overlay', 'lens flare', 'planets in foreground', 'moon', 'satellite',
-    'multiple galaxies', 'swirl effect', 'cosmic art',
-    'standard spiral', 'arms from center',
+    'nebula overlay', 'gas cloud overlay',
+    'multiple galaxies', 'galaxy cluster',
+    'planets in foreground', 'moon',
+    'lens flare', 'light rays',
+    'swirl effect', 'portal', 'vortex',
+    'standard spiral', 'arms from center', 'no bar', 'regular spiral',
   ],
+
+  // BLACK HOLES: Main failures are portals, eyes, symmetric rings, blue glows
+  // Want: EHT M87 style - asymmetric orange accretion disk, dark void center
   'Black Hole': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'planet', 'planetary surface', 'galaxy inside', 'multiple objects',
-    'symmetrical glow', 'eye', 'portal', 'wormhole', 'sphere', 'marble',
-    'blue glow', 'ring of fire', 'universe inside', 'cosmic art',
+    'portal', 'wormhole', 'tunnel', 'gateway',
+    'eye', 'iris', 'pupil',
+    'symmetric ring', 'perfect circle glow', 'ring of fire',
+    'blue glow', 'purple glow', 'colorful',
+    'galaxy inside', 'universe inside', 'stars inside',
+    'sphere', 'ball', 'orb',
+    'planet', 'moon', 'nebula',
+    'multiple black holes',
   ],
+
+  // NEBULAE: Actually render well - main issues are lens flares, added planets
+  // Note: Do NOT exclude "transparent" - nebulae ARE gas clouds
   'Nebula': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'lens flare', 'planets in foreground', 'cosmic art',
+    'lens flare', 'light rays', 'god rays',
+    'planets in foreground', 'planet', 'moon',
+    'sharp edges', 'solid object',
+    'single star only', 'star focus',
+    'galaxy overlay',
   ],
+
+  // SUPERNOVA REMNANTS: Similar to nebulae but more structured
+  // Want: Filamentary expanding shell like Crab Nebula
   'Supernova Remnant': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'planet', 'galaxy', 'black hole', 'cosmic art',
+    'lens flare', 'light rays',
+    'planet', 'moon', 'asteroid',
+    'galaxy', 'black hole',
+    'smooth edges', 'perfect sphere',
+    'star cluster',
   ],
+
+  // PLANETS: Main failures are glass balls, unwanted rings/moons
+  // Want: Solid rocky or gaseous body like Voyager/Cassini images
   'Planet': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'rings', 'moons', 'lens flare', 'alien structures', 'cosmic art',
+    'glass', 'crystal', 'transparent', 'translucent',
+    'orb', 'marble', 'sphere inside',
+    'rings', 'ring system', // unless Saturn-type
+    'multiple moons', 'moon in frame',
+    'lens flare', 'light rays',
+    'alien city', 'alien structures', 'buildings',
+    'atmosphere glow only', 'just atmosphere',
   ],
+
+  // EXOPLANETS: Same as planets plus star dominance issues
+  // Want: Planet with dramatic parent star illumination
   'Exoplanet': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'rings', 'moons', 'lens flare', 'alien structures', 'cosmic art',
+    'glass', 'crystal', 'transparent', 'translucent',
+    'orb', 'marble', 'sphere inside',
+    'rings', 'ring system',
+    'multiple moons',
+    'lens flare', 'light rays',
+    'alien city', 'alien structures',
+    'star only', 'no planet visible',
+    'Earth-like continents', // unless specified
   ],
-  // PULSAR: Heavy negatives to prevent diagram/beam/disk rendering
+
+  // PULSARS: BIGGEST PROBLEM - diagram-style with beams/field lines
+  // Want: Simple hot glowing stellar sphere, no physics diagrams
   'Pulsar': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'beams', 'rays', 'jets', 'radiation beams', 'magnetic field lines',
-    'synchrotron', 'field lines', 'emanating',
-    'diagram', 'visualization', 'schematic', 'infographic',
-    'nebula', 'filaments', 'rings', 'accretion disk',
-    'disk', 'protoplanetary', 'edge-on', 'equatorial glow', 'horizontal band',
-    'planet', 'galaxy', 'cosmic art',
+    'beams', 'radiation beams', 'light beams', 'jets',
+    'magnetic field lines', 'field lines', 'force lines',
+    'synchrotron radiation', 'emanating rays',
+    'diagram', 'schematic', 'infographic', 'visualization',
+    'accretion disk', 'disk', 'ring',
+    'nebula around', 'gas cloud',
+    'planet', 'galaxy',
+    'cross pattern', 'lighthouse beam',
   ],
-  // MAGNETAR: Same as pulsar
+
+  // MAGNETARS: Same as pulsar - describe appearance not physics
   'Magnetar': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'beams', 'rays', 'jets', 'radiation beams', 'magnetic field lines',
-    'field distortions', 'synchrotron', 'emanating',
-    'diagram', 'visualization', 'schematic',
-    'disk', 'protoplanetary', 'edge-on', 'equatorial glow', 'horizontal band',
-    'accretion disk', 'rings',
-    'planet', 'galaxy', 'nebula', 'cosmic art',
+    'beams', 'radiation beams', 'light beams', 'jets',
+    'magnetic field lines', 'field lines', 'force lines', 'field distortions',
+    'synchrotron', 'emanating rays',
+    'diagram', 'schematic', 'visualization',
+    'accretion disk', 'disk', 'ring',
+    'nebula', 'gas cloud',
+    'planet', 'galaxy',
+    'electric arcs', 'lightning',
   ],
-  // NEUTRON STAR: Same as pulsar
+
+  // NEUTRON STARS: Same as pulsar
   'Neutron Star': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'beams', 'rays', 'jets', 'radiation beams', 'magnetic field lines',
-    'synchrotron', 'field lines', 'emanating',
-    'diagram', 'visualization', 'schematic', 'infographic',
-    'nebula', 'filaments', 'rings', 'accretion disk',
-    'disk', 'protoplanetary', 'edge-on', 'equatorial glow', 'horizontal band',
-    'planet', 'galaxy', 'cosmic art',
+    'beams', 'radiation beams', 'light beams', 'jets',
+    'magnetic field lines', 'field lines', 'force lines',
+    'synchrotron', 'emanating rays',
+    'diagram', 'schematic', 'infographic', 'visualization',
+    'accretion disk', 'disk', 'ring',
+    'nebula around', 'gas cloud',
+    'planet', 'galaxy',
+    'cross pattern',
   ],
+
+  // QUASARS: Main issue is missing jet, multiple objects
+  // Want: Bright nucleus with visible relativistic jet
   'Quasar': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'multiple objects', 'planet', 'cosmic art',
+    'multiple quasars', 'multiple objects',
+    'planet', 'moon',
+    'no jet', 'jet missing',
+    'dim nucleus', 'faint center',
+    'lens flare covering jet',
   ],
+
+  // COMETS: Main failures are fireball rendering, wrong tail direction
+  // Want: Icy nucleus with dust and ion tails pointing away from sun
   'Comet': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'planet', 'galaxy', 'fireball', 'cosmic art',
+    'fireball', 'fire', 'flames', 'burning',
+    'meteor', 'meteorite', 'shooting star',
+    'planet', 'galaxy', 'nebula',
+    'no tail', 'tail missing',
+    'glass', 'crystal ball',
+    'single tail only',
   ],
+
+  // STAR CLUSTERS: Main failures are single star focus, nebula overlay
+  // Want: Many individual stars of varied colors, dense grouping
   'Star Cluster': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'nebula overlay', 'single star focus', 'galaxy', 'cosmic art',
+    'single star', 'one star only', 'star focus',
+    'nebula overlay', 'gas cloud covering',
+    'galaxy', 'spiral structure',
+    'lens flare', 'light rays',
+    'uniform color', 'all same color',
   ],
+
+  // MOONS: Main failures are glass effect, unwanted rings
+  // Want: Cratered rocky/icy surface like Galileo images
   'Moon': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'rings', 'alien structures', 'cosmic art',
+    'glass', 'crystal', 'transparent', 'translucent',
+    'orb', 'marble',
+    'rings', 'ring system',
+    'atmosphere', 'clouds', 'weather',
+    'alien city', 'alien structures',
+    'smooth surface', 'no craters',
+    'lens flare',
   ],
-  // FALLBACK
+
+  // FALLBACK: Generic space object negatives
   'Unknown': [
-    'glass', 'transparent', 'orb', 'crystal ball', 'mystical', 'ethereal',
-    'portal', 'marble', 'sphere inside',
-    'lens flare', 'cosmic art',
+    'lens flare', 'light rays',
+    'multiple objects',
+    'diagram', 'schematic',
   ],
 };
 
