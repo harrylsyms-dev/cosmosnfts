@@ -1,9 +1,13 @@
 name: Generate NFT Images
 
+# NOTE: Scheduled execution disabled - now using Vercel Cron Jobs
+# See frontend/vercel.json for cron configuration
+# This workflow can still be triggered manually via workflow_dispatch
+
 on:
-  schedule:
-    # Run every day at 2 AM UTC
-    - cron: '0 2 * * *'
+  # schedule:
+  #   # Run every day at 2 AM UTC
+  #   - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       phase:
@@ -27,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
@@ -71,7 +75,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 

@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/auction-check",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/generate-images",
+      "schedule": "0 2 * * *"
     }
   ]
 }
