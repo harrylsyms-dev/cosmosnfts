@@ -115,6 +115,12 @@ export default function AstronomicalDataAdmin() {
   const [generateCount, setGenerateCount] = useState(10);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Reference image lookup state
+  const [refLookupName, setRefLookupName] = useState('');
+  const [refLookupResult, setRefLookupResult] = useState<{ url: string; source: string; title?: string } | null>(null);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
   const allObjects = getAllAstronomicalObjects();
   const typeCounts = getObjectCountsByType();
 
@@ -270,6 +276,63 @@ export default function AstronomicalDataAdmin() {
     } finally {
       setIsGenerating(false);
       fetchGenerationStats();
+    }
+  }
+
+  // Look up reference image from NASA
+  async function handleRefLookup() {
+    if (!refLookupName.trim()) return;
+
+    setIsLookingUp(true);
+    setLookupError(null);
+    setRefLookupResult(null);
+
+    try {
+      // Call NASA Image API directly from browser
+      const searchUrl = `https://images-api.nasa.gov/search?q=${encodeURIComponent(refLookupName)}&media_type=image&page_size=5`;
+      const response = await fetch(searchUrl);
+
+      if (!response.ok) {
+        throw new Error(`NASA API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const items = data.collection?.items;
+
+      if (!items || items.length === 0) {
+        setLookupError(`No images found for "${refLookupName}"`);
+        return;
+      }
+
+      // Find the best image
+      for (const item of items) {
+        const links = item.links;
+        const itemData = item.data?.[0];
+
+        if (!links || links.length === 0) continue;
+
+        const imageLink = links.find((l: any) => l.rel === 'preview' || l.render === 'image');
+        if (!imageLink?.href) continue;
+
+        let imageUrl = imageLink.href;
+        // Try to get higher resolution version
+        if (imageUrl.includes('~thumb')) {
+          imageUrl = imageUrl.replace('~thumb', '~medium');
+        }
+
+        setRefLookupResult({
+          url: imageUrl,
+          source: 'NASA',
+          title: itemData?.title,
+        });
+        return;
+      }
+
+      setLookupError('Found results but no usable image URLs');
+    } catch (error: any) {
+      setLookupError(error.message || 'Failed to look up image');
+    } finally {
+      setIsLookingUp(false);
     }
   }
 
@@ -441,6 +504,74 @@ export default function AstronomicalDataAdmin() {
               </div>
             </div>
           )}
+
+          {/* Reference Image Lookup */}
+          <div className="mb-8 p-6 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 rounded-lg border border-cyan-500/30">
+            <h2 className="text-lg font-semibold text-cyan-400 mb-4">Reference Image Lookup (NASA)</h2>
+            <p className="text-gray-400 text-sm mb-4">
+              Test if a reference image is available from NASA for any astronomical object.
+            </p>
+
+            <div className="flex flex-wrap gap-4 items-start">
+              <div className="flex-1 min-w-[300px]">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={refLookupName}
+                    onChange={(e) => setRefLookupName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRefLookup()}
+                    placeholder="Enter object name (e.g., Sirius, Orion Nebula, Andromeda)"
+                    className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
+                  />
+                  <button
+                    onClick={handleRefLookup}
+                    disabled={isLookingUp || !refLookupName.trim()}
+                    className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 text-white px-4 py-2 rounded font-semibold transition-colors"
+                  >
+                    {isLookingUp ? 'Searching...' : 'Look Up'}
+                  </button>
+                </div>
+
+                {lookupError && (
+                  <div className="mt-3 p-3 bg-red-900/30 border border-red-500 rounded text-red-300 text-sm">
+                    {lookupError}
+                  </div>
+                )}
+
+                {refLookupResult && (
+                  <div className="mt-3 p-3 bg-green-900/30 border border-green-500 rounded">
+                    <div className="text-green-300 text-sm mb-2">
+                      Found: {refLookupResult.title || 'Image'}
+                    </div>
+                    <div className="text-gray-400 text-xs mb-2">
+                      Source: {refLookupResult.source}
+                    </div>
+                    <a
+                      href={refLookupResult.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 text-xs break-all hover:underline"
+                    >
+                      {refLookupResult.url}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {refLookupResult && (
+                <div className="w-48 flex-shrink-0">
+                  <img
+                    src={refLookupResult.url}
+                    alt={refLookupResult.title || 'Reference image'}
+                    className="w-full rounded-lg border border-gray-600"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Overview Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
