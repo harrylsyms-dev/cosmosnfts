@@ -310,11 +310,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       for (const obj of objectsToCreate) {
         // Fetch reference image from NASA/ESA - REQUIRED for NFT creation
-        let referenceImage: ReferenceImage | null = await getReferenceImage(obj.name, obj.objectType);
+        let referenceImage: ReferenceImage | null = null;
+
+        try {
+          console.log(`Fetching reference image for: ${obj.name} (${obj.objectType})`);
+          referenceImage = await getReferenceImage(obj.name, obj.objectType);
+          console.log(`getReferenceImage result for ${obj.name}:`, referenceImage ? `Found from ${referenceImage.source}` : 'null');
+        } catch (refError: any) {
+          console.error(`Error fetching reference image for ${obj.name}:`, refError?.message || refError);
+        }
 
         // Try fallback by object type if no specific image found
         if (!referenceImage && obj.objectType) {
           referenceImage = getFallbackReferenceImage(obj.objectType);
+          if (referenceImage) {
+            console.log(`Using fallback reference image for ${obj.name} (${obj.objectType}): ${referenceImage.url}`);
+          }
         }
 
         // Skip objects without reference images - they cannot be minted
@@ -324,7 +335,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           continue;
         }
 
-        console.log(`Found reference image for ${obj.name} from ${referenceImage.source}`);
+        console.log(`Creating NFT for ${obj.name} with reference image from ${referenceImage.source}: ${referenceImage.url}`);
 
         const scores = calculateScores(obj);
         const totalScore = scores.distance + scores.mass + scores.luminosity + scores.temperature + scores.discovery;
