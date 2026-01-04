@@ -58,6 +58,19 @@ model NFT {
   constellation           String?   // Constellation location (e.g., "Orion", "Cygnus")
   distance                String?   // Distance from Earth (e.g., "4.24 ly", "2.5M ly")
 
+  // Scientific data for prompt generation
+  spectralType            String?   @map("spectral_type")      // e.g., "G2V", "M1Ia"
+  distanceLy              Float?    @map("distance_ly")         // Distance in light years
+  massSolar               Float?    @map("mass_solar")          // Mass in solar masses
+  temperatureK            Float?    @map("temperature_k")       // Temperature in Kelvin
+  luminosity              Float?    @map("luminosity_value")    // Luminosity value
+  notableFeatures         String?   @map("notable_features")    // JSON array of notable features
+
+  // Image generation prompts (pre-generated using astronomical templates)
+  imagePrompt             String?   @map("image_prompt") @db.Text       // Full Leonardo AI prompt
+  imageNegativePrompt     String?   @map("image_negative_prompt") @db.Text // Negative prompt
+  promptGeneratedAt       DateTime? @map("prompt_generated_at")  // When prompt was generated
+
   // Timestamps
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
@@ -416,6 +429,10 @@ model ImagePromptConfig {
   includeScoreInPrompt  Boolean   @default(false) @map("include_score_in_prompt")
   includeMetadataInPrompt Boolean @default(true) @map("include_metadata_in_prompt")
   useDescriptionTransform Boolean @default(false) @map("use_description_transform")
+  useNftDescription     Boolean   @default(true) @map("use_nft_description")
+
+  // === TEMPLATE SYSTEM ===
+  useAstronomicalTemplates Boolean @default(true) @map("use_astronomical_templates") // Use new astronomical prompt templates (tested for Leonardo AI)
 
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")

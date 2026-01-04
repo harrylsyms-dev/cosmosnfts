@@ -312,6 +312,15 @@ export const DEFAULT_WIDGETS: Widget[] = [
     defaultSize: { cols: 1, rows: 1 },
   },
   {
+    id: 'astronomical-data',
+    title: 'Astronomical Data',
+    description: 'Real data sources',
+    icon: '🔭',
+    href: '/admin/astronomical-data',
+    color: 'border-indigo-800 hover:border-indigo-500',
+    defaultSize: { cols: 1, rows: 1 },
+  },
+  {
     id: 'images',
     title: 'Image Generation',
     description: 'Generate NFT images',

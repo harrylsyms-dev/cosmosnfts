@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("COSMO_PRISMA_DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 // NFT Model - Celestial objects (20,000 total)
@@ -58,24 +58,18 @@ model NFT {
   constellation           String?   // Constellation location (e.g., "Orion", "Cygnus")
   distance                String?   // Distance from Earth (e.g., "4.24 ly", "2.5M ly")
 
-  // Scientific Data (for objective scoring)
-  distanceLy              Float?    @map("distance_ly")        // Distance in light years
-  massSolar               Float?    @map("mass_solar")         // Mass in solar masses
-  ageYears                Float?    @map("age_years")          // Age in years
-  luminosity              Float?    @map("luminosity")         // Absolute magnitude
-  sizeKm                  Float?    @map("size_km")            // Size/radius in km
-  temperatureK            Float?    @map("temperature_k")      // Temperature in Kelvin
-  paperCount              Int?      @map("paper_count")        // Number of scientific papers
+  // Scientific data for prompt generation
+  spectralType            String?   @map("spectral_type")      // e.g., "G2V", "M1Ia"
+  distanceLy              Float?    @map("distance_ly")         // Distance in light years
+  massSolar               Float?    @map("mass_solar")          // Mass in solar masses
+  temperatureK            Float?    @map("temperature_k")       // Temperature in Kelvin
+  luminosity              Float?    @map("luminosity_value")    // Luminosity value
+  notableFeatures         String?   @map("notable_features")    // JSON array of notable features
 
-  // Calculated objective scores (0-100 each)
-  distanceScore           Float?    @map("distance_score")
-  massScore               Float?    @map("mass_score")
-  ageScore                Float?    @map("age_score")
-  luminosityScore         Float?    @map("luminosity_score")
-  sizeScore               Float?    @map("size_score")
-  temperatureScore        Float?    @map("temperature_score")
-  discoveryScore          Float?    @map("discovery_score")
-  papersScore             Float?    @map("papers_score")
+  // Image generation prompts (pre-generated using astronomical templates)
+  imagePrompt             String?   @map("image_prompt") @db.Text       // Full Leonardo AI prompt
+  imageNegativePrompt     String?   @map("image_negative_prompt") @db.Text // Negative prompt
+  promptGeneratedAt       DateTime? @map("prompt_generated_at")  // When prompt was generated
 
   // Timestamps
   createdAt               DateTime  @default(now()) @map("created_at")
@@ -297,18 +291,16 @@ model EmailLog {
 
 // Admin Users
 model AdminUser {
-  id                  String    @id @default(uuid())
-  email               String    @unique
-  passwordHash        String    @map("password_hash")
-  name                String?
-  role                String    @default("ADMIN") // ADMIN, SUPER_ADMIN
-  isActive            Boolean   @default(true) @map("is_active")
-  // mustChangePassword field - uncomment after running: ALTER TABLE admin_users ADD COLUMN must_change_password BOOLEAN DEFAULT FALSE;
-  // mustChangePassword  Boolean   @default(false) @map("must_change_password")
-  lastLoginAt         DateTime? @map("last_login_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-  privileges          String?   @default("[]") // JSON: section access privileges
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String?
+  role          String    @default("ADMIN") // ADMIN, SUPER_ADMIN
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  privileges    String?   @default("[]") // JSON: section access privileges
 
   sessions      AdminSession[]
   dashboardPreference AdminDashboardPreference?
@@ -389,6 +381,63 @@ model SiteSettings {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("site_settings")
+}
+
+// Comprehensive Image Prompt Configuration
+model ImagePromptConfig {
+  id                    String    @id @default("main")
+
+  // === BASE PROMPT TEMPLATE ===
+  basePromptTemplate    String?   @map("base_prompt_template") @db.Text
+
+  // === STYLE PARAMETERS ===
+  artStyle              String    @default("photorealistic astrophotography") @map("art_style")
+  colorPalette          String    @default("Natural space colors, deep blacks, subtle nebula hues") @map("color_palette")
+  lightingStyle         String    @default("Natural starlight, subtle glow effects") @map("lighting_style")
+  compositionStyle      String    @default("Scientific, documentary-style") @map("composition_style")
+  qualityDescriptors    String    @default("8K, ultra high definition, NASA-quality") @map("quality_descriptors")
+  mediumDescriptors     String    @default("Telescope photography, Hubble-style imagery") @map("medium_descriptors")
+
+  // === REALISM CONTROLS ===
+  realismLevel          Int       @default(80) @map("realism_level")
+  usePhotorealistic     Boolean   @default(true) @map("use_photorealistic")
+  useScientificAccuracy Boolean   @default(true) @map("use_scientific_accuracy")
+  avoidArtisticStylization Boolean @default(true) @map("avoid_artistic_stylization")
+
+  // === LEONARDO AI PARAMETERS ===
+  leonardoModelId       String    @default("b24e16ff-06e3-43eb-8d33-4416c2d75876") @map("leonardo_model_id")
+  imageWidth            Int       @default(1024) @map("image_width")
+  imageHeight           Int       @default(1024) @map("image_height")
+  promptMagic           Boolean   @default(false) @map("prompt_magic")
+  guidanceScale         Float     @default(7) @map("guidance_scale")
+
+  // === NEGATIVE PROMPT ===
+  negativePrompt        String    @default("cartoon, anime, illustration, painting, artistic, stylized, fantasy, magical, glowing effects, text, watermarks, signatures, logos, words, letters, blur, low quality") @map("negative_prompt") @db.Text
+
+  // === OBJECT TYPE CONFIGURATIONS (JSON) ===
+  objectTypeConfigs     String    @default("{}") @map("object_type_configs") @db.Text
+
+  // === SCORE-BASED MODIFIERS ===
+  premiumThreshold      Int       @default(400) @map("premium_threshold")
+  eliteThreshold        Int       @default(425) @map("elite_threshold")
+  legendaryThreshold    Int       @default(450) @map("legendary_threshold")
+  premiumModifier       String    @default("Exceptional detail and clarity") @map("premium_modifier")
+  eliteModifier         String    @default("Museum-quality, breathtaking composition") @map("elite_modifier")
+  legendaryModifier     String    @default("Once-in-a-lifetime capture, iconic imagery") @map("legendary_modifier")
+
+  // === ADVANCED OPTIONS ===
+  includeScoreInPrompt  Boolean   @default(false) @map("include_score_in_prompt")
+  includeMetadataInPrompt Boolean @default(true) @map("include_metadata_in_prompt")
+  useDescriptionTransform Boolean @default(false) @map("use_description_transform")
+  useNftDescription     Boolean   @default(true) @map("use_nft_description")
+
+  // === TEMPLATE SYSTEM ===
+  useAstronomicalTemplates Boolean @default(true) @map("use_astronomical_templates") // Use new astronomical prompt templates (tested for Leonardo AI)
+
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("image_prompt_config")
 }
 
 // Encrypted API Keys Storage
@@ -775,151 +824,4 @@ model BenefactorReminder {
 
   @@index([month, year])
   @@map("benefactor_reminders")
-}
-
-// ============================================
-// IMAGE GENERATION CONFIGURATION
-// ============================================
-
-// Comprehensive Image Prompt Configuration
-model ImagePromptConfig {
-  id                    String    @id @default("main")
-
-  // === BASE PROMPT TEMPLATE ===
-  // The main template with placeholders: {name}, {objectType}, {description}, {features}, {score}, {badge}
-  basePromptTemplate    String?   @map("base_prompt_template") @db.Text
-
-  // === STYLE PARAMETERS ===
-  // Controls the overall look and feel
-  artStyle              String    @default("photorealistic astrophotography") @map("art_style")
-  colorPalette          String    @default("Natural space colors, deep blacks, subtle nebula hues") @map("color_palette")
-  lightingStyle         String    @default("Natural starlight, subtle glow effects") @map("lighting_style")
-  compositionStyle      String    @default("Scientific, documentary-style") @map("composition_style")
-  qualityDescriptors    String    @default("8K, ultra high definition, NASA-quality") @map("quality_descriptors")
-  mediumDescriptors     String    @default("Telescope photography, Hubble-style imagery") @map("medium_descriptors")
-
-  // === REALISM CONTROLS ===
-  realismLevel          Int       @default(80) @map("realism_level") // 0-100, higher = more realistic
-  usePhotorealistic     Boolean   @default(true) @map("use_photorealistic")
-  useScientificAccuracy Boolean   @default(true) @map("use_scientific_accuracy")
-  avoidArtisticStylization Boolean @default(true) @map("avoid_artistic_stylization")
-
-  // === LEONARDO AI PARAMETERS ===
-  leonardoModelId       String    @default("b24e16ff-06e3-43eb-8d33-4416c2d75876") @map("leonardo_model_id")
-  imageWidth            Int       @default(1024) @map("image_width")
-  imageHeight           Int       @default(1024) @map("image_height")
-  promptMagic           Boolean   @default(false) @map("prompt_magic") // Off for more control
-  guidanceScale         Float     @default(7) @map("guidance_scale") // 1-20, higher = more prompt adherence
-
-  // === NEGATIVE PROMPT ===
-  negativePrompt        String    @default("cartoon, anime, illustration, painting, artistic, stylized, fantasy, magical, glowing effects, text, watermarks, signatures, logos, words, letters, blur, low quality") @map("negative_prompt") @db.Text
-
-  // === OBJECT TYPE CONFIGURATIONS (JSON) ===
-  // Stores per-type settings: { "Star": { "poeticPrefix": "...", "visualFeatures": "...", "customPrompt": "..." }, ... }
-  objectTypeConfigs     String    @default("{}") @map("object_type_configs") @db.Text
-
-  // === SCORE-BASED MODIFIERS ===
-  // Premium/Elite thresholds and what text to add
-  premiumThreshold      Int       @default(400) @map("premium_threshold")
-  eliteThreshold        Int       @default(425) @map("elite_threshold")
-  legendaryThreshold    Int       @default(450) @map("legendary_threshold")
-  premiumModifier       String    @default("Exceptional detail and clarity") @map("premium_modifier")
-  eliteModifier         String    @default("Museum-quality, breathtaking composition") @map("elite_modifier")
-  legendaryModifier     String    @default("Once-in-a-lifetime capture, iconic imagery") @map("legendary_modifier")
-
-  // === ADVANCED OPTIONS ===
-  includeScoreInPrompt  Boolean   @default(false) @map("include_score_in_prompt")
-  includeMetadataInPrompt Boolean @default(true) @map("include_metadata_in_prompt")
-  useDescriptionTransform Boolean @default(false) @map("use_description_transform") // Transform to "poetic" style
-  useNftDescription     Boolean   @default(true) @map("use_nft_description") // Use NFT description vs object type only
-
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  @@map("image_prompt_config")
-}
-
-// ============================================
-// SCIENTIFIC SCORING SYSTEM
-// ============================================
-
-// Scoring Configuration (Admin-selectable scoring system)
-model ScoringConfig {
-  id                    String    @id @default("main")
-
-  // Active scoring system: EQUAL, PRIMARY_FIVE, WEIGHTED
-  activeSystem          String    @default("EQUAL") @map("active_system")
-
-  // Base price per score point (e.g., $0.10)
-  basePricePerPoint     Float     @default(0.10) @map("base_price_per_point")
-
-  // Weights for WEIGHTED system (must sum to 500)
-  distanceWeight        Float     @default(62.5) @map("distance_weight")
-  massWeight            Float     @default(62.5) @map("mass_weight")
-  ageWeight             Float     @default(62.5) @map("age_weight")
-  luminosityWeight      Float     @default(62.5) @map("luminosity_weight")
-  sizeWeight            Float     @default(62.5) @map("size_weight")
-  temperatureWeight     Float     @default(62.5) @map("temperature_weight")
-  discoveryWeight       Float     @default(62.5) @map("discovery_weight")
-  papersWeight          Float     @default(62.5) @map("papers_weight")
-
-  // For PRIMARY_FIVE system - which 5 metrics are primary (JSON array)
-  primaryMetrics        String    @default("[\"distance\",\"mass\",\"age\",\"luminosity\",\"size\"]") @map("primary_metrics")
-
-  // Global log scale parameters (can be overridden per object type)
-  distanceLogMin        Float     @default(1) @map("distance_log_min")           // 1 light year
-  distanceLogMax        Float     @default(13000000000) @map("distance_log_max") // 13 billion ly (observable universe)
-  massLogMin            Float     @default(0.00000001) @map("mass_log_min")      // Asteroid mass
-  massLogMax            Float     @default(100000000000) @map("mass_log_max")    // 100 billion solar masses
-  ageLogMin             Float     @default(1) @map("age_log_min")                // 1 year
-  ageLogMax             Float     @default(14000000000) @map("age_log_max")      // 14 billion years
-  sizeLogMin            Float     @default(1) @map("size_log_min")               // 1 km
-  sizeLogMax            Float     @default(100000000000000) @map("size_log_max") // 100 trillion km
-  temperatureLogMin     Float     @default(3) @map("temperature_log_min")        // 3 K (cosmic background)
-  temperatureLogMax     Float     @default(1000000000) @map("temperature_log_max") // 1 billion K
-  papersLogMin          Float     @default(1) @map("papers_log_min")             // 1 paper
-  papersLogMax          Float     @default(100000) @map("papers_log_max")        // 100k papers
-  discoveryYearMin      Int       @default(1600) @map("discovery_year_min")      // Galileo era
-  discoveryYearMax      Int       @default(2025) @map("discovery_year_max")      // Current year
-
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  @@map("scoring_config")
-}
-
-// Object Type Scoring Rules (Per-type formula adjustments)
-model ObjectTypeScoringRule {
-  id                    String    @id @default(uuid())
-  objectType            String    @unique @map("object_type") // "Star", "Black Hole", "Galaxy", etc.
-
-  // Which metrics apply to this object type
-  hasDistance           Boolean   @default(true) @map("has_distance")
-  hasMass               Boolean   @default(true) @map("has_mass")
-  hasAge                Boolean   @default(true) @map("has_age")
-  hasLuminosity         Boolean   @default(true) @map("has_luminosity")
-  hasSize               Boolean   @default(true) @map("has_size")
-  hasTemperature        Boolean   @default(true) @map("has_temperature")
-  hasDiscovery          Boolean   @default(true) @map("has_discovery")
-  hasPapers             Boolean   @default(true) @map("has_papers")
-
-  // Override log scale parameters for this object type (null = use global)
-  distanceLogMin        Float?    @map("distance_log_min")
-  distanceLogMax        Float?    @map("distance_log_max")
-  massLogMin            Float?    @map("mass_log_min")
-  massLogMax            Float?    @map("mass_log_max")
-  ageLogMin             Float?    @map("age_log_min")
-  ageLogMax             Float?    @map("age_log_max")
-  sizeLogMin            Float?    @map("size_log_min")
-  sizeLogMax            Float?    @map("size_log_max")
-  temperatureLogMin     Float?    @map("temperature_log_min")
-  temperatureLogMax     Float?    @map("temperature_log_max")
-
-  // Default value for missing metrics (0-100, used when metric not available)
-  defaultMissingScore   Float     @default(50) @map("default_missing_score")
-
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  @@map("object_type_scoring_rules")
 }

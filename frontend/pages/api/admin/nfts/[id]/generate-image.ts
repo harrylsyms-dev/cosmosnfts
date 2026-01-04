@@ -2,6 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../../lib/adminAuth';
 import crypto from 'crypto';
+import {
+  buildImagePrompt,
+  getNegativePrompt,
+  PromptBuildOptions,
+} from '../../../../../lib/imagePromptTemplates';
 
 // Decrypt API key if encrypted
 function decryptApiKey(encryptedData: string): string {
@@ -96,9 +101,43 @@ interface ImagePromptConfig {
   imageHeight: number;
   promptMagic: boolean;
   guidanceScale: number;
+  useAstronomicalTemplates?: boolean; // Use new astronomical template system
 }
 
-// Build prompt using the Advanced Prompt Editor configuration
+// Build prompt using the new astronomical template system (tested for Leonardo AI)
+function buildAstronomicalPrompt(nft: any): { prompt: string; negativePrompt: string } {
+  const options: PromptBuildOptions = {
+    name: nft.name,
+    objectType: nft.objectType || 'Star',
+    description: nft.description,
+    spectralType: nft.spectralType,
+    mass: nft.massSolar,
+    notableFeatures: nft.notableFeatures ?
+      (typeof nft.notableFeatures === 'string' ? JSON.parse(nft.notableFeatures) : nft.notableFeatures) :
+      undefined,
+    // These fields can be stored on the NFT for override
+    galaxyType: nft.galaxyType,
+    nebulaType: nft.nebulaType,
+    planetType: nft.planetType,
+    subType: nft.subType,
+    structureDetails: nft.structureDetails,
+    surfaceFeatures: nft.surfaceFeatures,
+    colorDescription: nft.colorDescription,
+    customVisualCharacteristics: nft.visualCharacteristics,
+  };
+
+  const result = buildImagePrompt(options);
+
+  // Remove the "--no " prefix for Leonardo API (it uses negative_prompt parameter)
+  const negativePrompt = result.negativePrompt.replace('--no ', '');
+
+  return {
+    prompt: result.prompt,
+    negativePrompt,
+  };
+}
+
+// Build prompt using the Advanced Prompt Editor configuration (legacy)
 function buildPromptFromConfig(nft: any, config: ImagePromptConfig): { prompt: string; negativePrompt: string } {
   // Parse object type configs
   let objectTypeConfigs: Record<string, { description: string; visualFeatures: string; customPrompt?: string; negativePrompt?: string }> = defaultObjectTypeConfigs;
@@ -497,11 +536,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (metadataRemoved) removedHashes.push(nft.metadataIpfsHash);
     }
 
-    // Build prompt using Advanced Prompt Editor configuration
-    const { prompt, negativePrompt } = buildPromptFromConfig(nft, promptConfig as ImagePromptConfig);
+    // Use pre-generated prompts if available (generated at NFT creation time)
+    // Otherwise fall back to generating on-demand
+    let prompt: string;
+    let negativePrompt: string;
+    let promptSource: 'stored' | 'generated';
+
+    if (nft.imagePrompt && nft.imageNegativePrompt) {
+      // Use pre-stored prompts from NFT creation
+      prompt = nft.imagePrompt;
+      negativePrompt = nft.imageNegativePrompt;
+      promptSource = 'stored';
+    } else {
+      // Generate prompt on-demand (for legacy NFTs without stored prompts)
+      const useAstronomicalTemplates = (promptConfig as ImagePromptConfig).useAstronomicalTemplates !== false;
+      const result = useAstronomicalTemplates
+        ? buildAstronomicalPrompt(nft)
+        : buildPromptFromConfig(nft, promptConfig as ImagePromptConfig);
+      prompt = result.prompt;
+      negativePrompt = result.negativePrompt;
+      promptSource = 'generated';
+
+      // Store the generated prompts for future use
+      await prisma.nFT.update({
+        where: { id: nftId },
+        data: {
+          imagePrompt: prompt,
+          imageNegativePrompt: negativePrompt,
+          promptGeneratedAt: new Date(),
+        },
+      });
+    }
 
     // Log the prompt for debugging
     console.log(`=== LEONARDO AI IMAGE GENERATION ===`);
+    console.log(`Prompt Source: ${promptSource === 'stored' ? 'Pre-stored (from NFT creation)' : 'Generated on-demand'}`);
     console.log(`NFT: #${nft.id} - ${nft.name}`);
     console.log(`Object Type: ${nft.objectType}`);
     console.log(`Total Score: ${nft.totalScore}`);
@@ -548,6 +617,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       nftId: nft.id,
       nftName: nft.name,
       objectType: nft.objectType,
+      promptSource: promptSource === 'stored' ? 'pre-stored' : 'generated-on-demand',
       imageUrl: ipfsUrl,
       ipfsHash,
       metadataHash,
