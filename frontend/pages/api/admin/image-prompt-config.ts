@@ -155,6 +155,7 @@ Medium: {mediumDescriptors}
           objectTypeConfigs
         },
         availableModels: [
+          { id: 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3', name: 'Leonardo Phoenix', description: 'Latest model with style reference support (recommended)' },
           { id: 'b24e16ff-06e3-43eb-8d33-4416c2d75876', name: 'Leonardo Diffusion XL', description: 'High quality general purpose model' },
           { id: '6bef9f1b-29cb-40c7-b9df-32b51c1f67d3', name: 'Leonardo Creative', description: 'More artistic interpretations' },
           { id: 'e316348f-7773-490e-adcd-46757c738eb7', name: 'Leonardo Kino XL', description: 'Cinematic quality images' },
@@ -230,7 +231,7 @@ Medium: {mediumDescriptors}
           usePhotorealistic: usePhotorealistic ?? true,
           useScientificAccuracy: useScientificAccuracy ?? true,
           avoidArtisticStylization: avoidArtisticStylization ?? true,
-          leonardoModelId: leonardoModelId || 'b24e16ff-06e3-43eb-8d33-4416c2d75876',
+          leonardoModelId: leonardoModelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3', // Leonardo Phoenix
           imageWidth: imageWidth ?? 1024,
           imageHeight: imageHeight ?? 1024,
           promptMagic: promptMagic ?? false,

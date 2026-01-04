@@ -157,7 +157,7 @@ async function generateWithLeonardo(
   const requestBody: Record<string, unknown> = {
     prompt,
     negative_prompt: negativePrompt,
-    modelId: modelId || 'b24e16ff-06e3-43eb-8d33-4416c2d75876',
+    modelId: modelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3', // Leonardo Phoenix - supports style reference
     width: width || 1024,
     height: height || 1024,
     num_images: 1,
@@ -166,11 +166,15 @@ async function generateWithLeonardo(
     promptMagic: false,
   };
 
-  // Note: Style reference via controlnets is not supported by all models
-  // For now, we skip it to ensure generation works
-  // The reference image is still stored for display purposes
+  // Add style reference if available (supported by Phoenix and SDXL models)
   if (styleReferenceId) {
-    console.log(`Reference image available: ${styleReferenceId} (not used in generation - model compatibility)`);
+    requestBody.controlnets = [{
+      initImageId: styleReferenceId,
+      initImageType: 'UPLOADED',
+      preprocessorId: 67, // Style Reference
+      strengthType: 'Mid',
+    }];
+    console.log(`Using style reference: ${styleReferenceId}`);
   }
 
   // Create generation
@@ -459,7 +463,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       leonardoApiKey,
       prompt,
       negativePrompt,
-      imageConfig?.leonardoModelId || 'b24e16ff-06e3-43eb-8d33-4416c2d75876',
+      imageConfig?.leonardoModelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3', // Leonardo Phoenix
       imageConfig?.imageWidth || 1024,
       imageConfig?.imageHeight || 1024,
       imageConfig?.guidanceScale || 7,
