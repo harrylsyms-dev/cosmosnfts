@@ -72,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ],
       });
 
-      const schedule = scheduled.map((s) => ({
+      const schedule = scheduled.map((s: typeof scheduled[number]) => ({
         id: s.id,
         nftId: s.nftId,
         week: s.week,
