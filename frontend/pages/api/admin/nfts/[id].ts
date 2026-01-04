@@ -225,6 +225,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.json({ success: true, nft: nftDetail });
   } catch (error: any) {
     console.error('Failed to fetch NFT:', error);
-    res.status(500).json({ error: 'Failed to fetch NFT', details: error?.message });
+    res.status(500).json({ success: false, error: error?.message || 'Failed to fetch NFT', details: error?.stack?.substring(0, 200) });
   }
 }
