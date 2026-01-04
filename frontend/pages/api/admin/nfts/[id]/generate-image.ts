@@ -518,9 +518,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (error: any) {
     console.error('Failed to generate image:', error);
+    console.error('Error stack:', error?.stack);
     res.status(500).json({
       error: 'Failed to generate image',
-      message: error?.message || 'Unknown error'
+      message: error?.message || 'Unknown error',
+      details: error?.stack?.substring(0, 500) || 'No stack trace',
     });
   }
 }
