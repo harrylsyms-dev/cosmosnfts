@@ -5,20 +5,20 @@
 // COLOR LOOKUP TABLES
 // ============================================
 
-// Star colors by spectral type (first letter)
+// Star colors by spectral type (first letter) - concise for prompt composition
 export const STAR_COLORS: Record<string, string> = {
-  'O': 'intense blue-white incandescent plasma',
-  'B': 'blue-white incandescent plasma',
-  'A': 'white with slight blue tint incandescent plasma',
-  'F': 'pale yellow-white incandescent plasma',
-  'G': 'yellow to orange-yellow incandescent plasma',
-  'K': 'orange incandescent plasma',
-  'M': 'deep red to crimson incandescent plasma',
-  'L': 'dark red to brown',
-  'T': 'magenta to brown',
+  'O': 'intense blue-white',
+  'B': 'blue-white',
+  'A': 'white-blue',
+  'F': 'pale yellow-white',
+  'G': 'yellow-orange',
+  'K': 'orange',
+  'M': 'deep red-crimson',
+  'L': 'dark red-brown',
+  'T': 'magenta-brown',
   'Y': 'dark brown',
   // Default
-  'default': 'orange-yellow incandescent plasma',
+  'default': 'orange-yellow',
 };
 
 // Get color from spectral type
@@ -237,8 +237,9 @@ export const UNIVERSAL_NEGATIVES = [
 // Object-specific negatives (absolute terms - no "excessive" or "oversaturated")
 export const OBJECT_TYPE_NEGATIVES: Record<string, string[]> = {
   'Star': [
-    'eclipse', 'dark center', 'ring', 'galaxy', 'nebula', 'planet', 'portal',
-    'marble', 'universe inside', 'corona visible', 'lens flare', 'god rays',
+    'glass', 'transparent', 'sphere inside sphere', 'portal', 'orb', 'marble',
+    'crystal ball', 'galaxy', 'nebula', 'ring', 'halo', 'corona', 'eclipse',
+    'universe', 'cosmic', 'mystical', 'ethereal', 'dark center', 'planet',
     'crescent', 'moon', 'sunset', 'sunrise',
   ],
   'Galaxy': [
@@ -357,8 +358,8 @@ export const TRIGGER_WORDS_TO_AVOID = {
 
 export const STYLE_REFERENCES: Record<string, { style: string; medium: string }> = {
   'Star': {
-    style: 'NASA Solar Dynamics Observatory photograph',
-    medium: 'SDO satellite imagery',
+    style: 'NASA Solar Dynamics Observatory solar imaging',
+    medium: 'Space telescope ultraviolet photography',
   },
   'Galaxy': {
     style: 'NASA Hubble Space Telescope imagery',
@@ -458,13 +459,13 @@ export interface PromptTemplate {
 export const PROMPT_TEMPLATES: Record<string, PromptTemplate> = {
   'Star': {
     realismStatement: 'Photorealistic photograph',
-    objectDescription: '{name}, a single star',
-    visualCharacteristics: 'Bright glowing plasma sphere, surface granulation texture, starspots, centered in frame with space around it, realistic deep space background',
-    styleReference: 'NASA Solar Dynamics Observatory photograph',
-    colorDescription: '{starColor}',
-    lighting: 'Self-luminous',
+    objectDescription: 'a hot {subType} stellar surface',
+    visualCharacteristics: 'Brilliant incandescent plasma sphere, visible granulation cells on surface, small dark starspots, solid opaque luminous surface, single star filling 40% of frame, black space background',
+    styleReference: 'NASA Solar Dynamics Observatory solar imaging',
+    colorDescription: 'Intense white core, {starColor} limb, orange granulation hints',
+    lighting: 'Self-luminous stellar surface',
     quality: '8K, ultra high definition',
-    medium: 'SDO satellite imagery',
+    medium: 'Space telescope ultraviolet photography',
   },
   'Galaxy': {
     realismStatement: 'Photorealistic photograph',
@@ -848,8 +849,8 @@ export function validatePrompt(prompt: string): { valid: boolean; warnings: stri
   }
 
   // Check for composition guidance
-  if (!lowerPrompt.includes('centered in frame') && !lowerPrompt.includes('single isolated')) {
-    warnings.push('Missing composition guidance (centered in frame / single isolated)');
+  if (!lowerPrompt.includes('centered in frame') && !lowerPrompt.includes('single isolated') && !lowerPrompt.includes('% of frame')) {
+    warnings.push('Missing composition guidance (centered in frame / filling X% of frame)');
   }
 
   // Check for explicit colors
