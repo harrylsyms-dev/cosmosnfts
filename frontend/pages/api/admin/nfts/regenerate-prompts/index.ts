@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../../../lib/prisma';
-import { verifyAdminToken } from '../../../../lib/adminAuth';
-import { getAllAstronomicalObjects, AstronomicalObject } from '../../../../lib/astronomicalData';
-import { buildImagePrompt, PromptBuildOptions, validatePrompt } from '../../../../lib/imagePromptTemplates';
+import { prisma } from '../../../../../lib/prisma';
+import { verifyAdminToken } from '../../../../../lib/adminAuth';
+import { getAllAstronomicalObjects, AstronomicalObject } from '../../../../../lib/astronomicalData';
+import { buildImagePrompt, PromptBuildOptions, validatePrompt } from '../../../../../lib/imagePromptTemplates';
 
 // Build a lookup map from astronomical data by name (case-insensitive)
 function buildAstroDataLookup(): Map<string, AstronomicalObject> {

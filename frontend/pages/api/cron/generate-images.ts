@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 // Decrypt API key if encrypted
 function decryptApiKey(encryptedData: string): string {
