@@ -279,61 +279,85 @@ export default function AstronomicalDataAdmin() {
     }
   }
 
-  // Look up reference image from NASA
-  async function handleRefLookup() {
+  // Curated reference images (same as server-side)
+  const CURATED_IMAGES: Record<string, { url: string; source: string; title: string }> = {
+    'Sirius': { url: 'https://cdn.esahubble.org/archives/images/screen/heic0516a.jpg', source: 'Hubble', title: 'Sirius A and B' },
+    'Betelgeuse': { url: 'https://cdn.esahubble.org/archives/images/screen/opo2003a.jpg', source: 'Hubble', title: 'Betelgeuse' },
+    'Proxima Centauri': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1324a.jpg', source: 'Hubble', title: 'Proxima Centauri' },
+    'Alpha Centauri': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1324a.jpg', source: 'Hubble', title: 'Alpha Centauri system' },
+    'Vega': { url: 'https://images-assets.nasa.gov/image/PIA17005/PIA17005~medium.jpg', source: 'NASA', title: 'Vega debris disk' },
+    'Crab Nebula': { url: 'https://cdn.esahubble.org/archives/images/screen/heic0515a.jpg', source: 'Hubble', title: 'Crab Nebula M1' },
+    'Andromeda Galaxy': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1502a.jpg', source: 'Hubble', title: 'Andromeda Galaxy M31' },
+    'Orion Nebula': { url: 'https://cdn.esahubble.org/archives/images/screen/heic0601a.jpg', source: 'Hubble', title: 'Orion Nebula M42' },
+    'Pleiades': { url: 'https://cdn.esahubble.org/archives/images/screen/opo0420a.jpg', source: 'Hubble', title: 'Pleiades M45' },
+    'Whirlpool Galaxy': { url: 'https://cdn.esahubble.org/archives/images/screen/heic0506a.jpg', source: 'Hubble', title: 'Whirlpool Galaxy M51' },
+    'Sombrero Galaxy': { url: 'https://cdn.esahubble.org/archives/images/screen/opo0328a.jpg', source: 'Hubble', title: 'Sombrero Galaxy M104' },
+    'Eagle Nebula': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1501a.jpg', source: 'Hubble', title: 'Pillars of Creation' },
+    'Helix Nebula': { url: 'https://cdn.esahubble.org/archives/images/screen/heic0707a.jpg', source: 'Hubble', title: 'Helix Nebula' },
+    'Ring Nebula': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1310a.jpg', source: 'Hubble', title: 'Ring Nebula M57' },
+    'Horsehead Nebula': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1307a.jpg', source: 'Hubble', title: 'Horsehead Nebula' },
+    'Sagittarius A*': { url: 'https://images-assets.nasa.gov/image/PIA25440/PIA25440~medium.jpg', source: 'NASA', title: 'Sagittarius A* Black Hole' },
+    'M87*': { url: 'https://images-assets.nasa.gov/image/PIA23122/PIA23122~medium.jpg', source: 'NASA', title: 'M87 Black Hole' },
+    'Milky Way': { url: 'https://images-assets.nasa.gov/image/PIA12348/PIA12348~medium.jpg', source: 'NASA', title: 'Milky Way Galaxy Center' },
+  };
+
+  // Fallback images by object type
+  const FALLBACK_IMAGES: Record<string, { url: string; source: string; title: string }> = {
+    'Star': { url: 'https://images-assets.nasa.gov/image/PIA03149/PIA03149~medium.jpg', source: 'NASA', title: 'The Sun (Star fallback)' },
+    'Galaxy': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1502a.jpg', source: 'Hubble', title: 'Andromeda (Galaxy fallback)' },
+    'Nebula': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1501a.jpg', source: 'Hubble', title: 'Pillars of Creation (Nebula fallback)' },
+    'Black Hole': { url: 'https://images-assets.nasa.gov/image/PIA23122/PIA23122~medium.jpg', source: 'NASA', title: 'M87 (Black Hole fallback)' },
+    'Star Cluster': { url: 'https://cdn.esahubble.org/archives/images/screen/heic0913a.jpg', source: 'Hubble', title: 'Omega Centauri (Cluster fallback)' },
+    'Exoplanet': { url: 'https://images-assets.nasa.gov/image/PIA23002/PIA23002~medium.jpg', source: 'NASA', title: 'Exoplanet (fallback)' },
+    'Pulsar': { url: 'https://cdn.esahubble.org/archives/images/screen/heic0515a.jpg', source: 'Hubble', title: 'Crab Nebula (Pulsar fallback)' },
+    'Quasar': { url: 'https://cdn.esahubble.org/archives/images/screen/heic1509a.jpg', source: 'Hubble', title: 'Galaxy Cluster (Quasar fallback)' },
+    'Comet': { url: 'https://images-assets.nasa.gov/image/PIA17485/PIA17485~medium.jpg', source: 'NASA', title: 'Comet ISON (Comet fallback)' },
+  };
+
+  // Look up reference image - curated first, then fallback
+  function handleRefLookup() {
     if (!refLookupName.trim()) return;
 
     setIsLookingUp(true);
     setLookupError(null);
     setRefLookupResult(null);
 
-    try {
-      // Call NASA Image API directly from browser
-      const searchUrl = `https://images-api.nasa.gov/search?q=${encodeURIComponent(refLookupName)}&media_type=image&page_size=5`;
-      const response = await fetch(searchUrl);
+    const searchName = refLookupName.trim();
 
-      if (!response.ok) {
-        throw new Error(`NASA API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const items = data.collection?.items;
-
-      if (!items || items.length === 0) {
-        setLookupError(`No images found for "${refLookupName}"`);
-        return;
-      }
-
-      // Find the best image
-      for (const item of items) {
-        const links = item.links;
-        const itemData = item.data?.[0];
-
-        if (!links || links.length === 0) continue;
-
-        const imageLink = links.find((l: any) => l.rel === 'preview' || l.render === 'image');
-        if (!imageLink?.href) continue;
-
-        let imageUrl = imageLink.href;
-        // Try to get higher resolution version
-        if (imageUrl.includes('~thumb')) {
-          imageUrl = imageUrl.replace('~thumb', '~medium');
-        }
-
-        setRefLookupResult({
-          url: imageUrl,
-          source: 'NASA',
-          title: itemData?.title,
-        });
-        return;
-      }
-
-      setLookupError('Found results but no usable image URLs');
-    } catch (error: any) {
-      setLookupError(error.message || 'Failed to look up image');
-    } finally {
+    // Check curated images first (exact match)
+    if (CURATED_IMAGES[searchName]) {
+      setRefLookupResult(CURATED_IMAGES[searchName]);
       setIsLookingUp(false);
+      return;
     }
+
+    // Check for partial matches
+    for (const [name, image] of Object.entries(CURATED_IMAGES)) {
+      if (searchName.toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes(searchName.toLowerCase())) {
+        setRefLookupResult({ ...image, title: `${image.title} (matched: ${name})` });
+        setIsLookingUp(false);
+        return;
+      }
+    }
+
+    // Find object type from our data
+    const matchingObj = allObjects.find(obj =>
+      obj.name.toLowerCase() === searchName.toLowerCase() ||
+      obj.name.toLowerCase().includes(searchName.toLowerCase())
+    );
+
+    if (matchingObj && FALLBACK_IMAGES[matchingObj.objectType]) {
+      setRefLookupResult({
+        ...FALLBACK_IMAGES[matchingObj.objectType],
+        title: `${FALLBACK_IMAGES[matchingObj.objectType].title} - for ${matchingObj.objectType}`,
+      });
+      setIsLookingUp(false);
+      return;
+    }
+
+    setLookupError(`No curated image for "${searchName}". Objects without curated images will use type-based fallbacks.`);
+    setIsLookingUp(false);
   }
 
   const filteredObjects = allObjects.filter(obj => {
