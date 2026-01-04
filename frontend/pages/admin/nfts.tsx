@@ -141,16 +141,16 @@ export default function AdminNFTs() {
   async function fetchCapacity() {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/nfts/generate`, {
+      const res = await fetch(`${apiUrl}/api/admin/nfts/generate-from-real-data`, {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
       if (data.success) {
         setCapacity({
-          current: data.currentCount,
-          max: data.maxNfts,
-          remaining: data.remainingCapacity,
+          current: data.nftStats?.total || 0,
+          max: data.nftStats?.maxCapacity || MAX_NFTS,
+          remaining: data.nftStats?.remainingSlots || MAX_NFTS,
         });
       }
     } catch (error) {
