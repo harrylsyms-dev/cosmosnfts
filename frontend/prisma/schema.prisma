@@ -19,14 +19,7 @@ model NFT {
   imageIpfsHash           String?   @map("image_ipfs_hash")
   metadataIpfsHash        String?   @map("metadata_ipfs_hash")
 
-  // Scoring categories (0-100 each) - original field names
-  fameScore               Int       @default(0) @map("fame_score")
-  significanceScore       Int       @default(0) @map("significance_score")
-  rarityScore             Int       @default(0) @map("rarity_score")
-  discoveryRecencyScore   Int       @default(0) @map("discovery_recency_score")
-  culturalImpactScore     Int       @default(0) @map("cultural_impact_score")
-
-  // Alternative score field names (used by code)
+  // Scientific scoring categories (0-100 each)
   fameVisibility          Int       @default(0) @map("fame_visibility")
   scientificSignificance  Int       @default(0) @map("scientific_significance")
   rarity                  Int       @default(0)
