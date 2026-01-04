@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../../lib/adminAuth';
 import crypto from 'crypto';
+import { getReferenceImage, getFallbackReferenceImage, type ReferenceImage } from '../../../../../lib/referenceImages';
 
 // Decrypt API key if encrypted
 function decryptApiKey(encryptedData: string): string {
@@ -48,6 +49,99 @@ async function getApiKey(service: string): Promise<string | null> {
   return null;
 }
 
+
+
+// Upload reference image to Leonardo AI for style guidance
+async function uploadImageToLeonardo(apiKey: string, imageUrl: string): Promise<string | null> {
+  try {
+    console.log('Uploading reference image to Leonardo...');
+
+    const initRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/init-image', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ extension: 'jpg' }),
+    });
+
+    if (!initRes.ok) {
+      console.error('Failed to get Leonardo presigned URL:', await initRes.text());
+      return null;
+    }
+
+    const initData = await initRes.json();
+    const { url: presignedUrl, fields, id: imageId } = initData.uploadInitImage || {};
+
+    if (!presignedUrl || !imageId) {
+      console.error('Invalid Leonardo init-image response');
+      return null;
+    }
+
+    const imageRes = await fetch(imageUrl);
+    if (!imageRes.ok) {
+      console.error('Failed to download reference image:', imageUrl);
+      return null;
+    }
+    const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+
+    const formData = new FormData();
+    if (fields) {
+      const fieldsObj = typeof fields === 'string' ? JSON.parse(fields) : fields;
+      for (const [key, value] of Object.entries(fieldsObj)) {
+        formData.append(key, value as string);
+      }
+    }
+
+    const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+    formData.append('file', blob, 'reference.jpg');
+
+    const uploadRes = await fetch(presignedUrl, { method: 'POST', body: formData });
+
+    if (!uploadRes.ok && uploadRes.status !== 204) {
+      console.error('Failed to upload to Leonardo S3:', uploadRes.status);
+      return null;
+    }
+
+    console.log(`Uploaded reference image to Leonardo: ${imageId}`);
+    return imageId;
+  } catch (error) {
+    console.error('Error uploading to Leonardo:', error);
+    return null;
+  }
+}
+
+// Fetch reference image for an NFT
+async function prepareReferenceImage(
+  nft: any,
+  leonardoApiKey: string
+): Promise<{ referenceImage: ReferenceImage | null; leonardoImageId: string | null }> {
+  if (nft.leonardoRefImageId) {
+    console.log(`Using existing Leonardo reference image: ${nft.leonardoRefImageId}`);
+    return {
+      referenceImage: { url: nft.referenceImageUrl || '', source: nft.referenceImageSource || 'NASA' },
+      leonardoImageId: nft.leonardoRefImageId,
+    };
+  }
+
+  console.log(`Fetching reference image for: ${nft.name}`);
+  let referenceImage = await getReferenceImage(nft.name, nft.objectType);
+
+  if (!referenceImage && nft.objectType) {
+    referenceImage = getFallbackReferenceImage(nft.objectType);
+    if (referenceImage) console.log(`Using fallback ${nft.objectType} reference image`);
+  }
+
+  if (!referenceImage) {
+    console.log(`No reference image found for: ${nft.name}`);
+    return { referenceImage: null, leonardoImageId: null };
+  }
+
+  console.log(`Found reference image from ${referenceImage.source}: ${referenceImage.url}`);
+  const leonardoImageId = await uploadImageToLeonardo(leonardoApiKey, referenceImage.url);
+  return { referenceImage, leonardoImageId };
+}
+
 // Leonardo AI generation
 async function generateWithLeonardo(
   apiKey: string,
@@ -56,8 +150,33 @@ async function generateWithLeonardo(
   modelId: string,
   width: number,
   height: number,
-  guidanceScale: number
+  guidanceScale: number,
+  styleReferenceId?: string | null
 ): Promise<string> {
+  // Build request body
+  const requestBody: Record<string, unknown> = {
+    prompt,
+    negative_prompt: negativePrompt,
+    modelId: modelId || 'b24e16ff-06e3-43eb-8d33-4416c2d75876',
+    width: width || 1024,
+    height: height || 1024,
+    num_images: 1,
+    guidance_scale: guidanceScale || 7,
+    num_inference_steps: 30,
+    promptMagic: false,
+  };
+
+  // Add style reference if available
+  if (styleReferenceId) {
+    requestBody.controlnets = [{
+      initImageId: styleReferenceId,
+      initImageType: 'UPLOADED',
+      preprocessorId: 67, // Style Reference
+      strengthType: 'Mid',
+    }];
+    console.log(`Using style reference: ${styleReferenceId}`);
+  }
+
   // Create generation
   const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/generations', {
     method: 'POST',
@@ -65,17 +184,7 @@ async function generateWithLeonardo(
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      prompt,
-      negative_prompt: negativePrompt,
-      modelId: modelId || 'b24e16ff-06e3-43eb-8d33-4416c2d75876',
-      width: width || 1024,
-      height: height || 1024,
-      num_images: 1,
-      guidance_scale: guidanceScale || 7,
-      num_inference_steps: 30,
-      promptMagic: false,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!createRes.ok) {
@@ -344,6 +453,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(negativePrompt);
     console.log(`--- PROMPT END ---`);
 
+    // Fetch reference image from NASA/ESA
+    console.log(`Fetching reference image for NFT #${nft.id}: ${nft.name}`);
+    const { referenceImage, leonardoImageId } = await prepareReferenceImage(nft, leonardoApiKey);
+
     // Generate image with Leonardo AI
     console.log(`Generating image for NFT #${nft.id}: ${nft.name}`);
     const leonardoImageUrl = await generateWithLeonardo(
@@ -353,7 +466,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       imageConfig?.leonardoModelId || 'b24e16ff-06e3-43eb-8d33-4416c2d75876',
       imageConfig?.imageWidth || 1024,
       imageConfig?.imageHeight || 1024,
-      imageConfig?.guidanceScale || 7
+      imageConfig?.guidanceScale || 7,
+      leonardoImageId
     );
 
     // Upload image to Pinata
@@ -371,6 +485,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         image: ipfsUrl,
         imageIpfsHash: ipfsHash,
         metadataIpfsHash: metadataHash,
+        referenceImageUrl: referenceImage?.url || null,
+        referenceImageSource: referenceImage?.source || null,
+        leonardoRefImageId: leonardoImageId || null,
         updatedAt: new Date(),
       },
     });
@@ -392,6 +509,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadataUrl: `https://gateway.pinata.cloud/ipfs/${metadataHash}`,
       promptUsed: prompt,
       negativePromptUsed: negativePrompt,
+      referenceImage: referenceImage ? {
+        url: referenceImage.url,
+        source: referenceImage.source,
+      } : null,
+      leonardoRefImageId: leonardoImageId || null,
       removedHashes: removedHashes.length > 0 ? removedHashes : undefined,
     });
   } catch (error: any) {
