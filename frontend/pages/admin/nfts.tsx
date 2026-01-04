@@ -168,7 +168,7 @@ export default function AdminNFTs() {
     setGenerateNftMessage(null);
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/nfts/generate`, {
+      const res = await fetch(`${apiUrl}/api/admin/nfts/generate-from-real-data`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -182,20 +182,21 @@ export default function AdminNFTs() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        const nftNames = data.nfts.map((n: any) => n.name).join(', ');
+        const nftNames = data.generated?.map((n: any) => n.name).join(', ') || '';
+        const promptStats = data.promptStats ? ` (${data.promptStats.generated} prompts generated)` : '';
         setGenerateNftMessage({
           type: 'success',
-          text: `Generated ${data.generated} NFT(s): ${nftNames}`
+          text: `Generated ${data.generated?.length || 0} NFT(s)${promptStats}: ${nftNames}`
         });
         setCapacity({
-          current: data.newTotal,
+          current: data.nftStats?.total || 0,
           max: MAX_NFTS,
-          remaining: MAX_NFTS - data.newTotal,
+          remaining: data.nftStats?.remainingSlots || 0,
         });
         // Refresh the list
         await fetchNFTs();
       } else {
-        setGenerateNftMessage({ type: 'error', text: data.error || 'Failed to generate NFTs' });
+        setGenerateNftMessage({ type: 'error', text: data.error || data.details || 'Failed to generate NFTs' });
       }
     } catch (error) {
       setGenerateNftMessage({ type: 'error', text: 'Failed to generate NFTs' });
