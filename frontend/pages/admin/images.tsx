@@ -19,6 +19,20 @@ interface APIStatus {
   message: string;
 }
 
+interface PromptStats {
+  total: number;
+  withPrompts: number;
+  withoutPrompts: number;
+}
+
+interface RegenerateProgress {
+  processed: number;
+  updated: number;
+  failed: number;
+  remaining: number;
+  isRunning: boolean;
+}
+
 export default function AdminImages() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +42,11 @@ export default function AdminImages() {
   const [selectedPhase, setSelectedPhase] = useState('1');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [verifyResult, setVerifyResult] = useState<{ verified: number; failed: number[] } | null>(null);
+
+  // Prompt regeneration state
+  const [promptStats, setPromptStats] = useState<PromptStats | null>(null);
+  const [regenProgress, setRegenProgress] = useState<RegenerateProgress | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -46,11 +65,95 @@ export default function AdminImages() {
         return;
       }
 
-      await Promise.all([fetchStats(), fetchApiStatus()]);
+      await Promise.all([fetchStats(), fetchApiStatus(), fetchPromptStats()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchPromptStats() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/nfts/regenerate-prompts`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPromptStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Failed to fetch prompt stats:', error);
+    }
+  }
+
+  async function regenerateAllPrompts() {
+    setIsRegenerating(true);
+    setRegenProgress({ processed: 0, updated: 0, failed: 0, remaining: promptStats?.total || 0, isRunning: true });
+
+    let offset = 0;
+    const batchSize = 200;
+    let totalUpdated = 0;
+    let totalFailed = 0;
+
+    try {
+      const token = localStorage.getItem('adminToken');
+
+      while (true) {
+        const res = await fetch(`${apiUrl}/api/admin/nfts/regenerate-prompts`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ batchSize, offset }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to regenerate prompts');
+        }
+
+        totalUpdated += data.stats.updated;
+        totalFailed += data.stats.failed;
+
+        setRegenProgress({
+          processed: offset + data.stats.processed,
+          updated: totalUpdated,
+          failed: totalFailed,
+          remaining: data.pagination.remaining,
+          isRunning: true,
+        });
+
+        if (!data.pagination.nextOffset) {
+          break;
+        }
+
+        offset = data.pagination.nextOffset;
+
+        // Small delay to prevent overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      setMessage({
+        type: 'success',
+        text: `Successfully regenerated ${totalUpdated.toLocaleString()} prompts!`,
+      });
+
+      // Refresh stats
+      await fetchPromptStats();
+    } catch (error: any) {
+      setMessage({
+        type: 'error',
+        text: error.message || 'Failed to regenerate prompts',
+      });
+    } finally {
+      setIsRegenerating(false);
+      setRegenProgress(prev => prev ? { ...prev, isRunning: false } : null);
     }
   }
 
@@ -245,6 +348,73 @@ export default function AdminImages() {
                 to generate photorealistic space imagery.
               </p>
             </div>
+          </div>
+
+          {/* Regenerate Prompts */}
+          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
+            <h2 className="text-xl font-bold mb-4">Regenerate Prompts</h2>
+            <p className="text-gray-400 mb-4">
+              Regenerate image prompts for all existing NFTs using the latest template system.
+              This will update the stored prompts with improved formatting and object-specific negative prompts.
+            </p>
+
+            {/* Prompt Stats */}
+            {promptStats && (
+              <div className="grid md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                  <p className="text-gray-400 text-sm">Total NFTs</p>
+                  <p className="text-2xl font-bold">{promptStats.total.toLocaleString()}</p>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4 border border-green-800">
+                  <p className="text-gray-400 text-sm">With Prompts</p>
+                  <p className="text-2xl font-bold text-green-400">{promptStats.withPrompts.toLocaleString()}</p>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4 border border-yellow-800">
+                  <p className="text-gray-400 text-sm">Missing Prompts</p>
+                  <p className="text-2xl font-bold text-yellow-400">{promptStats.withoutPrompts.toLocaleString()}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Progress */}
+            {regenProgress && (
+              <div className="mb-6">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-400">
+                    {regenProgress.isRunning ? 'Regenerating...' : 'Complete'}
+                  </span>
+                  <span className="text-white">
+                    {regenProgress.processed.toLocaleString()} / {(regenProgress.processed + regenProgress.remaining).toLocaleString()}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-3">
+                  <div
+                    className={`h-3 rounded-full transition-all ${regenProgress.isRunning ? 'bg-blue-500' : 'bg-green-500'}`}
+                    style={{
+                      width: `${((regenProgress.processed) / (regenProgress.processed + regenProgress.remaining)) * 100}%`,
+                    }}
+                  />
+                </div>
+                <div className="flex gap-4 mt-2 text-sm">
+                  <span className="text-green-400">Updated: {regenProgress.updated.toLocaleString()}</span>
+                  {regenProgress.failed > 0 && (
+                    <span className="text-red-400">Failed: {regenProgress.failed.toLocaleString()}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={regenerateAllPrompts}
+              disabled={isRegenerating}
+              className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRegenerating ? 'Regenerating...' : 'Regenerate All Prompts'}
+            </button>
+
+            <p className="text-gray-500 text-sm mt-3">
+              This will process all NFTs in batches of 200. The process runs in the background.
+            </p>
           </div>
 
           {/* Generate Form */}
