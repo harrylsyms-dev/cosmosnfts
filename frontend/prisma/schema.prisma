@@ -82,6 +82,7 @@ model NFT {
   auctions                Auction[]
   listings                Listing[]
   trades                  Trade[]
+  scheduledAuction        ScheduledAuction?
 
   @@index([status])
   @@index([totalScore])
@@ -493,6 +494,22 @@ model AuctionScheduleOverride {
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("auction_schedule_overrides")
+}
+
+// Scheduled auctions - admin-selected NFTs for future auctions
+model ScheduledAuction {
+  id                String    @id @default(uuid())
+  nftId             Int       @unique @map("nft_id")
+  nft               NFT       @relation(fields: [nftId], references: [id], onDelete: Cascade)
+  week              Int       // Week number when auction should start
+  startingBidCents  Int       @map("starting_bid_cents")
+  priority          Int       @default(0) // Higher priority = featured more prominently
+  status            String    @default("SCHEDULED") // SCHEDULED, ACTIVE, COMPLETED, CANCELLED
+  auctionId         String?   @map("auction_id") // Links to actual Auction once started
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("scheduled_auctions")
 }
 
 // ============================================

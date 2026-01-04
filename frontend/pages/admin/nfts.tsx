@@ -97,6 +97,12 @@ export default function AdminNFTs() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
+  // Auction scheduling state
+  const [showAuctionSchedule, setShowAuctionSchedule] = useState(false);
+  const [auctionWeek, setAuctionWeek] = useState(1);
+  const [auctionStartingBid, setAuctionStartingBid] = useState('100');
+  const [isSchedulingAuction, setIsSchedulingAuction] = useState(false);
+
   // Image Generation Queue
   const [imageGenQueue, setImageGenQueue] = useState<ImageGenJob[]>([]);
   const [showGenQueue, setShowGenQueue] = useState(false);
@@ -443,6 +449,43 @@ export default function AdminNFTs() {
     } finally {
       setIsBulkDeleting(false);
       setShowBulkDeleteConfirm(false);
+    }
+  }
+
+  async function handleScheduleAuction() {
+    if (!selectedNft) return;
+
+    setIsSchedulingAuction(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/auctions/schedule`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          nftId: selectedNft.id,
+          week: auctionWeek,
+          startingBidCents: Math.round(parseFloat(auctionStartingBid) * 100),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setGenerateMessage({ type: 'success', text: data.message || 'NFT scheduled for auction!' });
+        setShowAuctionSchedule(false);
+        // Refresh the list to show updated status
+        await fetchNFTs();
+      } else {
+        setGenerateMessage({ type: 'error', text: data.error || 'Failed to schedule auction' });
+      }
+    } catch (error) {
+      setGenerateMessage({ type: 'error', text: 'Failed to schedule auction' });
+    } finally {
+      setIsSchedulingAuction(false);
     }
   }
 
@@ -1000,23 +1043,23 @@ export default function AdminNFTs() {
                         </div>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-gray-400">Fame/Visibility</span>
+                            <span className="text-gray-400">Distance</span>
                             <span className="text-white">{selectedNft.scores.fameVisibility}/100</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-400">Scientific Significance</span>
+                            <span className="text-gray-400">Mass</span>
                             <span className="text-white">{selectedNft.scores.scientificSignificance}/100</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-400">Rarity</span>
+                            <span className="text-gray-400">Luminosity</span>
                             <span className="text-white">{selectedNft.scores.rarity}/100</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-400">Discovery Recency</span>
+                            <span className="text-gray-400">Temperature</span>
                             <span className="text-white">{selectedNft.scores.discoveryRecency}/100</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-400">Cultural Impact</span>
+                            <span className="text-gray-400">Discovery</span>
                             <span className="text-white">{selectedNft.scores.culturalImpact}/100</span>
                           </div>
                         </div>
@@ -1217,6 +1260,54 @@ export default function AdminNFTs() {
                       </div>
                     )}
 
+                    {/* Auction Schedule Form */}
+                    {showAuctionSchedule && (
+                      <div className="bg-purple-900/30 border border-purple-600 rounded-lg p-4 mb-4">
+                        <p className="text-purple-400 font-medium mb-3">
+                          Schedule &quot;{selectedNft.name}&quot; for Auction
+                        </p>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm text-gray-400 mb-1">Auction Week</label>
+                            <input
+                              type="number"
+                              value={auctionWeek}
+                              onChange={(e) => setAuctionWeek(parseInt(e.target.value) || 1)}
+                              min={1}
+                              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm text-gray-400 mb-1">Starting Bid ($)</label>
+                            <input
+                              type="number"
+                              value={auctionStartingBid}
+                              onChange={(e) => setAuctionStartingBid(e.target.value)}
+                              min={1}
+                              step="0.01"
+                              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={handleScheduleAuction}
+                            disabled={isSchedulingAuction}
+                            className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg"
+                          >
+                            {isSchedulingAuction ? 'Scheduling...' : 'Schedule Auction'}
+                          </button>
+                          <button
+                            onClick={() => setShowAuctionSchedule(false)}
+                            disabled={isSchedulingAuction}
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-3">
                       <button
                         onClick={() => handleGenerateImage(selectedNft.id, selectedNft.name)}
@@ -1234,6 +1325,15 @@ export default function AdminNFTs() {
                       >
                         View Public Page
                       </Link>
+                      {/* Schedule Auction button - only show for AVAILABLE NFTs */}
+                      {selectedNft.status === 'AVAILABLE' && !selectedNft.ownerAddress && (
+                        <button
+                          onClick={() => setShowAuctionSchedule(true)}
+                          className="bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-600 text-yellow-400 font-medium px-4 py-2 rounded-lg"
+                        >
+                          Schedule Auction
+                        </button>
+                      )}
                       {/* Delete button - only show for AVAILABLE NFTs */}
                       {selectedNft.status === 'AVAILABLE' && !selectedNft.ownerAddress && (
                         <button
@@ -1248,6 +1348,7 @@ export default function AdminNFTs() {
                           setSelectedNft(null);
                           setGenerateMessage(null);
                           setShowDeleteConfirm(false);
+                          setShowAuctionSchedule(false);
                         }}
                         className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-lg"
                       >

@@ -32,34 +32,34 @@ export default function ScoreBreakdown(props: ScoreBreakdownProps) {
 
   const categories: CategoryInfo[] = [
     {
-      name: 'Fame & Visibility',
+      name: 'Distance',
       value: fameVisibility,
       color: 'bg-blue-500',
-      description: 'How well-known is this object?',
+      description: 'Distance from Earth (light-years)',
     },
     {
-      name: 'Scientific Significance',
+      name: 'Mass',
       value: scientificSignificance,
       color: 'bg-purple-500',
-      description: 'Importance to scientific research',
+      description: 'Object mass (solar masses)',
     },
     {
-      name: 'Rarity',
+      name: 'Luminosity',
       value: rarity,
       color: 'bg-yellow-500',
-      description: 'How uncommon is this type of object?',
+      description: 'Brightness and luminosity',
     },
     {
-      name: 'Discovery Recency',
+      name: 'Temperature',
       value: discoveryRecency,
       color: 'bg-green-500',
-      description: 'Older discoveries are rarer',
+      description: 'Surface or core temperature (Kelvin)',
     },
     {
-      name: 'Cultural Impact',
+      name: 'Discovery',
       value: culturalImpact,
       color: 'bg-pink-500',
-      description: 'Presence in popular culture',
+      description: 'Historical discovery significance',
     },
   ];
 

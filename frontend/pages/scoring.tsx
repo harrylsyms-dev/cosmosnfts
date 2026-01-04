@@ -4,93 +4,93 @@ import Layout from '../components/Layout';
 
 const scoreCategories = [
   {
-    name: 'Fame & Visibility',
-    icon: '✨',
+    name: 'Distance',
+    icon: '📏',
     color: 'blue',
     maxScore: 100,
-    description: 'How well-known is this celestial object to the general public?',
+    description: 'How far is this object from Earth? Extreme distances (very close or at the edge of the observable universe) score highest.',
     factors: [
-      'Named in popular astronomy texts and media',
-      'Visibility from Earth (naked eye vs. telescope)',
-      'Frequency of mentions in scientific publications',
-      'Featured in documentaries or news coverage',
+      'Measured in light-years from Earth',
+      'Nearby objects (<100 ly) score high for accessibility',
+      'Objects at edge of observable universe score high for uniqueness',
+      'Logarithmic scale to handle vast cosmic distances',
     ],
     examples: [
-      { name: 'Polaris (North Star)', score: 95 },
-      { name: 'Sirius', score: 90 },
-      { name: 'Random distant galaxy', score: 15 },
+      { name: 'Proxima Centauri (4.24 ly)', score: 88 },
+      { name: 'Andromeda Galaxy (2.5M ly)', score: 55 },
+      { name: 'GN-z11 (13.4B ly)', score: 95 },
     ],
   },
   {
-    name: 'Scientific Significance',
-    icon: '🔬',
+    name: 'Mass',
+    icon: '⚖️',
     color: 'purple',
     maxScore: 100,
-    description: 'How important is this object to scientific research and understanding?',
+    description: 'How massive is this object? Calculated in solar masses on a logarithmic scale.',
     factors: [
-      'Role in major scientific discoveries',
-      'Contribution to understanding cosmic phenomena',
-      'Active research focus by space agencies',
-      'Potential for future discoveries',
+      'Mass measured in solar masses (M☉)',
+      'Supermassive objects (>1M M☉) get bonus scoring',
+      'Tiny objects (<0.001 M☉) also score well for uniqueness',
+      'Logarithmic scale from 0.00001 to 100 billion M☉',
     ],
     examples: [
-      { name: 'Sagittarius A* (black hole)', score: 98 },
-      { name: 'TRAPPIST-1 system', score: 92 },
-      { name: 'Common main-sequence star', score: 25 },
+      { name: 'TON 618 (66B M☉)', score: 100 },
+      { name: 'The Sun (1 M☉)', score: 50 },
+      { name: 'Jupiter (0.001 M☉)', score: 35 },
     ],
   },
   {
-    name: 'Rarity',
-    icon: '💎',
+    name: 'Luminosity',
+    icon: '💡',
     color: 'yellow',
     maxScore: 100,
-    description: 'How uncommon or unique is this type of celestial object?',
+    description: 'How bright is this object? Measured in solar luminosities or apparent magnitude.',
     factors: [
-      'Frequency of this object type in the universe',
-      'Unique properties or characteristics',
-      'One-of-a-kind phenomena',
-      'Limited number in observable universe',
+      'Intrinsic brightness measured in solar luminosities',
+      'Apparent magnitude as fallback when luminosity unavailable',
+      'Quasars can reach 10+ trillion solar luminosities',
+      'Range from dwarf stars to brightest objects in universe',
     ],
     examples: [
-      { name: 'Known black hole merger', score: 97 },
-      { name: 'Magnetar', score: 88 },
-      { name: 'Common red dwarf star', score: 10 },
+      { name: 'R136a1 (8.7M L☉)', score: 98 },
+      { name: 'The Sun (1 L☉)', score: 50 },
+      { name: 'Proxima Centauri (0.0017 L☉)', score: 25 },
     ],
   },
   {
-    name: 'Discovery Recency',
-    icon: '📅',
+    name: 'Temperature',
+    icon: '🌡️',
     color: 'green',
     maxScore: 100,
-    description: 'When was this object discovered? Older discoveries are often more historically significant.',
+    description: 'Surface or core temperature in Kelvin. Extreme temperatures score highest.',
     factors: [
-      'Historical significance of early discoveries',
-      'Ancient observations recorded in history',
-      'Modern discoveries with advanced technology',
-      'Balance between historical value and cutting-edge science',
+      'Temperature range from 3K (cosmic background) to 1 billion K',
+      'Extremely hot objects (>100,000 K) get bonus scoring',
+      'Very cold objects (<100 K) also score well',
+      'Logarithmic scale for the vast temperature range',
+    ],
+    examples: [
+      { name: 'Neutron star core (1B K)', score: 100 },
+      { name: 'The Sun (5,778 K)', score: 55 },
+      { name: 'CMB (2.7 K)', score: 85 },
+    ],
+  },
+  {
+    name: 'Discovery',
+    icon: '📜',
+    color: 'pink',
+    maxScore: 100,
+    description: 'Historical significance based on when the object was discovered.',
+    factors: [
+      'Ancient discoveries (pre-1600) score highest for historical importance',
+      'Early telescopic era (1600-1800) objects score high',
+      'Very recent discoveries (last 5 years) score high for cutting-edge science',
+      'Mid-era discoveries have moderate scores',
     ],
     examples: [
       { name: 'Orion Nebula (ancient)', score: 95 },
-      { name: 'Pluto (1930)', score: 75 },
-      { name: 'Exoplanet discovered 2024', score: 40 },
-    ],
-  },
-  {
-    name: 'Cultural Impact',
-    icon: '🎭',
-    color: 'pink',
-    maxScore: 100,
-    description: 'How much has this object influenced human culture, art, and mythology?',
-    factors: [
-      'Appearances in mythology and ancient cultures',
-      'Referenced in literature, film, and art',
-      'Influence on human navigation and timekeeping',
-      'Symbolic or spiritual significance',
-    ],
-    examples: [
-      { name: 'The Moon', score: 100 },
-      { name: 'Pleiades star cluster', score: 88 },
-      { name: 'Recently discovered asteroid', score: 5 },
+      { name: 'Neptune (1846)', score: 70 },
+      { name: 'JWST discovery (2024)', score: 80 },
     ],
   },
 ];
@@ -149,8 +149,8 @@ export default function Scoring() {
             The Cosmic Scoring System
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Every celestial object is evaluated across five scientific and cultural
-            categories, resulting in a total Cosmic Score from 0 to 500.
+            Every celestial object is evaluated using real astronomical data across five
+            scientific metrics, resulting in a total Cosmic Score from 0 to 500.
           </p>
         </div>
 
