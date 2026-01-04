@@ -92,6 +92,11 @@ export default function AdminNFTs() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Bulk select state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   // Image Generation Queue
   const [imageGenQueue, setImageGenQueue] = useState<ImageGenJob[]>([]);
   const [showGenQueue, setShowGenQueue] = useState(false);
@@ -365,6 +370,82 @@ export default function AdminNFTs() {
     }
   }
 
+  // Bulk selection functions
+  function handleSelectAll() {
+    if (selectedIds.size === nfts.length) {
+      // Deselect all
+      setSelectedIds(new Set());
+    } else {
+      // Select all on current page (only AVAILABLE without owner)
+      const selectableIds = nfts
+        .filter(nft => nft.status === 'AVAILABLE')
+        .map(nft => nft.id);
+      setSelectedIds(new Set(selectableIds));
+    }
+  }
+
+  function handleSelectOne(nftId: number) {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(nftId)) {
+      newSelected.delete(nftId);
+    } else {
+      newSelected.add(nftId);
+    }
+    setSelectedIds(newSelected);
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const idsToDelete = Array.from(selectedIds);
+
+      // Delete NFTs one by one (could be optimized with a bulk endpoint)
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const nftId of idsToDelete) {
+        try {
+          const res = await fetch(`${apiUrl}/api/admin/nfts/${nftId}/delete`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          });
+          if (res.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch {
+          errorCount++;
+        }
+      }
+
+      setSelectedIds(new Set());
+      setShowBulkDeleteConfirm(false);
+
+      if (errorCount === 0) {
+        setGenerateMessage({ type: 'success', text: `Successfully deleted ${successCount} NFT(s)` });
+      } else {
+        setGenerateMessage({ type: 'error', text: `Deleted ${successCount}, failed ${errorCount}` });
+      }
+
+      // Refresh the list
+      await fetchNFTs();
+      await fetchCapacity();
+    } catch (error) {
+      setGenerateMessage({ type: 'error', text: 'Failed to delete NFTs' });
+    } finally {
+      setIsBulkDeleting(false);
+      setShowBulkDeleteConfirm(false);
+    }
+  }
+
   async function handlePreviewPrompt(nftId: number) {
     setIsLoadingPrompt(true);
     setShowPrompt(true);
@@ -574,9 +655,53 @@ export default function AdminNFTs() {
             </form>
           </div>
 
-          <div className="mb-4 text-gray-400">
-            Showing {nfts.length} of {total.toLocaleString()} NFTs
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-gray-400">
+              Showing {nfts.length} of {total.toLocaleString()} NFTs
+              {selectedIds.size > 0 && (
+                <span className="ml-2 text-purple-400">
+                  ({selectedIds.size} selected)
+                </span>
+              )}
+            </span>
+            {selectedIds.size > 0 && (
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="bg-red-600 hover:bg-red-500 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                <span>🗑️</span>
+                Delete {selectedIds.size} Selected
+              </button>
+            )}
           </div>
+
+          {/* Bulk Delete Confirmation */}
+          {showBulkDeleteConfirm && (
+            <div className="mb-4 bg-red-900/30 border border-red-600 rounded-lg p-4">
+              <p className="text-red-400 font-medium mb-3">
+                Are you sure you want to delete {selectedIds.size} NFT(s)?
+              </p>
+              <p className="text-red-300 text-sm mb-4">
+                This action cannot be undone. All selected NFTs and their associated data will be permanently removed.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isBulkDeleting}
+                  className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg"
+                >
+                  {isBulkDeleting ? `Deleting... (${selectedIds.size} remaining)` : `Yes, Delete ${selectedIds.size} NFT(s)`}
+                </button>
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                  disabled={isBulkDeleting}
+                  className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-4 py-2 rounded-lg"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* NFT Table */}
           <div className="bg-gray-900 rounded-lg overflow-hidden">
@@ -584,6 +709,15 @@ export default function AdminNFTs() {
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
+                    <th className="px-4 py-3 text-left w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.size > 0 && selectedIds.size === nfts.filter(n => n.status === 'AVAILABLE').length}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-purple-600 focus:ring-purple-500"
+                        title="Select all available NFTs on this page"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left">ID</th>
                     <th className="px-4 py-3 text-left">Name</th>
                     <th className="px-4 py-3 text-left">Type</th>
@@ -598,9 +732,21 @@ export default function AdminNFTs() {
                   {nfts.map((nft) => (
                     <tr
                       key={nft.id}
-                      className="border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer"
+                      className={`border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer ${
+                        selectedIds.has(nft.id) ? 'bg-purple-900/20' : ''
+                      }`}
                       onClick={() => handleViewNft(nft.id)}
                     >
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(nft.id)}
+                          onChange={() => handleSelectOne(nft.id)}
+                          disabled={nft.status !== 'AVAILABLE'}
+                          className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-purple-600 focus:ring-purple-500 disabled:opacity-30"
+                          title={nft.status !== 'AVAILABLE' ? 'Only available NFTs can be deleted' : 'Select for bulk delete'}
+                        />
+                      </td>
                       <td className="px-4 py-3">#{nft.id}</td>
                       <td className="px-4 py-3 font-medium">{nft.name}</td>
                       <td className="px-4 py-3 text-gray-400">{nft.objectType}</td>
