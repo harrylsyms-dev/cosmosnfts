@@ -63,6 +63,10 @@ model NFT {
   imagePrompt             String?   @map("image_prompt") @db.Text       // Full Leonardo AI prompt
   imageNegativePrompt     String?   @map("image_negative_prompt") @db.Text // Negative prompt
   promptGeneratedAt       DateTime? @map("prompt_generated_at")  // When prompt was generated
+  // Reference images from NASA/ESA/Hubble for Leonardo AI style guidance
+  referenceImageUrl       String?   @map("reference_image_url")          // Source URL from NASA/ESA
+  referenceImageSource    String?   @map("reference_image_source")       // "NASA", "ESA", "Hubble", "ESO"
+  leonardoRefImageId      String?   @map("leonardo_ref_image_id")        // Leonardo AI uploaded image ID
 
   // Timestamps
   createdAt               DateTime  @default(now()) @map("created_at")
