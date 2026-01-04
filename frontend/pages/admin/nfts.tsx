@@ -258,14 +258,15 @@ export default function AdminNFTs() {
 
       console.log('[Modal] Response status:', res.status, res.ok);
 
+      // Parse JSON even for error responses to get detailed error info
+      const data = await res.json().catch(() => ({ error: 'Failed to parse response' }));
+      console.log('[Modal] Response:', res.status, data);
+
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error('[Modal] HTTP Error:', res.status, errorText.substring(0, 300));
-        alert(`HTTP Error ${res.status}: Unable to load NFT`);
+        console.error('[Modal] HTTP Error:', res.status, data);
+        alert(`Error: ${data.error || 'Unknown error'}\n${data.details || ''}`);
         return;
       }
-
-      const data = await res.json();
       console.log('[Modal] Response:', { success: data.success, hasNft: !!data.nft, error: data.error });
 
       if (data.success && data.nft) {
