@@ -15,83 +15,109 @@ import {
 
 const MAX_NFTS = 20000;
 
-// Calculate scores from real astronomical data
+// Logarithmic score calculation (0-100 based on where value falls in range)
+function logScore(value: number | undefined, min: number, max: number, defaultScore = 50): number {
+  if (value === undefined || value <= 0) return defaultScore;
+  const clampedValue = Math.max(min, Math.min(max, value));
+  const logValue = Math.log10(clampedValue);
+  const logMin = Math.log10(min);
+  const logMax = Math.log10(max);
+  if (logMax === logMin) return 50;
+  return Math.max(0, Math.min(100, ((logValue - logMin) / (logMax - logMin)) * 100));
+}
+
+// Calculate SCIENTIFIC scores from real astronomical data
+// 5 metrics at 100 points each = 500 total
 function calculateScores(obj: AstronomicalObject): {
-  fame: number;
-  significance: number;
-  rarity: number;
-  discovery: number;
-  cultural: number;
+  distance: number;    // Distance from Earth (further = more unique)
+  mass: number;        // Mass in solar masses (logarithmic scale)
+  luminosity: number;  // Brightness/luminosity (logarithmic scale)
+  temperature: number; // Surface temperature (logarithmic scale)
+  discovery: number;   // Historical discovery value (older = more significant)
 } {
-  // Fame: Based on magnitude (visibility), alternate names, notable features
-  let fame = 30;
-  if (obj.magnitude !== undefined) {
-    // Brighter objects (lower magnitude) are more famous
-    if (obj.magnitude < 0) fame += 40;
-    else if (obj.magnitude < 2) fame += 30;
-    else if (obj.magnitude < 4) fame += 20;
-    else if (obj.magnitude < 6) fame += 10;
-  }
-  if (obj.alternateNames && obj.alternateNames.length > 2) fame += 15;
-  if (obj.notableFeatures && obj.notableFeatures.length > 2) fame += 10;
-  fame = Math.min(100, fame);
-
-  // Scientific Significance: Based on description content and scientificSignificance field
-  let significance = 40;
-  if (obj.scientificSignificance) {
-    if (obj.scientificSignificance.includes('first') || obj.scientificSignificance.includes('First')) significance += 25;
-    if (obj.scientificSignificance.includes('key') || obj.scientificSignificance.includes('important')) significance += 15;
-    if (obj.scientificSignificance.includes('study') || obj.scientificSignificance.includes('research')) significance += 10;
-  }
-  significance = Math.min(100, significance);
-
-  // Rarity: Based on object type rarity and distance
-  let rarity = 30;
-  const rareTypes = ['Black Hole', 'Quasar', 'Magnetar', 'Pulsar'];
-  const uncommonTypes = ['Supernova Remnant', 'Neutron Star', 'Exoplanet'];
-  if (rareTypes.includes(obj.objectType)) rarity += 50;
-  else if (uncommonTypes.includes(obj.objectType)) rarity += 30;
-
-  // Distance also affects rarity (extremely far or extremely close are rare)
+  // Distance Score (0-100): Closer objects are more accessible/studied, but rare extremes score high
+  // Range: 0.00001 ly (within solar system) to 13 billion ly (observable universe edge)
+  let distanceScore = 50;
   if (obj.distanceLy !== undefined) {
-    if (obj.distanceLy < 10) rarity += 15; // Very close objects are rare
-    if (obj.distanceLy > 1000000000) rarity += 20; // Extremely distant objects
+    // Very close (<100 ly) and very far (>1 billion ly) score highest
+    if (obj.distanceLy < 100) {
+      distanceScore = 90 - (obj.distanceLy / 100) * 40; // Closer = higher (50-90)
+    } else if (obj.distanceLy > 1000000000) {
+      distanceScore = 80 + Math.min(20, (obj.distanceLy - 1000000000) / 1000000000 * 20); // Edge of universe
+    } else {
+      distanceScore = logScore(obj.distanceLy, 100, 1000000000, 50);
+    }
   }
-  rarity = Math.min(100, rarity);
 
-  // Discovery Recency: Newer discoveries score higher
-  let discovery = 50;
+  // Mass Score (0-100): Logarithmic scale for vast range
+  // Range: 0.00001 solar masses (small objects) to 100 billion solar masses (largest black holes)
+  let massScore = logScore(obj.mass, 0.00001, 100000000000, 50);
+  // Boost extreme masses
+  if (obj.mass !== undefined) {
+    if (obj.mass > 1000000) massScore = Math.min(100, massScore + 15); // Supermassive
+    if (obj.mass < 0.001) massScore = Math.min(100, massScore + 10); // Tiny
+  }
+
+  // Luminosity Score (0-100): Logarithmic scale
+  // Range: 0.00001 solar luminosities to 10 trillion solar luminosities (quasars)
+  let luminosityScore = logScore(obj.luminosity, 0.00001, 10000000000000, 50);
+  // Use magnitude as fallback if no luminosity
+  if (obj.luminosity === undefined && obj.magnitude !== undefined) {
+    // Brighter = lower magnitude = higher score
+    luminosityScore = Math.max(0, Math.min(100, 100 - ((obj.magnitude + 5) / 35) * 100));
+  }
+
+  // Temperature Score (0-100): Logarithmic scale
+  // Range: 3 K (cosmic background) to 1 billion K (neutron star cores)
+  let temperatureScore = logScore(obj.temperature, 3, 1000000000, 50);
+  // Extreme temperatures are interesting
+  if (obj.temperature !== undefined) {
+    if (obj.temperature > 100000) temperatureScore = Math.min(100, temperatureScore + 10);
+    if (obj.temperature < 100) temperatureScore = Math.min(100, temperatureScore + 10);
+  }
+
+  // Discovery Score (0-100): Historical significance
+  // Older discoveries = more historical significance, but very recent = cutting edge
+  let discoveryScore = 50;
   if (obj.discoveryYear !== undefined) {
-    if (obj.discoveryYear >= 2015) discovery = 95;
-    else if (obj.discoveryYear >= 2000) discovery = 80;
-    else if (obj.discoveryYear >= 1990) discovery = 70;
-    else if (obj.discoveryYear >= 1960) discovery = 55;
-    else if (obj.discoveryYear >= 1900) discovery = 40;
-    else if (obj.discoveryYear >= 1800) discovery = 30;
-    else if (obj.discoveryYear >= 1600) discovery = 20;
-    else discovery = 10; // Ancient discoveries
+    const currentYear = new Date().getFullYear();
+    if (obj.discoveryYear < 1600) {
+      discoveryScore = 95; // Ancient astronomy
+    } else if (obj.discoveryYear < 1800) {
+      discoveryScore = 85; // Early telescopic era
+    } else if (obj.discoveryYear < 1900) {
+      discoveryScore = 70; // 19th century
+    } else if (obj.discoveryYear < 1960) {
+      discoveryScore = 55; // Early 20th century
+    } else if (obj.discoveryYear < 2000) {
+      discoveryScore = 45; // Space age
+    } else if (obj.discoveryYear > currentYear - 5) {
+      discoveryScore = 80; // Very recent = cutting edge
+    } else {
+      discoveryScore = 40; // Recent but not cutting edge
+    }
   }
 
-  // Cultural Impact: Based on alternate names and notable features
-  let cultural = 25;
-  if (obj.alternateNames && obj.alternateNames.length > 0) {
-    // Named objects have cultural significance
-    cultural += Math.min(30, obj.alternateNames.length * 10);
-  }
-  if (obj.notableFeatures) {
-    cultural += Math.min(30, obj.notableFeatures.length * 7);
-  }
-  // Famous objects get bonus
-  const famousObjects = ['Sirius', 'Betelgeuse', 'Orion Nebula', 'Andromeda', 'Crab Nebula', 'Halley'];
-  if (famousObjects.some(f => obj.name.includes(f))) cultural += 20;
-  cultural = Math.min(100, cultural);
+  // Object type modifiers (some types are inherently more scientifically interesting)
+  const typeMultiplier: Record<string, number> = {
+    'Black Hole': 1.15,
+    'Quasar': 1.15,
+    'Magnetar': 1.12,
+    'Pulsar': 1.10,
+    'Neutron Star': 1.10,
+    'Supernova Remnant': 1.08,
+    'Exoplanet': 1.05,
+    'Galaxy': 1.03,
+    'Nebula': 1.02,
+  };
+  const multiplier = typeMultiplier[obj.objectType] || 1.0;
 
   return {
-    fame: Math.round(fame),
-    significance: Math.round(significance),
-    rarity: Math.round(rarity),
-    discovery: Math.round(discovery),
-    cultural: Math.round(cultural),
+    distance: Math.round(Math.min(100, distanceScore * multiplier)),
+    mass: Math.round(Math.min(100, massScore * multiplier)),
+    luminosity: Math.round(Math.min(100, luminosityScore * multiplier)),
+    temperature: Math.round(Math.min(100, temperatureScore * multiplier)),
+    discovery: Math.round(Math.min(100, discoveryScore * multiplier)),
   };
 }
 
@@ -278,7 +304,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       for (const obj of objectsToCreate) {
         const scores = calculateScores(obj);
-        const totalScore = scores.fame + scores.significance + scores.rarity + scores.discovery + scores.cultural;
+        const totalScore = scores.distance + scores.mass + scores.luminosity + scores.temperature + scores.discovery;
         const badgeTier = getBadgeTier(totalScore);
 
         // Generate image prompt from astronomical data
@@ -296,16 +322,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             description: obj.description,
             objectType: obj.objectType,
             status: 'AVAILABLE',
-            fameVisibility: scores.fame,
-            scientificSignificance: scores.significance,
-            rarity: scores.rarity,
-            discoveryRecency: scores.discovery,
-            culturalImpact: scores.cultural,
+            // Scientific scores (repurposing existing fields):
+            // fameVisibility = Distance Score, scientificSignificance = Mass Score
+            // rarity = Luminosity Score, discoveryRecency = Temperature Score
+            // culturalImpact = Discovery Score
+            fameVisibility: scores.distance,
+            scientificSignificance: scores.mass,
+            rarity: scores.luminosity,
+            discoveryRecency: scores.temperature,
+            culturalImpact: scores.discovery,
             totalScore,
             badgeTier,
             discoveryYear: obj.discoveryYear || null,
             constellation: obj.constellation || null,
-            // Scientific data for prompt generation
+            // Scientific data (raw values for display/recalculation)
             spectralType: obj.spectralType || null,
             distanceLy: obj.distanceLy || null,
             massSolar: obj.mass || null,
