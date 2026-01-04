@@ -255,9 +255,13 @@ export default function AdminNFTs() {
       const data = await res.json();
       if (data.success) {
         setSelectedNft(data.nft);
+      } else {
+        console.error('API error:', data.error || 'Unknown error');
+        alert('Failed to load NFT: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Failed to fetch NFT details:', error);
+      alert('Network error loading NFT details');
     } finally {
       setIsLoadingDetail(false);
     }
