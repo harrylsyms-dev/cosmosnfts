@@ -4,6 +4,16 @@ import { verifyAdminToken } from '../../../../../lib/adminAuth';
 import crypto from 'crypto';
 import { getReferenceImage, getFallbackReferenceImage, type ReferenceImage } from '../../../../../lib/referenceImages';
 
+// Baseline image from database
+interface BaselineImageData {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+  priority: number;
+  objectType: string | null;
+}
+
 // Decrypt API key if encrypted
 function decryptApiKey(encryptedData: string): string {
   const encryptionKey = process.env.ENCRYPTION_KEY;
@@ -49,7 +59,38 @@ async function getApiKey(service: string): Promise<string | null> {
   return null;
 }
 
+// Fetch baseline images from database
+// Prioritizes: 1) Object-type specific baselines, 2) Style baselines, 3) Any active baseline
+async function getBaselineImages(objectType?: string | null): Promise<BaselineImageData[]> {
+  try {
+    const baselines = await prisma.baselineImage.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { objectType: objectType || undefined },
+          { objectType: null },
+        ],
+      },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 3, // Get top 3 baselines for potential use
+    });
 
+    return baselines.map((b: { id: string; name: string; url: string; category: string; priority: number; objectType: string | null }) => ({
+      id: b.id,
+      name: b.name,
+      url: b.url,
+      category: b.category,
+      priority: b.priority,
+      objectType: b.objectType,
+    }));
+  } catch (error) {
+    console.error('Failed to fetch baseline images:', error);
+    return [];
+  }
+}
 
 // Upload reference image to Leonardo AI for style guidance
 async function uploadImageToLeonardo(apiKey: string, imageUrl: string): Promise<string | null> {
@@ -453,12 +494,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(negativePrompt);
     console.log(`--- PROMPT END ---`);
 
-    // Fetch reference image from NASA/ESA
-    console.log(`Fetching reference image for NFT #${nft.id}: ${nft.name}`);
-    const { referenceImage, leonardoImageId } = await prepareReferenceImage(nft, leonardoApiKey);
+    // Fetch baseline images from database (user-uploaded style references)
+    console.log(`Fetching baseline images for object type: ${nft.objectType}`);
+    const baselineImages = await getBaselineImages(nft.objectType);
+
+    let styleReferenceId: string | null = null;
+    let styleReferenceSource: string | null = null;
+
+    // Priority 1: Use baseline images if available (user's preferred style)
+    if (baselineImages.length > 0) {
+      const primaryBaseline = baselineImages[0];
+      console.log(`Using baseline image: "${primaryBaseline.name}" (priority: ${primaryBaseline.priority}, category: ${primaryBaseline.category})`);
+
+      const baselineUploadId = await uploadImageToLeonardo(leonardoApiKey, primaryBaseline.url);
+      if (baselineUploadId) {
+        styleReferenceId = baselineUploadId;
+        styleReferenceSource = `Baseline: ${primaryBaseline.name}`;
+        console.log(`Uploaded baseline to Leonardo: ${baselineUploadId}`);
+      }
+    }
+
+    // Priority 2: Fall back to NASA/ESA reference if no baseline available
+    let referenceImage: ReferenceImage | null = null;
+    if (!styleReferenceId) {
+      console.log(`Fetching reference image for NFT #${nft.id}: ${nft.name}`);
+      const refResult = await prepareReferenceImage(nft, leonardoApiKey);
+      referenceImage = refResult.referenceImage;
+
+      if (refResult.leonardoImageId) {
+        styleReferenceId = refResult.leonardoImageId;
+        styleReferenceSource = `NASA/ESA: ${referenceImage?.source || 'Unknown'}`;
+      }
+    }
 
     // Generate image with Leonardo AI
     console.log(`Generating image for NFT #${nft.id}: ${nft.name}`);
+    console.log(`Style reference: ${styleReferenceSource || 'None'}`);
+
     const leonardoImageUrl = await generateWithLeonardo(
       leonardoApiKey,
       prompt,
@@ -467,7 +539,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       imageConfig?.imageWidth || 1024,
       imageConfig?.imageHeight || 1024,
       imageConfig?.guidanceScale || 7,
-      leonardoImageId
+      styleReferenceId
     );
 
     // Upload image to Pinata
@@ -487,7 +559,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         metadataIpfsHash: metadataHash,
         referenceImageUrl: referenceImage?.url || null,
         referenceImageSource: referenceImage?.source || null,
-        leonardoRefImageId: leonardoImageId || null,
+        leonardoRefImageId: styleReferenceId || null,
         updatedAt: new Date(),
       },
     });
@@ -509,11 +581,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadataUrl: `https://gateway.pinata.cloud/ipfs/${metadataHash}`,
       promptUsed: prompt,
       negativePromptUsed: negativePrompt,
+      styleReference: styleReferenceSource ? {
+        source: styleReferenceSource,
+        leonardoId: styleReferenceId,
+      } : null,
+      baselineImages: baselineImages.length > 0 ? baselineImages.map(b => ({
+        name: b.name,
+        category: b.category,
+        objectType: b.objectType,
+      })) : null,
       referenceImage: referenceImage ? {
         url: referenceImage.url,
         source: referenceImage.source,
       } : null,
-      leonardoRefImageId: leonardoImageId || null,
       removedHashes: removedHashes.length > 0 ? removedHashes : undefined,
     });
   } catch (error: any) {

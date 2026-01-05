@@ -330,6 +330,15 @@ export const DEFAULT_WIDGETS: Widget[] = [
     defaultSize: { cols: 1, rows: 1 },
   },
   {
+    id: 'baseline-images',
+    title: 'Baseline Images',
+    description: 'Style references for AI',
+    icon: '🖼️',
+    href: '/admin/baseline-images',
+    color: 'border-violet-800 hover:border-violet-500',
+    defaultSize: { cols: 1, rows: 1 },
+  },
+  {
     id: 'phases',
     title: 'Phases & Pricing',
     description: 'Timer controls & pricing',
