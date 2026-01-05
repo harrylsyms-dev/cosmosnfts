@@ -125,6 +125,9 @@ export default function AdminImages() {
         setAvailableModels(data.availableModels);
         setContrastValues(data.contrastValues);
         setDimensionPresets(data.dimensionPresets);
+      } else {
+        const errorText = await res.text();
+        console.error('Leonardo settings API error:', res.status, errorText);
       }
     } catch (error) {
       console.error('Failed to fetch Leonardo settings:', error);
