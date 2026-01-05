@@ -45,6 +45,7 @@ function decryptApiKey(encryptedData: string): string {
 async function getPinataKeys(): Promise<{ apiKey: string; secretKey: string } | null> {
   // First check environment variables
   if (process.env.PINATA_API_KEY && process.env.PINATA_API_SECRET) {
+    console.log('Using Pinata keys from environment variables');
     return {
       apiKey: process.env.PINATA_API_KEY,
       secretKey: process.env.PINATA_API_SECRET,
@@ -53,15 +54,25 @@ async function getPinataKeys(): Promise<{ apiKey: string; secretKey: string } | 
 
   // Fall back to database
   try {
+    console.log('Looking for Pinata keys in database...');
     const apiKeyRecord = await prisma.apiKey.findUnique({ where: { service: 'pinata_api' } });
     const secretKeyRecord = await prisma.apiKey.findUnique({ where: { service: 'pinata_secret' } });
 
-    if (!apiKeyRecord || !secretKeyRecord) return null;
+    console.log('pinata_api found:', !!apiKeyRecord);
+    console.log('pinata_secret found:', !!secretKeyRecord);
 
-    return {
-      apiKey: decryptApiKey(apiKeyRecord.encryptedKey),
-      secretKey: decryptApiKey(secretKeyRecord.encryptedKey),
-    };
+    if (!apiKeyRecord || !secretKeyRecord) {
+      console.log('Pinata keys not found in database');
+      return null;
+    }
+
+    const apiKey = decryptApiKey(apiKeyRecord.encryptedKey);
+    const secretKey = decryptApiKey(secretKeyRecord.encryptedKey);
+
+    console.log('Decrypted API key length:', apiKey?.length || 0);
+    console.log('Decrypted secret key length:', secretKey?.length || 0);
+
+    return { apiKey, secretKey };
   } catch (error) {
     console.error('Failed to get Pinata keys:', error);
     return null;
@@ -250,9 +261,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
     console.error('Baseline image error:', error);
+    console.error('Error stack:', error?.stack);
     return res.status(500).json({
       error: 'Operation failed',
       message: error?.message || 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
     });
   }
 }

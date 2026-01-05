@@ -152,7 +152,8 @@ export default function BaselineImagesAdmin() {
         if (fileInputRef.current) fileInputRef.current.value = '';
         await fetchBaselines();
       } else {
-        setMessage({ type: 'error', text: data.error || 'Upload failed' });
+        const errorMsg = data.message ? `${data.error}: ${data.message}` : data.error;
+        setMessage({ type: 'error', text: errorMsg || 'Upload failed' });
       }
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Upload failed' });
