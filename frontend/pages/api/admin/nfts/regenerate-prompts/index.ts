@@ -61,8 +61,8 @@ function generatePromptForNFT(
   // Build the prompt using the template system
   const result = buildImagePrompt(options);
 
-  // Remove "--no " prefix for database storage
-  const negativePrompt = result.negativePrompt.replace('--no ', '');
+  // Negative prompt is already clean (no prefix)
+  const negativePrompt = result.negativePrompt;
 
   // Validate the generated prompt
   const validation = validatePrompt(result.prompt);

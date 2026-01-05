@@ -855,14 +855,20 @@ export function buildImagePrompt(options: PromptBuildOptions): { prompt: string;
     .replace('{planetColor}', color);
 
   // Construct the full prompt following the document structure
-  const prompt = `${template.realismStatement} of ${objectDesc}.
+  // CRITICAL: Object name goes in parentheses AFTER the technical description
+  // This prevents fantasy/artistic interpretations by anchoring to scientific terminology first
+  const prompt = `${template.realismStatement} of ${objectDesc}. (${name})
 
 Visual characteristics: ${visualChars}
 
 Style: ${styleRef.style}
+
 Colors: ${colorDesc}
+
 Lighting: ${template.lighting}
+
 Quality: ${template.quality}
+
 Medium: ${styleRef.medium}`;
 
   // Get negative prompt (pass galaxyType for barred spiral special handling)
@@ -870,7 +876,7 @@ Medium: ${styleRef.medium}`;
 
   return {
     prompt: prompt.trim(),
-    negativePrompt: `--no ${negativePrompt}`,
+    negativePrompt: negativePrompt, // No prefix - FLUX uses plain comma-separated list
   };
 }
 

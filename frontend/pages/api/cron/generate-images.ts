@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import * as crypto from 'crypto';
-import { getReferenceImage, getFallbackReferenceImage, type ReferenceImage } from '../../../lib/referenceImages';
 
 // Decrypt API key if encrypted
 function decryptApiKey(encryptedData: string): string {
@@ -48,177 +47,31 @@ async function getApiKey(service: string): Promise<string | null> {
   return null;
 }
 
-// Build prompt for Leonardo AI
-function buildPrompt(nft: any): string {
-  const poeticDescriptions: Record<string, string> = {
-    'Star': 'A brilliant celestial beacon, burning with ancient light across the cosmic void',
-    'Galaxy': 'A vast island universe, swirling with billions of stars in an eternal cosmic dance',
-    'Nebula': 'A cosmic nursery of gas and dust, painting the heavens with ethereal colors',
-    'Black Hole': 'The ultimate abyss, where light itself cannot escape the crushing grip of gravity',
-    'Pulsar': 'A rapidly spinning neutron star, beaming lighthouse signals across the cosmos',
-    'Quasar': 'The blazing heart of a distant galaxy, outshining trillions of suns',
-    'Star Cluster': 'A dazzling congregation of stars, born together in cosmic brotherhood',
-    'Asteroid': 'A primordial rock, a remnant from the dawn of our solar system',
-    'Comet': 'A wanderer of ice and dust, trailing a magnificent tail across the sky',
+// FLUX.2 Pro image dimensions
+const FLUX_WIDTH = 1440;
+const FLUX_HEIGHT = 1440;
+
+// Leonardo AI V2 API generation with FLUX.2 Pro
+async function generateWithFlux(
+  apiKey: string,
+  prompt: string,
+  negativePrompt: string
+): Promise<string> {
+  const requestBody = {
+    public: false,
+    model: 'flux-pro-2.0',
+    parameters: {
+      prompt: prompt,
+      negative_prompt: negativePrompt,
+      quantity: 1,
+      width: FLUX_WIDTH,
+      height: FLUX_HEIGHT,
+    },
   };
 
-  const typeFeatures: Record<string, string> = {
-    'Star': '- Brilliant corona and solar flares\n- Stellar surface with plasma dynamics',
-    'Galaxy': '- Spiral arms or elliptical structure\n- Central bright core with dark matter halo',
-    'Nebula': '- Colorful gas clouds with embedded stars\n- Pillars of creation aesthetic',
-    'Black Hole': '- Event horizon with accretion disk\n- Gravitational lensing effects',
-    'Pulsar': '- Magnetic field lines and radiation beams\n- Rapidly rotating compact star',
-    'Quasar': '- Supermassive black hole with jets\n- Incredibly luminous active core',
-    'Star Cluster': '- Hundreds of stars in close proximity\n- Varied star colors and sizes',
-    'Asteroid': '- Cratered rocky surface\n- Irregular shape with dramatic lighting',
-    'Comet': '- Icy nucleus with glowing coma\n- Long dust and ion tails',
-  };
+  console.log(`FLUX.2 Pro generating image...`);
 
-  const description = nft.description || poeticDescriptions[nft.objectType] || `A magnificent ${nft.objectType || 'cosmic object'} in the depths of space`;
-  const features = typeFeatures[nft.objectType] || '';
-  const totalScore = nft.totalScore || nft.cosmicScore || 300;
-  const isPremium = totalScore >= 400;
-  const isElite = totalScore >= 450;
-
-  return `Stunning artistic interpretation of ${nft.name} as a cosmic masterpiece.
-
-${description}
-
-Visual Style: Bold digital art, vibrant colors, stylized but detailed, cosmic art with ethereal glow
-${features}
-- Nebulae in vivid purples, blues, golds, oranges, and reds
-- Stars twinkling with magical light effects
-- Isolated cosmic object against deep black void
-- Pure black space background
-- Dreamlike, fantastical yet scientifically inspired
-${isElite ? '- Ultra premium, museum-worthy composition with breathtaking detail' : ''}
-${isPremium ? '- Premium quality with exceptional luminosity' : ''}
-
-Composition: Eye-catching, dramatic, energetic, centered cosmic object
-Quality: Professional digital art, vibrant, gallery-quality illustration
-Medium: Digital painting, concept art, stylized 3D render
-Color: Vibrant, saturated, cosmic palette with glow effects and deep space blacks
-Lighting: Magical cosmic glow, ethereal light effects, volumetric rays`;
-}
-
-
-/**
- * Upload an image to Leonardo AI for use as a style reference
- */
-async function uploadImageToLeonardo(apiKey: string, imageUrl: string): Promise<string | null> {
-  try {
-    const initRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/init-image', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ extension: 'jpg' }),
-    });
-
-    if (!initRes.ok) {
-      console.error('Failed to get Leonardo presigned URL:', await initRes.text());
-      return null;
-    }
-
-    const initData = await initRes.json();
-    const { url: presignedUrl, fields, id: imageId } = initData.uploadInitImage || {};
-
-    if (!presignedUrl || !imageId) {
-      console.error('Invalid Leonardo init-image response');
-      return null;
-    }
-
-    const imageRes = await fetch(imageUrl);
-    if (!imageRes.ok) {
-      console.error('Failed to download reference image:', imageUrl);
-      return null;
-    }
-    const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-
-    const formData = new FormData();
-    if (fields) {
-      const fieldsObj = typeof fields === 'string' ? JSON.parse(fields) : fields;
-      for (const [key, value] of Object.entries(fieldsObj)) {
-        formData.append(key, value as string);
-      }
-    }
-
-    const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
-    formData.append('file', blob, 'reference.jpg');
-
-    const uploadRes = await fetch(presignedUrl, { method: 'POST', body: formData });
-
-    if (!uploadRes.ok && uploadRes.status !== 204) {
-      console.error('Failed to upload to Leonardo S3:', uploadRes.status);
-      return null;
-    }
-
-    console.log(`Uploaded reference image to Leonardo: ${imageId}`);
-    return imageId;
-  } catch (error) {
-    console.error('Error uploading to Leonardo:', error);
-    return null;
-  }
-}
-
-/**
- * Fetch and prepare reference image for an NFT
- */
-async function prepareReferenceImage(
-  nft: any,
-  leonardoApiKey: string
-): Promise<{ referenceImage: ReferenceImage | null; leonardoImageId: string | null }> {
-  if (nft.leonardoRefImageId) {
-    return {
-      referenceImage: { url: nft.referenceImageUrl || '', source: nft.referenceImageSource || 'NASA' },
-      leonardoImageId: nft.leonardoRefImageId,
-    };
-  }
-
-  console.log(`Fetching reference image for: ${nft.name}`);
-  let referenceImage = await getReferenceImage(nft.name, nft.objectType);
-
-  if (!referenceImage && nft.objectType) {
-    referenceImage = getFallbackReferenceImage(nft.objectType);
-    if (referenceImage) console.log(`Using fallback ${nft.objectType} reference image`);
-  }
-
-  if (!referenceImage) {
-    console.log(`No reference image found for: ${nft.name}`);
-    return { referenceImage: null, leonardoImageId: null };
-  }
-
-  console.log(`Found reference image from ${referenceImage.source}: ${referenceImage.url}`);
-  const leonardoImageId = await uploadImageToLeonardo(leonardoApiKey, referenceImage.url);
-  return { referenceImage, leonardoImageId };
-}
-
-// Leonardo AI generation with optional style reference
-async function generateWithLeonardo(apiKey: string, prompt: string, styleReferenceId?: string | null): Promise<string> {
-  const requestBody: Record<string, unknown> = {
-    prompt,
-    negative_prompt: 'text, watermarks, signatures, logos, words, letters, blurry, low quality, landscape, terrain, ground, horizon, mountains, sky, environment, planet surface, land',
-    modelId: 'e316348f-7773-490e-adcd-46757c738eb7',
-    width: 1024,
-    height: 1024,
-    num_images: 1,
-    guidance_scale: 7,
-    num_inference_steps: 30,
-  };
-
-  // Add style reference if available (NASA/ESA/Hubble image as style guide)
-  if (styleReferenceId) {
-    requestBody.controlnets = [{
-      initImageId: styleReferenceId,
-      initImageType: 'UPLOADED',
-      preprocessorId: 67,
-      strengthType: 'Mid',
-    }];
-    console.log(`Using style reference: ${styleReferenceId}`);
-  }
-
-  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/generations', {
+  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v2/generations', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -229,35 +82,40 @@ async function generateWithLeonardo(apiKey: string, prompt: string, styleReferen
 
   if (!createRes.ok) {
     const error = await createRes.text();
-    throw new Error(`Leonardo API error: ${error}`);
+    throw new Error(`Leonardo FLUX API error: ${error}`);
   }
 
   const createData = await createRes.json();
-  const generationId = createData.sdGenerationJob?.generationId;
+  const generationId = createData.generation?.id;
 
   if (!generationId) {
-    throw new Error('No generation ID returned');
+    throw new Error('No generation ID returned from FLUX.2 Pro API');
   }
 
-  // Poll for completion (max 2 minutes)
-  for (let i = 0; i < 24; i++) {
+  // Poll for completion (max 3 minutes)
+  for (let i = 0; i < 36; i++) {
     await new Promise(resolve => setTimeout(resolve, 5000));
 
-    const statusRes = await fetch(`https://cloud.leonardo.ai/api/rest/v1/generations/${generationId}`, {
+    const statusRes = await fetch(`https://cloud.leonardo.ai/api/rest/v2/generations/${generationId}`, {
       headers: { 'Authorization': `Bearer ${apiKey}` },
     });
 
     if (!statusRes.ok) continue;
 
     const statusData = await statusRes.json();
-    const images = statusData.generations_by_pk?.generated_images;
+    const generation = statusData.generation;
 
+    if (generation?.status === 'FAILED') {
+      throw new Error(`Generation failed: ${generation.failureReason || 'Unknown reason'}`);
+    }
+
+    const images = generation?.assets;
     if (images && images.length > 0 && images[0].url) {
       return images[0].url;
     }
   }
 
-  throw new Error('Generation timed out');
+  throw new Error('FLUX.2 Pro generation timed out');
 }
 
 // Upload to Pinata
@@ -298,8 +156,7 @@ async function uploadMetadataToPinata(
   nft: any,
   imageIpfsHash: string,
   apiKey: string,
-  secretKey: string,
-  referenceSource?: string
+  secretKey: string
 ): Promise<string> {
   const attributes: { trait_type: string; value: any; display_type?: string }[] = [
     { trait_type: 'Object Type', value: nft.objectType || 'Unknown' },
@@ -311,7 +168,6 @@ async function uploadMetadataToPinata(
   if (nft.massSolar != null) attributes.push({ trait_type: 'Mass (Solar Masses)', value: nft.massSolar, display_type: 'number' });
   if (nft.ageYears != null) attributes.push({ trait_type: 'Age (Years)', value: nft.ageYears, display_type: 'number' });
   if (nft.constellation) attributes.push({ trait_type: 'Constellation', value: nft.constellation });
-  if (referenceSource) attributes.push({ trait_type: 'Reference Source', value: referenceSource });
 
   const metadata = {
     name: nft.name,
@@ -343,40 +199,41 @@ async function uploadMetadataToPinata(
   return uploadData.IpfsHash;
 }
 
-// Process a single NFT with reference image support
+// Process a single NFT with FLUX.2 Pro (prompt-only approach)
 async function processNFT(
   nft: any,
   leonardoApiKey: string,
   pinataApiKey: string,
   pinataSecretKey: string
-): Promise<{ success: boolean; error?: string; usedReference?: boolean }> {
+): Promise<{ success: boolean; error?: string }> {
   try {
-    // Step 1: Get reference image from NASA/ESA
-    const { referenceImage, leonardoImageId } = await prepareReferenceImage(nft, leonardoApiKey);
+    // Use stored prompts from database (generated by imagePromptTemplates)
+    const prompt = nft.imagePrompt;
+    const negativePrompt = nft.imageNegativePrompt || '';
 
-    // Step 2: Build prompt and generate image with style reference
-    const prompt = buildPrompt(nft);
-    const leonardoImageUrl = await generateWithLeonardo(leonardoApiKey, prompt, leonardoImageId);
+    if (!prompt) {
+      return { success: false, error: 'No image prompt stored for this NFT' };
+    }
 
-    // Step 3: Upload to IPFS
+    // Generate image with FLUX.2 Pro
+    const leonardoImageUrl = await generateWithFlux(leonardoApiKey, prompt, negativePrompt);
+
+    // Upload to IPFS
     const { hash: ipfsHash, url: ipfsUrl } = await uploadToPinata(leonardoImageUrl, pinataApiKey, pinataSecretKey, nft.name);
-    const metadataHash = await uploadMetadataToPinata(nft, ipfsHash, pinataApiKey, pinataSecretKey, referenceImage?.source);
+    const metadataHash = await uploadMetadataToPinata(nft, ipfsHash, pinataApiKey, pinataSecretKey);
 
-    // Step 4: Update NFT in database with reference info
+    // Update NFT in database
     await prisma.nFT.update({
       where: { id: nft.id },
       data: {
         image: ipfsUrl,
         imageIpfsHash: ipfsHash,
         metadataIpfsHash: metadataHash,
-        referenceImageUrl: referenceImage?.url || null,
-        referenceImageSource: referenceImage?.source || null,
-        leonardoRefImageId: leonardoImageId || null,
         updatedAt: new Date(),
       },
     });
 
-    return { success: true, usedReference: !!leonardoImageId };
+    return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -429,11 +286,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    console.log(`Processing ${nftsNeedingImages.length} NFTs for image generation`);
+    console.log(`Processing ${nftsNeedingImages.length} NFTs for image generation with FLUX.2 Pro`);
 
     let succeeded = 0;
     let failed = 0;
-    let usedReferences = 0;
     const errors: { nft: string; error: string }[] = [];
 
     for (const nft of nftsNeedingImages) {
@@ -442,8 +298,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (result.success) {
         succeeded++;
-        if (result.usedReference) usedReferences++;
-        console.log(`Success: ${nft.name}${result.usedReference ? ' (with reference)' : ''}`);
+        console.log(`Success: ${nft.name}`);
       } else {
         failed++;
         errors.push({ nft: nft.name, error: result.error || 'Unknown error' });
@@ -460,12 +315,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     res.json({
-      message: 'Image generation batch complete',
+      message: 'Image generation batch complete (FLUX.2 Pro)',
       processed: nftsNeedingImages.length,
       succeeded,
       failed,
-      usedReferences,
       remaining,
+      model: 'FLUX.2 Pro',
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: any) {

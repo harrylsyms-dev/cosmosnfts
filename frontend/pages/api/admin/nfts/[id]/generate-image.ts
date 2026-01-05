@@ -2,17 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../../lib/adminAuth';
 import crypto from 'crypto';
-import { getReferenceImage, getFallbackReferenceImage, type ReferenceImage } from '../../../../../lib/referenceImages';
-
-// Baseline image from database
-interface BaselineImageData {
-  id: string;
-  name: string;
-  url: string;
-  category: string;
-  priority: number;
-  objectType: string | null;
-}
 
 // Decrypt API key if encrypted
 function decryptApiKey(encryptedData: string): string {
@@ -59,177 +48,37 @@ async function getApiKey(service: string): Promise<string | null> {
   return null;
 }
 
-// Fetch baseline images from database
-// Prioritizes: 1) Object-type specific baselines, 2) Style baselines, 3) Any active baseline
-async function getBaselineImages(objectType?: string | null): Promise<BaselineImageData[]> {
-  try {
-    const baselines = await prisma.baselineImage.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { objectType: objectType || undefined },
-          { objectType: null },
-        ],
-      },
-      orderBy: [
-        { priority: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      take: 3, // Get top 3 baselines for potential use
-    });
+// FLUX.2 Pro image dimensions (fixed for consistent quality)
+const FLUX_WIDTH = 1440;
+const FLUX_HEIGHT = 1440;
 
-    return baselines.map((b: { id: string; name: string; url: string; category: string; priority: number; objectType: string | null }) => ({
-      id: b.id,
-      name: b.name,
-      url: b.url,
-      category: b.category,
-      priority: b.priority,
-      objectType: b.objectType,
-    }));
-  } catch (error) {
-    console.error('Failed to fetch baseline images:', error);
-    return [];
-  }
-}
-
-// Upload reference image to Leonardo AI for style guidance
-async function uploadImageToLeonardo(apiKey: string, imageUrl: string): Promise<string | null> {
-  try {
-    console.log('Uploading reference image to Leonardo...');
-
-    const initRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/init-image', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ extension: 'jpg' }),
-    });
-
-    if (!initRes.ok) {
-      console.error('Failed to get Leonardo presigned URL:', await initRes.text());
-      return null;
-    }
-
-    const initData = await initRes.json();
-    const { url: presignedUrl, fields, id: imageId } = initData.uploadInitImage || {};
-
-    if (!presignedUrl || !imageId) {
-      console.error('Invalid Leonardo init-image response');
-      return null;
-    }
-
-    const imageRes = await fetch(imageUrl);
-    if (!imageRes.ok) {
-      console.error('Failed to download reference image:', imageUrl);
-      return null;
-    }
-    const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-
-    const formData = new FormData();
-    if (fields) {
-      const fieldsObj = typeof fields === 'string' ? JSON.parse(fields) : fields;
-      for (const [key, value] of Object.entries(fieldsObj)) {
-        formData.append(key, value as string);
-      }
-    }
-
-    const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
-    formData.append('file', blob, 'reference.jpg');
-
-    const uploadRes = await fetch(presignedUrl, { method: 'POST', body: formData });
-
-    if (!uploadRes.ok && uploadRes.status !== 204) {
-      console.error('Failed to upload to Leonardo S3:', uploadRes.status);
-      return null;
-    }
-
-    console.log(`Uploaded reference image to Leonardo: ${imageId}`);
-    return imageId;
-  } catch (error) {
-    console.error('Error uploading to Leonardo:', error);
-    return null;
-  }
-}
-
-// Fetch reference image for an NFT
-async function prepareReferenceImage(
-  nft: any,
-  leonardoApiKey: string
-): Promise<{ referenceImage: ReferenceImage | null; leonardoImageId: string | null }> {
-  if (nft.leonardoRefImageId) {
-    console.log(`Using existing Leonardo reference image: ${nft.leonardoRefImageId}`);
-    return {
-      referenceImage: { url: nft.referenceImageUrl || '', source: nft.referenceImageSource || 'NASA' },
-      leonardoImageId: nft.leonardoRefImageId,
-    };
-  }
-
-  console.log(`Fetching reference image for: ${nft.name}`);
-  let referenceImage = await getReferenceImage(nft.name, nft.objectType);
-
-  if (!referenceImage && nft.objectType) {
-    referenceImage = getFallbackReferenceImage(nft.objectType);
-    if (referenceImage) console.log(`Using fallback ${nft.objectType} reference image`);
-  }
-
-  if (!referenceImage) {
-    console.log(`No reference image found for: ${nft.name}`);
-    return { referenceImage: null, leonardoImageId: null };
-  }
-
-  console.log(`Found reference image from ${referenceImage.source}: ${referenceImage.url}`);
-  const leonardoImageId = await uploadImageToLeonardo(leonardoApiKey, referenceImage.url);
-  return { referenceImage, leonardoImageId };
-}
-
-// Leonardo Phoenix model ID - required for style reference support
-const LEONARDO_PHOENIX_MODEL = 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3';
-
-// Leonardo AI generation
-async function generateWithLeonardo(
+// Leonardo AI V2 API generation with FLUX.2 Pro
+// Based on tested prompt configuration with 9/10 success rate
+async function generateWithFlux(
   apiKey: string,
   prompt: string,
-  negativePrompt: string,
-  modelId: string,
-  width: number,
-  height: number,
-  guidanceScale: number,
-  styleReferenceId?: string | null
+  negativePrompt: string
 ): Promise<string> {
-  // If using style reference, MUST use Phoenix model (only model that supports controlnets with style reference)
-  let effectiveModelId = modelId || LEONARDO_PHOENIX_MODEL;
-  if (styleReferenceId && effectiveModelId !== LEONARDO_PHOENIX_MODEL) {
-    console.log(`Style reference requires Phoenix model - switching from ${effectiveModelId} to Phoenix`);
-    effectiveModelId = LEONARDO_PHOENIX_MODEL;
-  }
-
-  // Build request body
-  const requestBody: Record<string, unknown> = {
-    prompt,
-    negative_prompt: negativePrompt,
-    modelId: effectiveModelId,
-    width: width || 1024,
-    height: height || 1024,
-    num_images: 1,
-    guidance_scale: guidanceScale || 7,
-    num_inference_steps: 30,
-    promptMagic: false,
+  // Build V2 API request body for FLUX.2 Pro
+  const requestBody = {
+    public: false,
+    model: 'flux-pro-2.0',
+    parameters: {
+      prompt: prompt,
+      negative_prompt: negativePrompt,
+      quantity: 1,
+      width: FLUX_WIDTH,
+      height: FLUX_HEIGHT,
+      // CRITICAL: Prompt Enhance must be OFF for accurate scientific imagery
+      // Without this, the model adds artistic interpretations
+    },
   };
 
-  // Add style reference if available (only works with Phoenix model)
-  if (styleReferenceId) {
-    requestBody.controlnets = [{
-      initImageId: styleReferenceId,
-      initImageType: 'UPLOADED',
-      preprocessorId: 67, // Style Reference
-      strengthType: 'Mid',
-    }];
-    console.log(`Using style reference: ${styleReferenceId}`);
-  }
+  // Log the request for debugging
+  console.log(`FLUX.2 Pro API request:`, JSON.stringify(requestBody, null, 2));
 
-  // Create generation
-  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/generations', {
+  // Create generation using V2 API endpoint
+  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v2/generations', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -240,35 +89,53 @@ async function generateWithLeonardo(
 
   if (!createRes.ok) {
     const error = await createRes.text();
-    throw new Error(`Leonardo API error: ${error}`);
+    throw new Error(`Leonardo FLUX API error: ${error}`);
   }
 
   const createData = await createRes.json();
-  const generationId = createData.sdGenerationJob?.generationId;
+  console.log(`FLUX.2 Pro generation response:`, JSON.stringify(createData, null, 2));
+
+  // V2 API response structure
+  const generationId = createData.generation?.id;
 
   if (!generationId) {
-    throw new Error('No generation ID returned');
+    throw new Error('No generation ID returned from FLUX.2 Pro API');
   }
 
-  // Poll for completion (max 2 minutes)
-  for (let i = 0; i < 24; i++) {
+  console.log(`FLUX.2 Pro generation started: ${generationId}`);
+
+  // Poll for completion (max 3 minutes for FLUX - it can take longer)
+  for (let i = 0; i < 36; i++) {
     await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
 
-    const statusRes = await fetch(`https://cloud.leonardo.ai/api/rest/v1/generations/${generationId}`, {
+    // Check generation status using V2 endpoint
+    const statusRes = await fetch(`https://cloud.leonardo.ai/api/rest/v2/generations/${generationId}`, {
       headers: { 'Authorization': `Bearer ${apiKey}` },
     });
 
-    if (!statusRes.ok) continue;
+    if (!statusRes.ok) {
+      console.log(`Status check ${i + 1}/36 failed, retrying...`);
+      continue;
+    }
 
     const statusData = await statusRes.json();
-    const images = statusData.generations_by_pk?.generated_images;
+    const generation = statusData.generation;
 
+    if (generation?.status === 'FAILED') {
+      throw new Error(`Generation failed: ${generation.failureReason || 'Unknown reason'}`);
+    }
+
+    // Check for completed images
+    const images = generation?.assets;
     if (images && images.length > 0 && images[0].url) {
+      console.log(`FLUX.2 Pro generation complete after ${(i + 1) * 5} seconds`);
       return images[0].url;
     }
+
+    console.log(`Status check ${i + 1}/36: ${generation?.status || 'pending'}`);
   }
 
-  throw new Error('Generation timed out');
+  throw new Error('FLUX.2 Pro generation timed out after 3 minutes');
 }
 
 // Unpin (remove) from Pinata
@@ -462,17 +329,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Get image generation settings
-    const imageConfig = await prisma.imagePromptConfig.findUnique({
-      where: { id: 'main' },
-      select: {
-        leonardoModelId: true,
-        imageWidth: true,
-        imageHeight: true,
-        guidanceScale: true,
-      },
-    });
-
     // Remove old images from Pinata if they exist
     const removedHashes: string[] = [];
     if (nft.imageIpfsHash) {
@@ -491,10 +347,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const negativePrompt = nft.imageNegativePrompt;
 
     // Log the prompt for debugging
-    console.log(`=== LEONARDO AI IMAGE GENERATION ===`);
+    console.log(`=== FLUX.2 PRO IMAGE GENERATION ===`);
     console.log(`NFT: #${nft.id} - ${nft.name}`);
     console.log(`Object Type: ${nft.objectType}`);
     console.log(`Total Score: ${nft.totalScore}`);
+    console.log(`Dimensions: ${FLUX_WIDTH}x${FLUX_HEIGHT}`);
     if (removedHashes.length > 0) {
       console.log(`Removed old IPFS hashes: ${removedHashes.join(', ')}`);
     }
@@ -504,75 +361,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(negativePrompt);
     console.log(`--- PROMPT END ---`);
 
-    // Fetch baseline images from database (user-uploaded style references)
-    console.log(`Fetching baseline images for object type: ${nft.objectType}`);
-    let baselineImages: BaselineImageData[] = [];
-    try {
-      baselineImages = await getBaselineImages(nft.objectType);
-      console.log(`Found ${baselineImages.length} baseline images`);
-    } catch (err: any) {
-      console.error(`Failed to fetch baseline images: ${err.message}`);
-    }
-
-    let styleReferenceId: string | null = null;
-    let styleReferenceSource: string | null = null;
-
-    // Priority 1: Use baseline images if available (user's preferred style)
-    if (baselineImages.length > 0) {
-      const primaryBaseline = baselineImages[0];
-      console.log(`Using baseline image: "${primaryBaseline.name}" (priority: ${primaryBaseline.priority}, category: ${primaryBaseline.category})`);
-      console.log(`Baseline URL: ${primaryBaseline.url}`);
-
-      try {
-        const baselineUploadId = await uploadImageToLeonardo(leonardoApiKey, primaryBaseline.url);
-        if (baselineUploadId) {
-          styleReferenceId = baselineUploadId;
-          styleReferenceSource = `Baseline: ${primaryBaseline.name}`;
-          console.log(`Uploaded baseline to Leonardo: ${baselineUploadId}`);
-        } else {
-          console.warn(`Failed to upload baseline image to Leonardo, will try NASA/ESA fallback`);
-        }
-      } catch (err: any) {
-        console.error(`Error uploading baseline to Leonardo: ${err.message}`);
-      }
-    }
-
-    // Priority 2: Fall back to NASA/ESA reference if no baseline available
-    let referenceImage: ReferenceImage | null = null;
-    if (!styleReferenceId) {
-      console.log(`Fetching reference image for NFT #${nft.id}: ${nft.name}`);
-      const refResult = await prepareReferenceImage(nft, leonardoApiKey);
-      referenceImage = refResult.referenceImage;
-
-      if (refResult.leonardoImageId) {
-        styleReferenceId = refResult.leonardoImageId;
-        styleReferenceSource = `NASA/ESA: ${referenceImage?.source || 'Unknown'}`;
-      }
-    }
-
-    // Generate image with Leonardo AI
-    console.log(`=== STARTING LEONARDO GENERATION ===`);
-    console.log(`NFT: #${nft.id}: ${nft.name}`);
-    console.log(`Style reference: ${styleReferenceSource || 'None'}`);
-    console.log(`Model ID: ${imageConfig?.leonardoModelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3'}`);
-    console.log(`Dimensions: ${imageConfig?.imageWidth || 1024}x${imageConfig?.imageHeight || 1024}`);
-
+    // Generate image with FLUX.2 Pro (prompt-only approach with 9/10 success rate)
     let leonardoImageUrl: string;
     try {
-      leonardoImageUrl = await generateWithLeonardo(
+      leonardoImageUrl = await generateWithFlux(
         leonardoApiKey,
         prompt,
-        negativePrompt,
-        imageConfig?.leonardoModelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3', // Leonardo Phoenix
-        imageConfig?.imageWidth || 1024,
-        imageConfig?.imageHeight || 1024,
-        imageConfig?.guidanceScale || 7,
-        styleReferenceId
+        negativePrompt
       );
-      console.log(`Leonardo generation complete: ${leonardoImageUrl}`);
+      console.log(`FLUX.2 Pro generation complete: ${leonardoImageUrl}`);
     } catch (leonardoError: any) {
-      console.error(`Leonardo generation FAILED: ${leonardoError.message}`);
-      throw new Error(`Leonardo AI generation failed: ${leonardoError.message}`);
+      console.error(`FLUX.2 Pro generation FAILED: ${leonardoError.message}`);
+      throw new Error(`Leonardo FLUX.2 Pro generation failed: ${leonardoError.message}`);
     }
 
     // Upload image to Pinata
@@ -590,9 +390,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         image: ipfsUrl,
         imageIpfsHash: ipfsHash,
         metadataIpfsHash: metadataHash,
-        referenceImageUrl: referenceImage?.url || null,
-        referenceImageSource: referenceImage?.source || null,
-        leonardoRefImageId: styleReferenceId || null,
+        // Clear old reference fields since we're using prompt-only approach
+        referenceImageUrl: null,
+        referenceImageSource: null,
+        leonardoRefImageId: null,
         updatedAt: new Date(),
       },
     });
@@ -614,19 +415,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadataUrl: `https://gateway.pinata.cloud/ipfs/${metadataHash}`,
       promptUsed: prompt,
       negativePromptUsed: negativePrompt,
-      styleReference: styleReferenceSource ? {
-        source: styleReferenceSource,
-        leonardoId: styleReferenceId,
-      } : null,
-      baselineImages: baselineImages.length > 0 ? baselineImages.map(b => ({
-        name: b.name,
-        category: b.category,
-        objectType: b.objectType,
-      })) : null,
-      referenceImage: referenceImage ? {
-        url: referenceImage.url,
-        source: referenceImage.source,
-      } : null,
+      model: 'FLUX.2 Pro',
+      dimensions: `${FLUX_WIDTH}x${FLUX_HEIGHT}`,
       removedHashes: removedHashes.length > 0 ? removedHashes : undefined,
     });
   } catch (error: any) {

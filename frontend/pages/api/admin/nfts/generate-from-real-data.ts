@@ -12,11 +12,6 @@ import {
   PromptBuildOptions,
   validatePrompt,
 } from '../../../../lib/imagePromptTemplates';
-import {
-  getReferenceImage,
-  getFallbackReferenceImage,
-  type ReferenceImage,
-} from '../../../../lib/referenceImages';
 
 const MAX_NFTS = 20000;
 
@@ -306,36 +301,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Track prompt generation stats
       let promptsGenerated = 0;
       let promptWarnings = 0;
-      let skippedNoReference = 0;
 
       for (const obj of objectsToCreate) {
-        // Fetch reference image from NASA/ESA - REQUIRED for NFT creation
-        let referenceImage: ReferenceImage | null = null;
-
-        try {
-          console.log(`Fetching reference image for: ${obj.name} (${obj.objectType})`);
-          referenceImage = await getReferenceImage(obj.name, obj.objectType);
-          console.log(`getReferenceImage result for ${obj.name}:`, referenceImage ? `Found from ${referenceImage.source}` : 'null');
-        } catch (refError: any) {
-          console.error(`Error fetching reference image for ${obj.name}:`, refError?.message || refError);
-        }
-
-        // Try fallback by object type if no specific image found
-        if (!referenceImage && obj.objectType) {
-          referenceImage = getFallbackReferenceImage(obj.objectType);
-          if (referenceImage) {
-            console.log(`Using fallback reference image for ${obj.name} (${obj.objectType}): ${referenceImage.url}`);
-          }
-        }
-
-        // Skip objects without reference images - they cannot be minted
-        if (!referenceImage) {
-          console.log(`Skipping ${obj.name}: No reference image available from NASA/ESA`);
-          skippedNoReference++;
-          continue;
-        }
-
-        console.log(`Creating NFT for ${obj.name} with reference image from ${referenceImage.source}: ${referenceImage.url}`);
+        // Using prompt-only approach with FLUX.2 Pro
+        console.log(`Creating NFT for ${obj.name}`);
 
         const scores = calculateScores(obj);
         const totalScore = scores.distance + scores.mass + scores.luminosity + scores.temperature + scores.discovery;
@@ -376,13 +345,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             temperatureK: obj.temperature || null,
             luminosity: obj.luminosity || null,
             notableFeatures: obj.notableFeatures ? JSON.stringify(obj.notableFeatures) : null,
-            // Pre-generated image prompts
+            // Pre-generated image prompts for FLUX.2 Pro
             imagePrompt: promptResult.prompt,
             imageNegativePrompt: promptResult.negativePrompt,
             promptGeneratedAt: new Date(),
-            // Reference image from NASA/ESA (required)
-            referenceImageUrl: referenceImage.url,
-            referenceImageSource: referenceImage.source,
           },
         });
 
@@ -394,10 +360,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           totalScore: nft.totalScore,
           badgeTier: nft.badgeTier,
           source: 'Real Astronomical Data',
-          referenceImage: {
-            url: referenceImage.url,
-            source: referenceImage.source,
-          },
           promptGenerated: promptResult.isValid,
           promptWarnings: promptResult.warnings.length > 0 ? promptResult.warnings : undefined,
         });
@@ -405,17 +367,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       console.log(`Admin ${admin.email} generated ${generatedNfts.length} NFT(s) from real astronomical data`);
       console.log(`Image prompts: ${promptsGenerated} valid, ${promptWarnings} with warnings`);
-      if (skippedNoReference > 0) {
-        console.log(`Skipped ${skippedNoReference} object(s) - no reference images available`);
-      }
 
       const newTotal = await prisma.nFT.count();
 
       return res.json({
         success: true,
-        message: skippedNoReference > 0
-          ? `Generated ${generatedNfts.length} NFT(s) with reference images. Skipped ${skippedNoReference} object(s) without NASA/ESA reference images.`
-          : `Generated ${generatedNfts.length} NFT(s) from real astronomical data with reference images`,
+        message: `Generated ${generatedNfts.length} NFT(s) from real astronomical data with FLUX.2 Pro prompts`,
         generated: generatedNfts,
         remaining: {
           totalRealObjects: TOTAL_AVAILABLE_OBJECTS,
@@ -431,10 +388,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           withWarnings: promptWarnings,
           total: generatedNfts.length,
         },
-        referenceImageStats: {
-          withReferenceImage: generatedNfts.length,
-          skippedNoReference,
-        },
+        model: 'FLUX.2 Pro',
       });
     }
 
