@@ -47,33 +47,98 @@ async function getApiKey(service: string): Promise<string | null> {
   return null;
 }
 
-// FLUX image dimensions
-const FLUX_WIDTH = 1440;
-const FLUX_HEIGHT = 1440;
+// Image generation settings type
+interface LeonardoSettings {
+  modelId: string;
+  modelName: string;
+  width: number;
+  height: number;
+  contrast: number;
+  enhancePrompt: boolean;
+  numImages: number;
+  isPublic: boolean;
+}
 
-// FLUX model ID - from Leonardo AI docs
-const FLUX_MODEL_ID = 'b2614463-296c-462a-9586-aafdb8f00e36';
+// Default settings if not configured
+const DEFAULT_SETTINGS: LeonardoSettings = {
+  modelId: 'flux-pro-2.0',
+  modelName: 'FLUX.2 Pro',
+  width: 1440,
+  height: 1440,
+  contrast: 3.5,
+  enhancePrompt: false,
+  numImages: 1,
+  isPublic: false,
+};
 
-// Leonardo AI V1 API generation with FLUX model
-async function generateWithFlux(
+// Get Leonardo settings from database
+async function getLeonardoSettings(): Promise<LeonardoSettings> {
+  try {
+    const config = await prisma.imagePromptConfig.findUnique({
+      where: { id: 'main' },
+    });
+
+    if (config) {
+      return {
+        modelId: config.leonardoModelId || DEFAULT_SETTINGS.modelId,
+        modelName: config.leonardoModelName || DEFAULT_SETTINGS.modelName,
+        width: config.imageWidth || DEFAULT_SETTINGS.width,
+        height: config.imageHeight || DEFAULT_SETTINGS.height,
+        contrast: config.contrast || DEFAULT_SETTINGS.contrast,
+        enhancePrompt: config.enhancePrompt ?? DEFAULT_SETTINGS.enhancePrompt,
+        numImages: config.numImages || DEFAULT_SETTINGS.numImages,
+        isPublic: config.isPublic ?? DEFAULT_SETTINGS.isPublic,
+      };
+    }
+  } catch (err) {
+    console.warn('Failed to load Leonardo settings, using defaults:', err);
+  }
+  return DEFAULT_SETTINGS;
+}
+
+// Leonardo AI generation with configurable settings
+// Supports both V1 API (legacy models) and V2 API (FLUX.2 Pro)
+async function generateWithLeonardo(
   apiKey: string,
   prompt: string,
-  negativePrompt: string
+  negativePrompt: string,
+  settings: LeonardoSettings
 ): Promise<string> {
-  const requestBody = {
-    modelId: FLUX_MODEL_ID,
-    prompt: prompt,
-    negative_prompt: negativePrompt,
-    num_images: 1,
-    width: FLUX_WIDTH,
-    height: FLUX_HEIGHT,
-    contrast: 3.5,
-    enhancePrompt: false,
-  };
+  const isV2Model = settings.modelId === 'flux-pro-2.0';
 
-  console.log(`FLUX generating image...`);
+  let requestBody: any;
+  let apiUrl: string;
 
-  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/generations', {
+  if (isV2Model) {
+    apiUrl = 'https://cloud.leonardo.ai/api/rest/v2/generations';
+    requestBody = {
+      model: 'flux-pro-2.0',
+      public: settings.isPublic,
+      parameters: {
+        prompt: prompt,
+        quantity: settings.numImages,
+        width: settings.width,
+        height: settings.height,
+      },
+    };
+    console.log(`Using FLUX.2 Pro V2 API`);
+  } else {
+    apiUrl = 'https://cloud.leonardo.ai/api/rest/v1/generations';
+    requestBody = {
+      modelId: settings.modelId,
+      prompt: prompt,
+      negative_prompt: negativePrompt,
+      num_images: settings.numImages,
+      width: settings.width,
+      height: settings.height,
+      contrast: settings.contrast,
+      enhancePrompt: settings.enhancePrompt,
+      public: settings.isPublic,
+    };
+    console.log(`Using V1 API with model: ${settings.modelName}`);
+  }
+
+  const createRes = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -84,14 +149,16 @@ async function generateWithFlux(
 
   if (!createRes.ok) {
     const error = await createRes.text();
-    throw new Error(`Leonardo FLUX API error: ${error}`);
+    throw new Error(`Leonardo API error: ${error}`);
   }
 
   const createData = await createRes.json();
-  const generationId = createData.sdGenerationJob?.generationId;
+  const generationId = isV2Model
+    ? createData.generation?.id
+    : createData.sdGenerationJob?.generationId;
 
   if (!generationId) {
-    throw new Error('No generation ID returned from FLUX API');
+    throw new Error('No generation ID returned from Leonardo API');
   }
 
   // Poll for completion (max 3 minutes)
@@ -117,7 +184,7 @@ async function generateWithFlux(
     }
   }
 
-  throw new Error('FLUX generation timed out');
+  throw new Error('Leonardo generation timed out');
 }
 
 // Upload to Pinata
@@ -201,12 +268,13 @@ async function uploadMetadataToPinata(
   return uploadData.IpfsHash;
 }
 
-// Process a single NFT with FLUX.2 Pro (prompt-only approach)
+// Process a single NFT with Leonardo AI (uses stored settings)
 async function processNFT(
   nft: any,
   leonardoApiKey: string,
   pinataApiKey: string,
-  pinataSecretKey: string
+  pinataSecretKey: string,
+  settings: LeonardoSettings
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Use stored prompts from database (generated by imagePromptTemplates)
@@ -217,8 +285,8 @@ async function processNFT(
       return { success: false, error: 'No image prompt stored for this NFT' };
     }
 
-    // Generate image with FLUX.2 Pro
-    const leonardoImageUrl = await generateWithFlux(leonardoApiKey, prompt, negativePrompt);
+    // Generate image with Leonardo AI (uses stored settings)
+    const leonardoImageUrl = await generateWithLeonardo(leonardoApiKey, prompt, negativePrompt, settings);
 
     // Upload to IPFS
     const { hash: ipfsHash, url: ipfsUrl } = await uploadToPinata(leonardoImageUrl, pinataApiKey, pinataSecretKey, nft.name);
@@ -267,6 +335,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Load Leonardo settings from database
+    const settings = await getLeonardoSettings();
+
     // Find NFTs that need images (limit to batch size for cron timeout)
     const BATCH_SIZE = 5; // Process 5 at a time to stay within Vercel timeout
     const nftsNeedingImages = await prisma.nFT.findMany({
@@ -288,7 +359,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    console.log(`Processing ${nftsNeedingImages.length} NFTs for image generation with FLUX.2 Pro`);
+    console.log(`Processing ${nftsNeedingImages.length} NFTs for image generation with ${settings.modelName}`);
 
     let succeeded = 0;
     let failed = 0;
@@ -296,7 +367,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     for (const nft of nftsNeedingImages) {
       console.log(`Generating image for: ${nft.name} (ID: ${nft.id})`);
-      const result = await processNFT(nft, leonardoApiKey, pinataApiKey, pinataSecretKey);
+      const result = await processNFT(nft, leonardoApiKey, pinataApiKey, pinataSecretKey, settings);
 
       if (result.success) {
         succeeded++;
@@ -317,12 +388,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     res.json({
-      message: 'Image generation batch complete (FLUX.2 Pro)',
+      message: `Image generation batch complete (${settings.modelName})`,
       processed: nftsNeedingImages.length,
       succeeded,
       failed,
       remaining,
-      model: 'FLUX.2 Pro',
+      model: settings.modelName,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: any) {

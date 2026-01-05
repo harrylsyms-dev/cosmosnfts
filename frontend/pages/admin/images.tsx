@@ -33,6 +33,38 @@ interface RegenerateProgress {
   isRunning: boolean;
 }
 
+interface LeonardoModel {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface DimensionPreset {
+  width: number;
+  height: number;
+  label: string;
+}
+
+interface LeonardoSettings {
+  modelId: string;
+  modelName: string;
+  width: number;
+  height: number;
+  contrast: number;
+  enhancePrompt: boolean;
+  guidanceScale: number;
+  numImages: number;
+  isPublic: boolean;
+}
+
+interface LeonardoSettingsResponse {
+  success: boolean;
+  settings: LeonardoSettings;
+  availableModels: LeonardoModel[];
+  contrastValues: number[];
+  dimensionPresets: DimensionPreset[];
+}
+
 export default function AdminImages() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -47,6 +79,13 @@ export default function AdminImages() {
   const [promptStats, setPromptStats] = useState<PromptStats | null>(null);
   const [regenProgress, setRegenProgress] = useState<RegenerateProgress | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+
+  // Leonardo settings state
+  const [leonardoSettings, setLeonardoSettings] = useState<LeonardoSettings | null>(null);
+  const [availableModels, setAvailableModels] = useState<LeonardoModel[]>([]);
+  const [contrastValues, setContrastValues] = useState<number[]>([]);
+  const [dimensionPresets, setDimensionPresets] = useState<DimensionPreset[]>([]);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -65,11 +104,82 @@ export default function AdminImages() {
         return;
       }
 
-      await Promise.all([fetchStats(), fetchApiStatus(), fetchPromptStats()]);
+      await Promise.all([fetchStats(), fetchApiStatus(), fetchPromptStats(), fetchLeonardoSettings()]);
     } catch (error) {
       router.push('/admin/login');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchLeonardoSettings() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/leonardo-settings`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data: LeonardoSettingsResponse = await res.json();
+        setLeonardoSettings(data.settings);
+        setAvailableModels(data.availableModels);
+        setContrastValues(data.contrastValues);
+        setDimensionPresets(data.dimensionPresets);
+      }
+    } catch (error) {
+      console.error('Failed to fetch Leonardo settings:', error);
+    }
+  }
+
+  async function saveLeonardoSettings() {
+    if (!leonardoSettings) return;
+
+    setIsSavingSettings(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/leonardo-settings`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(leonardoSettings),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'Leonardo settings saved successfully!' });
+        setLeonardoSettings(data.settings);
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to save settings' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save settings' });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
+  function handleModelChange(modelId: string) {
+    const model = availableModels.find(m => m.id === modelId);
+    if (model && leonardoSettings) {
+      setLeonardoSettings({
+        ...leonardoSettings,
+        modelId: model.id,
+        modelName: model.name,
+      });
+    }
+  }
+
+  function handleDimensionChange(preset: DimensionPreset) {
+    if (leonardoSettings) {
+      setLeonardoSettings({
+        ...leonardoSettings,
+        width: preset.width,
+        height: preset.height,
+      });
     }
   }
 
@@ -329,6 +439,161 @@ export default function AdminImages() {
                     Pinata IPFS: {apiStatus.configured.pinata ? 'Configured' : 'Not Configured'}
                   </span>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Leonardo AI Settings */}
+          {leonardoSettings && (
+            <div className="bg-gray-900 rounded-lg p-6 border border-purple-800 mb-8">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <span className="text-purple-400">⚙</span>
+                Leonardo AI Settings
+              </h2>
+              <p className="text-gray-400 mb-6">
+                Configure the Leonardo AI image generation parameters. Changes will apply to all new image generations.
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Model Selection */}
+                <div>
+                  <label className="block text-gray-400 text-sm mb-2">Model</label>
+                  <select
+                    value={leonardoSettings.modelId}
+                    onChange={(e) => handleModelChange(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  >
+                    {availableModels.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.name} - {model.description}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-gray-500 text-xs mt-1">
+                    {leonardoSettings.modelId === 'flux-pro-2.0'
+                      ? 'FLUX.2 Pro uses V2 API for best quality'
+                      : 'Legacy models use V1 API'}
+                  </p>
+                </div>
+
+                {/* Image Dimensions */}
+                <div>
+                  <label className="block text-gray-400 text-sm mb-2">Dimensions</label>
+                  <select
+                    value={`${leonardoSettings.width}x${leonardoSettings.height}`}
+                    onChange={(e) => {
+                      const preset = dimensionPresets.find(d => `${d.width}x${d.height}` === e.target.value);
+                      if (preset) handleDimensionChange(preset);
+                    }}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  >
+                    {dimensionPresets.map((preset) => (
+                      <option key={preset.label} value={`${preset.width}x${preset.height}`}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Contrast (for V1 models) */}
+                {leonardoSettings.modelId !== 'flux-pro-2.0' && (
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">Contrast</label>
+                    <select
+                      value={leonardoSettings.contrast}
+                      onChange={(e) => setLeonardoSettings({ ...leonardoSettings, contrast: parseFloat(e.target.value) })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                    >
+                      {contrastValues.map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Number of Images */}
+                <div>
+                  <label className="block text-gray-400 text-sm mb-2">Images per Generation</label>
+                  <select
+                    value={leonardoSettings.numImages}
+                    onChange={(e) => setLeonardoSettings({ ...leonardoSettings, numImages: parseInt(e.target.value) })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  >
+                    {[1, 2, 3, 4].map((num) => (
+                      <option key={num} value={num}>{num}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Toggle Options */}
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                  <div>
+                    <p className="text-white font-medium">Prompt Enhance</p>
+                    <p className="text-gray-400 text-sm">
+                      Let Leonardo AI enhance your prompts (NOT recommended for scientific imagery)
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setLeonardoSettings({ ...leonardoSettings, enhancePrompt: !leonardoSettings.enhancePrompt })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      leonardoSettings.enhancePrompt ? 'bg-purple-600' : 'bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        leonardoSettings.enhancePrompt ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                  <div>
+                    <p className="text-white font-medium">Privacy Mode</p>
+                    <p className="text-gray-400 text-sm">
+                      {leonardoSettings.isPublic
+                        ? 'Images are public on Leonardo AI'
+                        : 'Images are private (only visible to you)'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setLeonardoSettings({ ...leonardoSettings, isPublic: !leonardoSettings.isPublic })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      !leonardoSettings.isPublic ? 'bg-green-600' : 'bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        !leonardoSettings.isPublic ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Current Settings Summary */}
+              <div className="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                <p className="text-gray-400 text-sm">
+                  <strong className="text-white">Current Configuration:</strong>{' '}
+                  {leonardoSettings.modelName} at {leonardoSettings.width}x{leonardoSettings.height},{' '}
+                  {leonardoSettings.enhancePrompt ? 'Enhanced Prompts' : 'Raw Prompts'},{' '}
+                  {leonardoSettings.isPublic ? 'Public' : 'Private'} mode
+                </p>
+              </div>
+
+              {/* Save Button */}
+              <div className="mt-6">
+                <button
+                  onClick={saveLeonardoSettings}
+                  disabled={isSavingSettings}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingSettings ? 'Saving...' : 'Save Settings'}
+                </button>
               </div>
             </div>
           )}
