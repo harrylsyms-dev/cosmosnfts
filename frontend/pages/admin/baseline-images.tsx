@@ -44,9 +44,24 @@ export default function BaselineImagesAdmin() {
   const [uploadCategory, setUploadCategory] = useState('style');
   const [uploadPriority, setUploadPriority] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
 
   // Selected image for preview
   const [selectedImage, setSelectedImage] = useState<BaselineImage | null>(null);
+
+  // Handle file selection for preview
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setUploadPreview(null);
+    }
+  }
 
   useEffect(() => {
     checkAuth();
@@ -133,6 +148,7 @@ export default function BaselineImagesAdmin() {
         setUploadObjectType('');
         setUploadCategory('style');
         setUploadPriority(0);
+        setUploadPreview(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
         await fetchBaselines();
       } else {
@@ -226,9 +242,34 @@ export default function BaselineImagesAdmin() {
                       type="file"
                       ref={fileInputRef}
                       accept="image/*"
+                      onChange={handleFileChange}
                       className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white text-sm"
                     />
                   </div>
+
+                  {/* Image Preview */}
+                  {uploadPreview && (
+                    <div className="relative">
+                      <label className="block text-sm text-gray-300 mb-1">Preview</label>
+                      <div className="relative rounded-lg overflow-hidden border border-gray-600">
+                        <img
+                          src={uploadPreview}
+                          alt="Upload preview"
+                          className="w-full h-48 object-contain bg-gray-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadPreview(null);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }}
+                          className="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded text-xs"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm text-gray-300 mb-1">Name *</label>
