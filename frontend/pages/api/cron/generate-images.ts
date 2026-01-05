@@ -47,31 +47,33 @@ async function getApiKey(service: string): Promise<string | null> {
   return null;
 }
 
-// FLUX.2 Pro image dimensions
+// FLUX image dimensions
 const FLUX_WIDTH = 1440;
 const FLUX_HEIGHT = 1440;
 
-// Leonardo AI V2 API generation with FLUX.2 Pro
+// FLUX model ID - from Leonardo AI docs
+const FLUX_MODEL_ID = 'b2614463-296c-462a-9586-aafdb8f00e36';
+
+// Leonardo AI V1 API generation with FLUX model
 async function generateWithFlux(
   apiKey: string,
   prompt: string,
   negativePrompt: string
 ): Promise<string> {
   const requestBody = {
-    public: false,
-    model: 'flux-pro-2.0',
-    parameters: {
-      prompt: prompt,
-      negative_prompt: negativePrompt,
-      quantity: 1,
-      width: FLUX_WIDTH,
-      height: FLUX_HEIGHT,
-    },
+    modelId: FLUX_MODEL_ID,
+    prompt: prompt,
+    negative_prompt: negativePrompt,
+    num_images: 1,
+    width: FLUX_WIDTH,
+    height: FLUX_HEIGHT,
+    contrast: 3.5,
+    enhancePrompt: false,
   };
 
-  console.log(`FLUX.2 Pro generating image...`);
+  console.log(`FLUX generating image...`);
 
-  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v2/generations', {
+  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/generations', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -86,36 +88,36 @@ async function generateWithFlux(
   }
 
   const createData = await createRes.json();
-  const generationId = createData.generation?.id;
+  const generationId = createData.sdGenerationJob?.generationId;
 
   if (!generationId) {
-    throw new Error('No generation ID returned from FLUX.2 Pro API');
+    throw new Error('No generation ID returned from FLUX API');
   }
 
   // Poll for completion (max 3 minutes)
   for (let i = 0; i < 36; i++) {
     await new Promise(resolve => setTimeout(resolve, 5000));
 
-    const statusRes = await fetch(`https://cloud.leonardo.ai/api/rest/v2/generations/${generationId}`, {
+    const statusRes = await fetch(`https://cloud.leonardo.ai/api/rest/v1/generations/${generationId}`, {
       headers: { 'Authorization': `Bearer ${apiKey}` },
     });
 
     if (!statusRes.ok) continue;
 
     const statusData = await statusRes.json();
-    const generation = statusData.generation;
+    const generation = statusData.generations_by_pk;
 
     if (generation?.status === 'FAILED') {
       throw new Error(`Generation failed: ${generation.failureReason || 'Unknown reason'}`);
     }
 
-    const images = generation?.assets;
+    const images = generation?.generated_images;
     if (images && images.length > 0 && images[0].url) {
       return images[0].url;
     }
   }
 
-  throw new Error('FLUX.2 Pro generation timed out');
+  throw new Error('FLUX generation timed out');
 }
 
 // Upload to Pinata

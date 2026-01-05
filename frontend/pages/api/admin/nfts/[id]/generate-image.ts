@@ -52,33 +52,35 @@ async function getApiKey(service: string): Promise<string | null> {
 const FLUX_WIDTH = 1440;
 const FLUX_HEIGHT = 1440;
 
-// Leonardo AI V2 API generation with FLUX.2 Pro
+// FLUX model ID - from Leonardo AI docs
+// Using FLUX Precision (Dev) model for higher quality
+const FLUX_MODEL_ID = 'b2614463-296c-462a-9586-aafdb8f00e36';
+
+// Leonardo AI V1 API generation with FLUX model
 // Based on tested prompt configuration with 9/10 success rate
 async function generateWithFlux(
   apiKey: string,
   prompt: string,
   negativePrompt: string
 ): Promise<string> {
-  // Build V2 API request body for FLUX.2 Pro
+  // Build V1 API request body for FLUX
+  // FLUX uses V1 endpoint with modelId, contrast, and enhancePrompt: false
   const requestBody = {
-    public: false,
-    model: 'flux-pro-2.0',
-    parameters: {
-      prompt: prompt,
-      negative_prompt: negativePrompt,
-      quantity: 1,
-      width: FLUX_WIDTH,
-      height: FLUX_HEIGHT,
-      // CRITICAL: Prompt Enhance must be OFF for accurate scientific imagery
-      // Without this, the model adds artistic interpretations
-    },
+    modelId: FLUX_MODEL_ID,
+    prompt: prompt,
+    negative_prompt: negativePrompt,
+    num_images: 1,
+    width: FLUX_WIDTH,
+    height: FLUX_HEIGHT,
+    contrast: 3.5, // Required for FLUX models (valid: 1.0, 1.3, 1.8, 2.5, 3, 3.5, 4, 4.5)
+    enhancePrompt: false, // CRITICAL: Must be OFF for accurate scientific imagery
   };
 
   // Log the request for debugging
-  console.log(`FLUX.2 Pro API request:`, JSON.stringify(requestBody, null, 2));
+  console.log(`FLUX API request:`, JSON.stringify(requestBody, null, 2));
 
-  // Create generation using V2 API endpoint
-  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v2/generations', {
+  // Create generation using V1 API endpoint
+  const createRes = await fetch('https://cloud.leonardo.ai/api/rest/v1/generations', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -93,23 +95,23 @@ async function generateWithFlux(
   }
 
   const createData = await createRes.json();
-  console.log(`FLUX.2 Pro generation response:`, JSON.stringify(createData, null, 2));
+  console.log(`FLUX generation response:`, JSON.stringify(createData, null, 2));
 
-  // V2 API response structure
-  const generationId = createData.generation?.id;
+  // V1 API response structure
+  const generationId = createData.sdGenerationJob?.generationId;
 
   if (!generationId) {
-    throw new Error('No generation ID returned from FLUX.2 Pro API');
+    throw new Error('No generation ID returned from FLUX API');
   }
 
-  console.log(`FLUX.2 Pro generation started: ${generationId}`);
+  console.log(`FLUX generation started: ${generationId}`);
 
   // Poll for completion (max 3 minutes for FLUX - it can take longer)
   for (let i = 0; i < 36; i++) {
     await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
 
-    // Check generation status using V2 endpoint
-    const statusRes = await fetch(`https://cloud.leonardo.ai/api/rest/v2/generations/${generationId}`, {
+    // Check generation status using V1 endpoint
+    const statusRes = await fetch(`https://cloud.leonardo.ai/api/rest/v1/generations/${generationId}`, {
       headers: { 'Authorization': `Bearer ${apiKey}` },
     });
 
@@ -119,23 +121,23 @@ async function generateWithFlux(
     }
 
     const statusData = await statusRes.json();
-    const generation = statusData.generation;
+    const generation = statusData.generations_by_pk;
 
     if (generation?.status === 'FAILED') {
       throw new Error(`Generation failed: ${generation.failureReason || 'Unknown reason'}`);
     }
 
     // Check for completed images
-    const images = generation?.assets;
+    const images = generation?.generated_images;
     if (images && images.length > 0 && images[0].url) {
-      console.log(`FLUX.2 Pro generation complete after ${(i + 1) * 5} seconds`);
+      console.log(`FLUX generation complete after ${(i + 1) * 5} seconds`);
       return images[0].url;
     }
 
     console.log(`Status check ${i + 1}/36: ${generation?.status || 'pending'}`);
   }
 
-  throw new Error('FLUX.2 Pro generation timed out after 3 minutes');
+  throw new Error('FLUX generation timed out after 3 minutes');
 }
 
 // Unpin (remove) from Pinata
