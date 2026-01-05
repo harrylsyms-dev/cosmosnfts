@@ -28,8 +28,17 @@ function decryptApiKey(encryptedData: string): string {
   return decrypted;
 }
 
-// Get Pinata API keys from database
+// Get Pinata API keys from environment or database
 async function getPinataKeys(): Promise<{ apiKey: string; secretKey: string } | null> {
+  // First check environment variables
+  if (process.env.PINATA_API_KEY && process.env.PINATA_API_SECRET) {
+    return {
+      apiKey: process.env.PINATA_API_KEY,
+      secretKey: process.env.PINATA_API_SECRET,
+    };
+  }
+
+  // Fall back to database
   try {
     const apiKeyRecord = await prisma.apiKey.findUnique({ where: { service: 'pinata_api' } });
     const secretKeyRecord = await prisma.apiKey.findUnique({ where: { service: 'pinata_secret' } });
