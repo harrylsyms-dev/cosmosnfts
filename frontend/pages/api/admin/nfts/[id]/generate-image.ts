@@ -496,7 +496,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Fetch baseline images from database (user-uploaded style references)
     console.log(`Fetching baseline images for object type: ${nft.objectType}`);
-    const baselineImages = await getBaselineImages(nft.objectType);
+    let baselineImages: BaselineImageData[] = [];
+    try {
+      baselineImages = await getBaselineImages(nft.objectType);
+      console.log(`Found ${baselineImages.length} baseline images`);
+    } catch (err: any) {
+      console.error(`Failed to fetch baseline images: ${err.message}`);
+    }
 
     let styleReferenceId: string | null = null;
     let styleReferenceSource: string | null = null;
@@ -505,12 +511,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (baselineImages.length > 0) {
       const primaryBaseline = baselineImages[0];
       console.log(`Using baseline image: "${primaryBaseline.name}" (priority: ${primaryBaseline.priority}, category: ${primaryBaseline.category})`);
+      console.log(`Baseline URL: ${primaryBaseline.url}`);
 
-      const baselineUploadId = await uploadImageToLeonardo(leonardoApiKey, primaryBaseline.url);
-      if (baselineUploadId) {
-        styleReferenceId = baselineUploadId;
-        styleReferenceSource = `Baseline: ${primaryBaseline.name}`;
-        console.log(`Uploaded baseline to Leonardo: ${baselineUploadId}`);
+      try {
+        const baselineUploadId = await uploadImageToLeonardo(leonardoApiKey, primaryBaseline.url);
+        if (baselineUploadId) {
+          styleReferenceId = baselineUploadId;
+          styleReferenceSource = `Baseline: ${primaryBaseline.name}`;
+          console.log(`Uploaded baseline to Leonardo: ${baselineUploadId}`);
+        } else {
+          console.warn(`Failed to upload baseline image to Leonardo, will try NASA/ESA fallback`);
+        }
+      } catch (err: any) {
+        console.error(`Error uploading baseline to Leonardo: ${err.message}`);
       }
     }
 
@@ -528,19 +541,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Generate image with Leonardo AI
-    console.log(`Generating image for NFT #${nft.id}: ${nft.name}`);
+    console.log(`=== STARTING LEONARDO GENERATION ===`);
+    console.log(`NFT: #${nft.id}: ${nft.name}`);
     console.log(`Style reference: ${styleReferenceSource || 'None'}`);
+    console.log(`Model ID: ${imageConfig?.leonardoModelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3'}`);
+    console.log(`Dimensions: ${imageConfig?.imageWidth || 1024}x${imageConfig?.imageHeight || 1024}`);
 
-    const leonardoImageUrl = await generateWithLeonardo(
-      leonardoApiKey,
-      prompt,
-      negativePrompt,
-      imageConfig?.leonardoModelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3', // Leonardo Phoenix
-      imageConfig?.imageWidth || 1024,
-      imageConfig?.imageHeight || 1024,
-      imageConfig?.guidanceScale || 7,
-      styleReferenceId
-    );
+    let leonardoImageUrl: string;
+    try {
+      leonardoImageUrl = await generateWithLeonardo(
+        leonardoApiKey,
+        prompt,
+        negativePrompt,
+        imageConfig?.leonardoModelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3', // Leonardo Phoenix
+        imageConfig?.imageWidth || 1024,
+        imageConfig?.imageHeight || 1024,
+        imageConfig?.guidanceScale || 7,
+        styleReferenceId
+      );
+      console.log(`Leonardo generation complete: ${leonardoImageUrl}`);
+    } catch (leonardoError: any) {
+      console.error(`Leonardo generation FAILED: ${leonardoError.message}`);
+      throw new Error(`Leonardo AI generation failed: ${leonardoError.message}`);
+    }
 
     // Upload image to Pinata
     console.log(`Uploading image to Pinata...`);
