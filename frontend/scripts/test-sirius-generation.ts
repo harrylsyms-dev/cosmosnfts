@@ -77,25 +77,10 @@ async function main() {
   console.log('\n--- Negative Prompt ---');
   console.log(sirius.imageNegativePrompt || '(none)');
 
-  // Step 2: Get Leonardo API key
-  console.log('\n\nStep 2: Getting Leonardo API key...');
-  let leonardoApiKey = process.env.LEONARDO_API_KEY;
-
-  if (!leonardoApiKey) {
-    const stored = await prisma.apiKey.findUnique({
-      where: { service: 'leonardo' },
-      select: { encryptedKey: true }
-    });
-    if (stored?.encryptedKey) {
-      leonardoApiKey = decryptApiKey(stored.encryptedKey);
-    }
-  }
-
-  if (!leonardoApiKey) {
-    console.log('ERROR: No Leonardo API key found!');
-    return;
-  }
-  console.log('Leonardo API key found: ' + leonardoApiKey.substring(0, 8) + '...');
+  // Step 2: Use new Leonardo API key
+  console.log('\n\nStep 2: Using Leonardo API key...');
+  const leonardoApiKey = 'a5bb99bf-7c5f-40fe-a5fa-6b0888f1e502';
+  console.log('Leonardo API key: ' + leonardoApiKey.substring(0, 8) + '...');
 
   // Step 3: Test Leonardo V1 API with FLUX model
   console.log('\n\nStep 3: Testing Leonardo V1 API with FLUX model...');
