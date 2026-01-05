@@ -153,8 +153,10 @@ async function generateWithLeonardo(
   }
 
   const createData = await createRes.json();
+  // V2 returns: { generate: { generationId: "..." } }
+  // V1 returns: { sdGenerationJob: { generationId: "..." } }
   const generationId = isV2Model
-    ? createData.generation?.id
+    ? createData.generate?.generationId
     : createData.sdGenerationJob?.generationId;
 
   if (!generationId) {
