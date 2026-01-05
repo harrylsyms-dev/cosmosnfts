@@ -23,10 +23,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get total from paid benefactor payments
     const paidPayments = await prisma.benefactorPayment.aggregate({
       where: { status: 'PAID' },
-      _sum: { amountCents: true },
+      _sum: { totalOwedCents: true },
     });
 
-    const totalDonatedCents = paidPayments._sum?.amountCents || 0;
+    const totalDonatedCents = paidPayments._sum?.totalOwedCents || 0;
     const percentage = settings?.percentage || 5;
 
     res.json({
