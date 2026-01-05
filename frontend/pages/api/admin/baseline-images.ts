@@ -14,18 +14,31 @@ export const config = {
 // Decrypt encrypted API key
 function decryptApiKey(encryptedData: string): string {
   const crypto = require('crypto');
-  const algorithm = 'aes-256-gcm';
-  const encryptionKey = process.env.API_KEY_ENCRYPTION_KEY || process.env.NEXTAUTH_SECRET || 'default-key-for-dev';
-  const key = crypto.scryptSync(encryptionKey, 'salt', 32);
+  const encryptionKey = process.env.ENCRYPTION_KEY;
 
-  const [ivHex, authTagHex, encrypted] = encryptedData.split(':');
-  const iv = Buffer.from(ivHex, 'hex');
-  const authTag = Buffer.from(authTagHex, 'hex');
-  const decipher = crypto.createDecipheriv(algorithm, key, iv);
-  decipher.setAuthTag(authTag);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+  // If no encryption key was used, return as-is
+  if (!encryptionKey || !encryptedData.includes(':')) {
+    return encryptedData;
+  }
+
+  try {
+    const parts = encryptedData.split(':');
+    if (parts.length !== 3) return encryptedData;
+
+    const iv = Buffer.from(parts[0], 'hex');
+    const authTag = Buffer.from(parts[1], 'hex');
+    const encrypted = parts[2];
+
+    const key = crypto.scryptSync(encryptionKey, 'salt', 32);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch {
+    return encryptedData;
+  }
 }
 
 // Get Pinata API keys from environment or database
