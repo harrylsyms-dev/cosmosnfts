@@ -452,6 +452,24 @@ model ApiKey {
   @@map("api_keys")
 }
 
+// Baseline Images for AI Feedback Loop
+// User uploads images representing their desired style
+model BaselineImage {
+  id            String    @id @default(uuid())
+  name          String    // User-provided name for the image
+  description   String?   // Optional description of what this baseline represents
+  url           String    // IPFS or cloud storage URL
+  ipfsHash      String?   @map("ipfs_hash")  // IPFS hash if stored on IPFS
+  objectType    String?   @map("object_type")  // Optional: Star, Galaxy, Nebula, etc.
+  category      String    @default("style")  // "style", "composition", "color", "reference"
+  isActive      Boolean   @default(true) @map("is_active")
+  priority      Int       @default(0)  // Higher priority = more influence
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("baseline_images")
+}
+
 // User (Wallet-based authentication)
 model User {
   id            String    @id @default(uuid())
