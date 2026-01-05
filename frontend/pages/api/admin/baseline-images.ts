@@ -75,10 +75,24 @@ async function uploadToPinata(
   apiKey: string,
   secretKey: string
 ): Promise<{ url: string; ipfsHash: string }> {
-  const FormData = require('form-data');
-  const formData = new FormData();
+  // Read file into buffer
+  const fileBuffer = fs.readFileSync(filePath);
 
-  formData.append('file', fs.createReadStream(filePath), fileName);
+  // Determine mime type from extension
+  const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+  const mimeTypes: Record<string, string> = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+  };
+  const mimeType = mimeTypes[ext] || 'image/jpeg';
+
+  // Create form data using native FormData and Blob
+  const formData = new FormData();
+  const blob = new Blob([fileBuffer], { type: mimeType });
+  formData.append('file', blob, fileName);
   formData.append('pinataMetadata', JSON.stringify({
     name: `baseline-${fileName}`,
   }));
@@ -88,7 +102,6 @@ async function uploadToPinata(
     headers: {
       'pinata_api_key': apiKey,
       'pinata_secret_api_key': secretKey,
-      ...formData.getHeaders(),
     },
     body: formData,
   });
