@@ -183,6 +183,9 @@ async function prepareReferenceImage(
   return { referenceImage, leonardoImageId };
 }
 
+// Leonardo Phoenix model ID - required for style reference support
+const LEONARDO_PHOENIX_MODEL = 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3';
+
 // Leonardo AI generation
 async function generateWithLeonardo(
   apiKey: string,
@@ -194,11 +197,18 @@ async function generateWithLeonardo(
   guidanceScale: number,
   styleReferenceId?: string | null
 ): Promise<string> {
+  // If using style reference, MUST use Phoenix model (only model that supports controlnets with style reference)
+  let effectiveModelId = modelId || LEONARDO_PHOENIX_MODEL;
+  if (styleReferenceId && effectiveModelId !== LEONARDO_PHOENIX_MODEL) {
+    console.log(`Style reference requires Phoenix model - switching from ${effectiveModelId} to Phoenix`);
+    effectiveModelId = LEONARDO_PHOENIX_MODEL;
+  }
+
   // Build request body
   const requestBody: Record<string, unknown> = {
     prompt,
     negative_prompt: negativePrompt,
-    modelId: modelId || 'de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3', // Leonardo Phoenix - supports style reference
+    modelId: effectiveModelId,
     width: width || 1024,
     height: height || 1024,
     num_images: 1,
@@ -207,7 +217,7 @@ async function generateWithLeonardo(
     promptMagic: false,
   };
 
-  // Add style reference if available (supported by Phoenix and SDXL models)
+  // Add style reference if available (only works with Phoenix model)
   if (styleReferenceId) {
     requestBody.controlnets = [{
       initImageId: styleReferenceId,
