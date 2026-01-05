@@ -443,161 +443,6 @@ export default function AdminImages() {
             </div>
           )}
 
-          {/* Leonardo AI Settings */}
-          {leonardoSettings && (
-            <div className="bg-gray-900 rounded-lg p-6 border border-purple-800 mb-8">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <span className="text-purple-400">⚙</span>
-                Leonardo AI Settings
-              </h2>
-              <p className="text-gray-400 mb-6">
-                Configure the Leonardo AI image generation parameters. Changes will apply to all new image generations.
-              </p>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Model Selection */}
-                <div>
-                  <label className="block text-gray-400 text-sm mb-2">Model</label>
-                  <select
-                    value={leonardoSettings.modelId}
-                    onChange={(e) => handleModelChange(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                  >
-                    {availableModels.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.name} - {model.description}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-gray-500 text-xs mt-1">
-                    {leonardoSettings.modelId === 'flux-pro-2.0'
-                      ? 'FLUX.2 Pro uses V2 API for best quality'
-                      : 'Legacy models use V1 API'}
-                  </p>
-                </div>
-
-                {/* Image Dimensions */}
-                <div>
-                  <label className="block text-gray-400 text-sm mb-2">Dimensions</label>
-                  <select
-                    value={`${leonardoSettings.width}x${leonardoSettings.height}`}
-                    onChange={(e) => {
-                      const preset = dimensionPresets.find(d => `${d.width}x${d.height}` === e.target.value);
-                      if (preset) handleDimensionChange(preset);
-                    }}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                  >
-                    {dimensionPresets.map((preset) => (
-                      <option key={preset.label} value={`${preset.width}x${preset.height}`}>
-                        {preset.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Contrast (for V1 models) */}
-                {leonardoSettings.modelId !== 'flux-pro-2.0' && (
-                  <div>
-                    <label className="block text-gray-400 text-sm mb-2">Contrast</label>
-                    <select
-                      value={leonardoSettings.contrast}
-                      onChange={(e) => setLeonardoSettings({ ...leonardoSettings, contrast: parseFloat(e.target.value) })}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                    >
-                      {contrastValues.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Number of Images */}
-                <div>
-                  <label className="block text-gray-400 text-sm mb-2">Images per Generation</label>
-                  <select
-                    value={leonardoSettings.numImages}
-                    onChange={(e) => setLeonardoSettings({ ...leonardoSettings, numImages: parseInt(e.target.value) })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                  >
-                    {[1, 2, 3, 4].map((num) => (
-                      <option key={num} value={num}>{num}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Toggle Options */}
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">Prompt Enhance</p>
-                    <p className="text-gray-400 text-sm">
-                      Let Leonardo AI enhance your prompts (NOT recommended for scientific imagery)
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setLeonardoSettings({ ...leonardoSettings, enhancePrompt: !leonardoSettings.enhancePrompt })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      leonardoSettings.enhancePrompt ? 'bg-purple-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        leonardoSettings.enhancePrompt ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">Privacy Mode</p>
-                    <p className="text-gray-400 text-sm">
-                      {leonardoSettings.isPublic
-                        ? 'Images are public on Leonardo AI'
-                        : 'Images are private (only visible to you)'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setLeonardoSettings({ ...leonardoSettings, isPublic: !leonardoSettings.isPublic })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      !leonardoSettings.isPublic ? 'bg-green-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        !leonardoSettings.isPublic ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Current Settings Summary */}
-              <div className="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-                <p className="text-gray-400 text-sm">
-                  <strong className="text-white">Current Configuration:</strong>{' '}
-                  {leonardoSettings.modelName} at {leonardoSettings.width}x{leonardoSettings.height},{' '}
-                  {leonardoSettings.enhancePrompt ? 'Enhanced Prompts' : 'Raw Prompts'},{' '}
-                  {leonardoSettings.isPublic ? 'Public' : 'Private'} mode
-                </p>
-              </div>
-
-              {/* Save Button */}
-              <div className="mt-6">
-                <button
-                  onClick={saveLeonardoSettings}
-                  disabled={isSavingSettings}
-                  className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSavingSettings ? 'Saving...' : 'Save Settings'}
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Prompt Info */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
             <h2 className="text-xl font-bold mb-4">Image Prompts</h2>
@@ -688,6 +533,96 @@ export default function AdminImages() {
             <p className="text-gray-400 mb-4">
               Generate AI images for NFTs by phase. Images are uploaded to Pinata IPFS.
             </p>
+
+            {/* Leonardo Settings */}
+            {leonardoSettings && (
+              <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                <h3 className="text-lg font-semibold mb-4 text-purple-400">Leonardo AI Settings</h3>
+
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  {/* Model */}
+                  <div>
+                    <label className="block text-gray-400 text-xs mb-1">Model</label>
+                    <select
+                      value={leonardoSettings.modelId}
+                      onChange={(e) => handleModelChange(e.target.value)}
+                      className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm"
+                    >
+                      {availableModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Dimensions */}
+                  <div>
+                    <label className="block text-gray-400 text-xs mb-1">Dimensions</label>
+                    <select
+                      value={`${leonardoSettings.width}x${leonardoSettings.height}`}
+                      onChange={(e) => {
+                        const preset = dimensionPresets.find(d => `${d.width}x${d.height}` === e.target.value);
+                        if (preset) handleDimensionChange(preset);
+                      }}
+                      className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm"
+                    >
+                      {dimensionPresets.map((preset) => (
+                        <option key={preset.label} value={`${preset.width}x${preset.height}`}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Prompt Enhance */}
+                  <div>
+                    <label className="block text-gray-400 text-xs mb-1">Prompt Enhance</label>
+                    <button
+                      type="button"
+                      onClick={() => setLeonardoSettings({ ...leonardoSettings, enhancePrompt: !leonardoSettings.enhancePrompt })}
+                      className={`w-full px-3 py-1.5 rounded text-sm font-medium ${
+                        leonardoSettings.enhancePrompt
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-700 text-gray-300 border border-gray-600'
+                      }`}
+                    >
+                      {leonardoSettings.enhancePrompt ? 'ON' : 'OFF (Recommended)'}
+                    </button>
+                  </div>
+
+                  {/* Privacy */}
+                  <div>
+                    <label className="block text-gray-400 text-xs mb-1">Privacy</label>
+                    <button
+                      type="button"
+                      onClick={() => setLeonardoSettings({ ...leonardoSettings, isPublic: !leonardoSettings.isPublic })}
+                      className={`w-full px-3 py-1.5 rounded text-sm font-medium ${
+                        !leonardoSettings.isPublic
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-700 text-gray-300 border border-gray-600'
+                      }`}
+                    >
+                      {leonardoSettings.isPublic ? 'Public' : 'Private'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-500 text-xs">
+                    {leonardoSettings.modelName} | {leonardoSettings.width}x{leonardoSettings.height} | {leonardoSettings.isPublic ? 'Public' : 'Private'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={saveLeonardoSettings}
+                    disabled={isSavingSettings}
+                    className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
+                  >
+                    {isSavingSettings ? 'Saving...' : 'Save Settings'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleGeneratePhase} className="grid md:grid-cols-2 gap-4">
               <div>
