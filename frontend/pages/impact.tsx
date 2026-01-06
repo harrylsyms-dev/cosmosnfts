@@ -3,6 +3,16 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Layout from '../components/Layout';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
+// Milestone targets in dollars
+const MILESTONES = {
+  launch: 50000,
+  orbit: 100000,
+  deepSpace: 250000,
+  cosmic: 500000,
+};
+
 interface DonationStats {
   totalDonated: number;
   totalDonatedFormatted: string;
@@ -22,10 +32,10 @@ const defaultStats: DonationStats = {
   nftsSold: 0,
   donationPercentage: 30,
   milestones: {
-    launch: { target: 50000, reached: false },
-    orbit: { target: 100000, reached: false },
-    deepSpace: { target: 250000, reached: false },
-    cosmic: { target: 500000, reached: false },
+    launch: { target: MILESTONES.launch, reached: false },
+    orbit: { target: MILESTONES.orbit, reached: false },
+    deepSpace: { target: MILESTONES.deepSpace, reached: false },
+    cosmic: { target: MILESTONES.cosmic, reached: false },
   },
 };
 
@@ -59,10 +69,26 @@ export default function Impact() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const res = await fetch('/api/donations/stats');
+        // Fetch from existing backend endpoint
+        const res = await fetch(`${apiUrl}/api/benefactor/total-donated`);
         if (res.ok) {
           const data = await res.json();
-          setStats(data);
+          // Validate response has expected structure
+          if (data?.grandTotal?.usd !== undefined) {
+            const totalDonated = data.grandTotal.usd;
+            setStats({
+              totalDonated,
+              totalDonatedFormatted: data.grandTotal.formatted || '$0',
+              nftsSold: 0, // Will be updated when sales tracking is added
+              donationPercentage: 30,
+              milestones: {
+                launch: { target: MILESTONES.launch, reached: totalDonated >= MILESTONES.launch },
+                orbit: { target: MILESTONES.orbit, reached: totalDonated >= MILESTONES.orbit },
+                deepSpace: { target: MILESTONES.deepSpace, reached: totalDonated >= MILESTONES.deepSpace },
+                cosmic: { target: MILESTONES.cosmic, reached: totalDonated >= MILESTONES.cosmic },
+              },
+            });
+          }
         }
       } catch (error) {
         console.error('Failed to fetch donation stats:', error);
