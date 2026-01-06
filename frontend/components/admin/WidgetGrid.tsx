@@ -321,6 +321,15 @@ export const DEFAULT_WIDGETS: Widget[] = [
     defaultSize: { cols: 1, rows: 1 },
   },
   {
+    id: 'system-report',
+    title: 'System Report',
+    description: 'Full architecture docs',
+    icon: '📋',
+    href: '/admin/system-report',
+    color: 'border-purple-800 hover:border-purple-500',
+    defaultSize: { cols: 1, rows: 1 },
+  },
+  {
     id: 'images',
     title: 'Image Generation',
     description: 'Generate NFT images',

@@ -1,96 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import {
-  AstronomicalObject,
-  REAL_STARS,
-  MESSIER_OBJECTS,
-  EXOPLANETS,
-  BLACK_HOLES,
-  PULSARS,
-  QUASARS,
-  COMETS,
-  getAllAstronomicalObjects,
-  getObjectCountsByType,
-} from '../../lib/astronomicalData';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
-interface DataSource {
+// Database object interface (from NFT table)
+interface DatabaseObject {
+  id: number;
+  tokenId: number;
   name: string;
-  category: string;
-  count: number;
   description: string;
-  source: string;
-  data: AstronomicalObject[];
+  objectType: string;
+  totalScore: number;
+  badgeTier: string;
+  status: string;
+  spectralType?: string;
+  distanceLy?: number;
+  constellation?: string;
+  distance?: string;
 }
 
-const DATA_SOURCES: DataSource[] = [
+interface DataSourceInfo {
+  name: string;
+  description: string;
+  source: string;
+}
+
+// Data source descriptions (for reference)
+const DATA_SOURCE_INFO: DataSourceInfo[] = [
   {
-    name: 'Famous Stars',
-    category: 'REAL_STARS',
-    count: REAL_STARS.length,
-    description: 'Well-known stars from SIMBAD database and astronomical catalogs',
-    source: 'SIMBAD Astronomical Database, Wikipedia, NASA',
-    data: REAL_STARS,
+    name: 'HYG Database',
+    description: '~120,000 stars from Hipparcos, Yale Bright Star, and Gliese catalogs with spectral types, distances, and magnitudes',
+    source: 'astronexus.com (CC BY-SA-4.0)',
   },
   {
-    name: 'Messier Objects',
-    category: 'MESSIER_OBJECTS',
-    count: MESSIER_OBJECTS.length,
-    description: 'Objects from the famous Messier Catalog (nebulae, galaxies, star clusters)',
-    source: 'Messier Catalog, NGC/IC Catalogs, NASA',
-    data: MESSIER_OBJECTS,
+    name: 'Messier Catalog',
+    description: 'Famous deep-sky objects including galaxies, nebulae, and star clusters',
+    source: 'Messier Catalog, NGC/IC Catalogs',
   },
   {
     name: 'Exoplanets',
-    category: 'EXOPLANETS',
-    count: EXOPLANETS.length,
     description: 'Confirmed planets orbiting stars outside our solar system',
-    source: 'NASA Exoplanet Archive, Kepler/TESS Mission Data',
-    data: EXOPLANETS,
+    source: 'NASA Exoplanet Archive',
   },
   {
-    name: 'Black Holes',
-    category: 'BLACK_HOLES',
-    count: BLACK_HOLES.length,
-    description: 'Known black holes including stellar and supermassive types',
-    source: 'NASA, Event Horizon Telescope, X-ray observations',
-    data: BLACK_HOLES,
-  },
-  {
-    name: 'Pulsars & Magnetars',
-    category: 'PULSARS',
-    count: PULSARS.length,
-    description: 'Rotating neutron stars with intense magnetic fields',
-    source: 'ATNF Pulsar Catalogue, NASA',
-    data: PULSARS,
-  },
-  {
-    name: 'Quasars',
-    category: 'QUASARS',
-    count: QUASARS.length,
-    description: 'Extremely luminous active galactic nuclei',
-    source: 'SDSS Quasar Catalog, NASA',
-    data: QUASARS,
-  },
-  {
-    name: 'Comets',
-    category: 'COMETS',
-    count: COMETS.length,
-    description: 'Famous comets with historical or scientific significance',
-    source: 'JPL Small-Body Database, ESA',
-    data: COMETS,
+    name: 'Exotic Objects',
+    description: 'Black holes, pulsars, quasars, and other extreme cosmic phenomena',
+    source: 'NASA, ESA, Event Horizon Telescope',
   },
 ];
-
-interface GenerationStats {
-  totalRealObjects: number;
-  availableToMint: number;
-  alreadyMinted: number;
-  byType: Record<string, { total: number; available: number }>;
-}
 
 interface NftStats {
   total: number;
@@ -98,21 +57,36 @@ interface NftStats {
   remainingSlots: number;
 }
 
+interface TypeCount {
+  objectType: string;
+  _count: number;
+}
+
+interface TierCount {
+  badgeTier: string;
+  _count: number;
+}
+
 export default function AstronomicalDataAdmin() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedSource, setSelectedSource] = useState<DataSource | null>(null);
-  const [selectedObject, setSelectedObject] = useState<AstronomicalObject | null>(null);
+  const [selectedObject, setSelectedObject] = useState<DatabaseObject | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('');
+  const [filterTier, setFilterTier] = useState<string>('');
+
+  // Database objects state
+  const [dbObjects, setDbObjects] = useState<DatabaseObject[]>([]);
+  const [totalObjects, setTotalObjects] = useState(0);
+  const [page, setPage] = useState(1);
+  const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
+  const [tierCounts, setTierCounts] = useState<Record<string, number>>({});
+  const limit = 100;
 
   // Generation state
-  const [generationStats, setGenerationStats] = useState<GenerationStats | null>(null);
   const [nftStats, setNftStats] = useState<NftStats | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [generateCount, setGenerateCount] = useState(10);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Reference image lookup state
@@ -121,18 +95,16 @@ export default function AstronomicalDataAdmin() {
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
-  const allObjects = getAllAstronomicalObjects();
-  const typeCounts = getObjectCountsByType();
-
   useEffect(() => {
     checkAuth();
   }, []);
 
   useEffect(() => {
     if (!isLoading) {
-      fetchGenerationStats();
+      fetchObjects();
+      fetchStats();
     }
-  }, [isLoading]);
+  }, [isLoading, page, filterType, filterTier]);
 
   async function checkAuth() {
     try {
@@ -153,51 +125,76 @@ export default function AstronomicalDataAdmin() {
     }
   }
 
-  async function fetchGenerationStats() {
+  async function fetchObjects() {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/nfts/generate-from-real-data`, {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (searchQuery) params.append('search', searchQuery);
+      if (filterType) params.append('objectType', filterType);
+      if (filterTier) params.append('badge', filterTier);
+
+      const res = await fetch(`${apiUrl}/api/admin/nfts?${params}`, {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (res.ok) {
         const data = await res.json();
-        setGenerationStats(data.realDataStats);
-        setNftStats(data.nftStats);
+        setDbObjects(data.items || []);
+        setTotalObjects(data.total || 0);
       }
     } catch (error) {
-      console.error('Failed to fetch generation stats:', error);
+      console.error('Failed to fetch objects:', error);
     }
   }
 
-  async function handleGenerateFromRealData() {
-    setIsGenerating(true);
-    setMessage(null);
+  async function fetchStats() {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${apiUrl}/api/admin/nfts/generate-from-real-data`, {
-        method: 'POST',
+
+      // Fetch type and tier counts
+      const statsRes = await fetch(`${apiUrl}/api/admin/nfts/stats`, {
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ count: generateCount }),
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        setMessage({ type: 'success', text: data.message });
-        fetchGenerationStats();
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to generate NFTs' });
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        if (statsData.typeCounts) {
+          const typeMap: Record<string, number> = {};
+          statsData.typeCounts.forEach((t: TypeCount) => {
+            typeMap[t.objectType] = t._count;
+          });
+          setTypeCounts(typeMap);
+        }
+        if (statsData.tierCounts) {
+          const tierMap: Record<string, number> = {};
+          statsData.tierCounts.forEach((t: TierCount) => {
+            tierMap[t.badgeTier] = t._count;
+          });
+          setTierCounts(tierMap);
+        }
+        if (statsData.total !== undefined) {
+          setNftStats({
+            total: statsData.total,
+            maxCapacity: 20000,
+            remainingSlots: 20000 - statsData.total,
+          });
+        }
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to generate NFTs' });
-    } finally {
-      setIsGenerating(false);
+      console.error('Failed to fetch stats:', error);
     }
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    fetchObjects();
   }
 
   async function handleClearAllNfts(includeOwned: boolean) {
@@ -222,7 +219,8 @@ export default function AstronomicalDataAdmin() {
       if (res.ok) {
         setMessage({ type: 'success', text: data.message });
         setShowClearConfirm(false);
-        fetchGenerationStats();
+        fetchStats();
+        fetchObjects();
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to clear NFTs' });
       }
@@ -230,52 +228,6 @@ export default function AstronomicalDataAdmin() {
       setMessage({ type: 'error', text: 'Failed to clear NFTs' });
     } finally {
       setIsClearing(false);
-    }
-  }
-
-  async function handleGenerateAll() {
-    if (!generationStats) return;
-    setIsGenerating(true);
-    setMessage(null);
-
-    const batchSize = 50;
-    let generated = 0;
-    const toGenerate = generationStats.availableToMint;
-
-    try {
-      const token = localStorage.getItem('adminToken');
-
-      while (generated < toGenerate) {
-        const count = Math.min(batchSize, toGenerate - generated);
-        const res = await fetch(`${apiUrl}/api/admin/nfts/generate-from-real-data`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ count }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          setMessage({ type: 'error', text: data.error || 'Failed during batch generation' });
-          break;
-        }
-
-        generated += data.generated?.length || 0;
-        setMessage({ type: 'success', text: `Generated ${generated} of ${toGenerate} NFTs...` });
-        await fetchGenerationStats();
-      }
-
-      if (generated >= toGenerate) {
-        setMessage({ type: 'success', text: `Successfully generated all ${generated} NFTs from real data!` });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed during batch generation' });
-    } finally {
-      setIsGenerating(false);
-      fetchGenerationStats();
     }
   }
 
@@ -341,8 +293,8 @@ export default function AstronomicalDataAdmin() {
       }
     }
 
-    // Find object type from our data
-    const matchingObj = allObjects.find(obj =>
+    // Find object type from database
+    const matchingObj = dbObjects.find(obj =>
       obj.name.toLowerCase() === searchName.toLowerCase() ||
       obj.name.toLowerCase().includes(searchName.toLowerCase())
     );
@@ -360,16 +312,8 @@ export default function AstronomicalDataAdmin() {
     setIsLookingUp(false);
   }
 
-  const filteredObjects = allObjects.filter(obj => {
-    const matchesSearch = !searchQuery ||
-      obj.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      obj.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      obj.alternateNames?.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesType = !filterType || obj.objectType === filterType;
-    return matchesSearch && matchesType;
-  });
-
   const objectTypes = Object.keys(typeCounts).sort();
+  const tierOrder = ['LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
 
   if (isLoading) {
     return (
@@ -396,7 +340,7 @@ export default function AstronomicalDataAdmin() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-purple-400 font-semibold">
-                {allObjects.length} Total Objects
+                {(nftStats?.total ?? totalObjects).toLocaleString()} Total Objects
               </span>
             </div>
           </div>
@@ -414,64 +358,40 @@ export default function AstronomicalDataAdmin() {
             </div>
           )}
 
-          {/* NFT Generation Controls */}
+          {/* Database Stats */}
           <div className="mb-8 p-6 bg-gradient-to-r from-indigo-900/30 to-purple-900/30 rounded-lg border border-purple-500/30">
-            <h2 className="text-lg font-semibold text-purple-400 mb-4">NFT Generation from Real Data</h2>
+            <h2 className="text-lg font-semibold text-purple-400 mb-4">Astronomical Objects in Database</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
               <div className="bg-gray-800/50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-purple-400">
-                  {generationStats?.totalRealObjects ?? allObjects.length}
+                  {(nftStats?.total ?? 0).toLocaleString()}
                 </div>
-                <div className="text-sm text-gray-400">Total Real Objects</div>
+                <div className="text-sm text-gray-400">Total Objects</div>
               </div>
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-green-400">
-                  {generationStats?.availableToMint ?? 0}
+              {tierOrder.map(tier => (
+                <div key={tier} className="bg-gray-800/50 rounded-lg p-4">
+                  <div className={`text-2xl font-bold ${
+                    tier === 'LEGENDARY' ? 'text-yellow-400' :
+                    tier === 'ELITE' ? 'text-purple-400' :
+                    tier === 'PREMIUM' ? 'text-blue-400' :
+                    tier === 'EXCEPTIONAL' ? 'text-cyan-400' :
+                    'text-gray-400'
+                  }`}>
+                    {(tierCounts[tier] ?? 0).toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-400">{tier}</div>
                 </div>
-                <div className="text-sm text-gray-400">Available to Mint</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-blue-400">
-                  {generationStats?.alreadyMinted ?? 0}
-                </div>
-                <div className="text-sm text-gray-400">Already Minted</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-yellow-400">
-                  {nftStats?.total ?? 0}
-                </div>
-                <div className="text-sm text-gray-400">Total NFTs in DB</div>
-              </div>
+              ))}
             </div>
 
             <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex items-center gap-2">
-                <label className="text-gray-300">Generate:</label>
-                <input
-                  type="number"
-                  value={generateCount}
-                  onChange={(e) => setGenerateCount(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
-                  className="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white"
-                  min={1}
-                  max={100}
-                />
-                <button
-                  onClick={handleGenerateFromRealData}
-                  disabled={isGenerating || !generationStats?.availableToMint}
-                  className="bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 text-white px-4 py-2 rounded font-semibold transition-colors"
-                >
-                  {isGenerating ? 'Generating...' : 'Generate NFTs'}
-                </button>
-              </div>
-
-              <button
-                onClick={handleGenerateAll}
-                disabled={isGenerating || !generationStats?.availableToMint}
-                className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white px-4 py-2 rounded font-semibold transition-colors"
+              <Link
+                href="/admin/nfts"
+                className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-semibold transition-colors"
               >
-                {isGenerating ? 'Generating...' : `Generate All (${generationStats?.availableToMint ?? 0})`}
-              </button>
+                Manage NFTs &rarr;
+              </Link>
 
               <button
                 onClick={() => setShowClearConfirm(true)}
@@ -482,7 +402,7 @@ export default function AstronomicalDataAdmin() {
               </button>
 
               <button
-                onClick={fetchGenerationStats}
+                onClick={() => { fetchStats(); fetchObjects(); }}
                 className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded font-semibold transition-colors"
               >
                 Refresh Stats
@@ -597,51 +517,17 @@ export default function AstronomicalDataAdmin() {
             </div>
           </div>
 
-          {/* Overview Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-            {DATA_SOURCES.map(source => (
-              <button
-                key={source.category}
-                onClick={() => {
-                  setSelectedSource(source);
-                  setSelectedObject(null);
-                }}
-                className={`p-4 rounded-lg border transition-all ${
-                  selectedSource?.category === source.category
-                    ? 'bg-purple-600 border-purple-400'
-                    : 'bg-gray-800 border-gray-700 hover:border-purple-500'
-                }`}
-              >
-                <div className="text-2xl font-bold text-purple-400">{source.count}</div>
-                <div className="text-sm text-gray-300">{source.name}</div>
-              </button>
-            ))}
-          </div>
-
           {/* Main Content Area */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Data Sources List */}
+            {/* Data Sources Info */}
             <div className="lg:col-span-1 space-y-4">
               <h2 className="text-lg font-semibold text-purple-400 mb-4">Data Sources</h2>
-              {DATA_SOURCES.map(source => (
+              {DATA_SOURCE_INFO.map(source => (
                 <div
-                  key={source.category}
-                  onClick={() => {
-                    setSelectedSource(source);
-                    setSelectedObject(null);
-                  }}
-                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                    selectedSource?.category === source.category
-                      ? 'bg-purple-600/20 border-purple-500'
-                      : 'bg-gray-800 border-gray-700 hover:border-purple-500'
-                  }`}
+                  key={source.name}
+                  className="p-4 rounded-lg border bg-gray-800 border-gray-700"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-white">{source.name}</h3>
-                    <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-sm">
-                      {source.count}
-                    </span>
-                  </div>
+                  <h3 className="font-semibold text-white mb-2">{source.name}</h3>
                   <p className="text-sm text-gray-400 mb-2">{source.description}</p>
                   <div className="text-xs text-gray-500">
                     Source: {source.source}
@@ -668,105 +554,103 @@ export default function AstronomicalDataAdmin() {
 
             {/* Objects Browser */}
             <div className="lg:col-span-2">
-              {selectedSource ? (
-                <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold text-purple-400">
-                      {selectedSource.name} ({selectedSource.count} objects)
-                    </h2>
-                    <button
-                      onClick={() => setSelectedSource(null)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      &times; Close
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
-                    {selectedSource.data.map((obj, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setSelectedObject(obj)}
-                        className={`p-3 rounded border cursor-pointer transition-all ${
-                          selectedObject?.name === obj.name
-                            ? 'bg-purple-600/30 border-purple-400'
-                            : 'bg-gray-700/50 border-gray-600 hover:border-purple-500'
-                        }`}
-                      >
-                        <div className="font-semibold text-white">{obj.name}</div>
-                        <div className="text-xs text-purple-400">{obj.objectType}</div>
-                        {obj.constellation && (
-                          <div className="text-xs text-gray-400">
-                            Constellation: {obj.constellation}
-                          </div>
-                        )}
-                        {obj.distanceDisplay && (
-                          <div className="text-xs text-gray-500">{obj.distanceDisplay}</div>
-                        )}
-                      </div>
+              {/* Search and Filter */}
+              <form onSubmit={handleSearch} className="bg-gray-800 rounded-lg border border-gray-700 p-4 mb-4">
+                <div className="flex flex-wrap gap-4">
+                  <input
+                    type="text"
+                    placeholder="Search objects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 min-w-[200px] bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
+                  />
+                  <select
+                    value={filterType}
+                    onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+                    className="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
+                  >
+                    <option value="">All Types</option>
+                    {objectTypes.map(type => (
+                      <option key={type} value={type}>{type} ({(typeCounts[type] ?? 0).toLocaleString()})</option>
                     ))}
-                  </div>
+                  </select>
+                  <select
+                    value={filterTier}
+                    onChange={(e) => { setFilterTier(e.target.value); setPage(1); }}
+                    className="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
+                  >
+                    <option value="">All Tiers</option>
+                    {tierOrder.map(tier => (
+                      <option key={tier} value={tier}>{tier} ({(tierCounts[tier] ?? 0).toLocaleString()})</option>
+                    ))}
+                  </select>
+                  <button
+                    type="submit"
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-semibold"
+                  >
+                    Search
+                  </button>
                 </div>
-              ) : (
-                <>
-                  {/* Search and Filter */}
-                  <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 mb-4">
-                    <div className="flex gap-4">
-                      <input
-                        type="text"
-                        placeholder="Search objects..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="flex-1 bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
-                      />
-                      <select
-                        value={filterType}
-                        onChange={(e) => setFilterType(e.target.value)}
-                        className="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
-                      >
-                        <option value="">All Types</option>
-                        {objectTypes.map(type => (
-                          <option key={type} value={type}>{type} ({typeCounts[type]})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="mt-2 text-sm text-gray-400">
-                      Showing {filteredObjects.length} of {allObjects.length} objects
-                    </div>
-                  </div>
+                <div className="mt-2 text-sm text-gray-400">
+                  Showing {dbObjects.length} of {totalObjects.toLocaleString()} objects (page {page})
+                </div>
+              </form>
 
-                  {/* All Objects Grid */}
-                  <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-                    <h2 className="text-lg font-semibold text-purple-400 mb-4">
-                      All Astronomical Objects
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
-                      {filteredObjects.map((obj, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => setSelectedObject(obj)}
-                          className={`p-3 rounded border cursor-pointer transition-all ${
-                            selectedObject?.name === obj.name
-                              ? 'bg-purple-600/30 border-purple-400'
-                              : 'bg-gray-700/50 border-gray-600 hover:border-purple-500'
-                          }`}
-                        >
-                          <div className="font-semibold text-white">{obj.name}</div>
-                          <div className="text-xs text-purple-400">{obj.objectType}</div>
-                          {obj.constellation && (
-                            <div className="text-xs text-gray-400">
-                              Constellation: {obj.constellation}
-                            </div>
-                          )}
-                          {obj.distanceDisplay && (
-                            <div className="text-xs text-gray-500">{obj.distanceDisplay}</div>
-                          )}
-                        </div>
-                      ))}
+              {/* Objects Grid */}
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                <h2 className="text-lg font-semibold text-purple-400 mb-4">
+                  Astronomical Objects
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
+                  {dbObjects.map((obj) => (
+                    <div
+                      key={obj.id}
+                      onClick={() => setSelectedObject(obj)}
+                      className={`p-3 rounded border cursor-pointer transition-all ${
+                        selectedObject?.id === obj.id
+                          ? 'bg-purple-600/30 border-purple-400'
+                          : 'bg-gray-700/50 border-gray-600 hover:border-purple-500'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="font-semibold text-white truncate">{obj.name}</div>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          obj.badgeTier === 'LEGENDARY' ? 'bg-yellow-600 text-white' :
+                          obj.badgeTier === 'ELITE' ? 'bg-purple-600 text-white' :
+                          obj.badgeTier === 'PREMIUM' ? 'bg-blue-600 text-white' :
+                          obj.badgeTier === 'EXCEPTIONAL' ? 'bg-cyan-600 text-white' :
+                          'bg-gray-600 text-white'
+                        }`}>
+                          {obj.badgeTier}
+                        </span>
+                      </div>
+                      <div className="text-xs text-purple-400">{obj.objectType}</div>
+                      <div className="text-xs text-gray-500">Score: {obj.totalScore}</div>
                     </div>
-                  </div>
-                </>
-              )}
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                <div className="flex justify-center items-center gap-4 mt-4 pt-4 border-t border-gray-700">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-4 py-2 bg-gray-700 rounded disabled:opacity-50 hover:bg-gray-600"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-gray-400">
+                    Page {page} of {Math.ceil(totalObjects / limit)}
+                  </span>
+                  <button
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={page >= Math.ceil(totalObjects / limit)}
+                    className="px-4 py-2 bg-gray-700 rounded disabled:opacity-50 hover:bg-gray-600"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -785,112 +669,65 @@ export default function AstronomicalDataAdmin() {
                 </div>
 
                 <div className="p-6 space-y-4">
-                  {/* Type Badge */}
-                  <div className="inline-block bg-purple-600 text-white px-3 py-1 rounded-full text-sm">
-                    {selectedObject.objectType}
+                  {/* Type and Tier Badges */}
+                  <div className="flex gap-2">
+                    <span className="inline-block bg-purple-600 text-white px-3 py-1 rounded-full text-sm">
+                      {selectedObject.objectType}
+                    </span>
+                    <span className={`inline-block px-3 py-1 rounded-full text-sm ${
+                      selectedObject.badgeTier === 'LEGENDARY' ? 'bg-yellow-600 text-white' :
+                      selectedObject.badgeTier === 'ELITE' ? 'bg-purple-600 text-white' :
+                      selectedObject.badgeTier === 'PREMIUM' ? 'bg-blue-600 text-white' :
+                      selectedObject.badgeTier === 'EXCEPTIONAL' ? 'bg-cyan-600 text-white' :
+                      'bg-gray-600 text-white'
+                    }`}>
+                      {selectedObject.badgeTier}
+                    </span>
                   </div>
-
-                  {/* Alternate Names */}
-                  {selectedObject.alternateNames && selectedObject.alternateNames.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-400">Also Known As</h3>
-                      <p className="text-gray-300">{selectedObject.alternateNames.join(', ')}</p>
-                    </div>
-                  )}
 
                   {/* Description */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-400">Description</h3>
-                    <p className="text-white">{selectedObject.description}</p>
+                    <p className="text-white">{selectedObject.description || 'No description available'}</p>
                   </div>
 
                   {/* Properties Grid */}
                   <div className="grid grid-cols-2 gap-4">
-                    {selectedObject.constellation && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Constellation</h3>
-                        <p className="text-white">{selectedObject.constellation}</p>
-                      </div>
-                    )}
-                    {selectedObject.distanceDisplay && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Distance</h3>
-                        <p className="text-white">{selectedObject.distanceDisplay}</p>
-                      </div>
-                    )}
-                    {selectedObject.mass && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Mass</h3>
-                        <p className="text-white">{selectedObject.mass.toLocaleString()} solar masses</p>
-                      </div>
-                    )}
-                    {selectedObject.temperature && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Temperature</h3>
-                        <p className="text-white">{selectedObject.temperature.toLocaleString()} K</p>
-                      </div>
-                    )}
-                    {selectedObject.luminosity && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Luminosity</h3>
-                        <p className="text-white">{selectedObject.luminosity.toLocaleString()} solar luminosities</p>
-                      </div>
-                    )}
-                    {selectedObject.magnitude !== undefined && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Apparent Magnitude</h3>
-                        <p className="text-white">{selectedObject.magnitude}</p>
-                      </div>
-                    )}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-400">Token ID</h3>
+                      <p className="text-white">#{selectedObject.tokenId}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-400">Total Score</h3>
+                      <p className="text-white">{selectedObject.totalScore}/500</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-400">Status</h3>
+                      <p className="text-white">{selectedObject.status}</p>
+                    </div>
                     {selectedObject.spectralType && (
                       <div>
                         <h3 className="text-sm font-semibold text-gray-400">Spectral Type</h3>
                         <p className="text-white">{selectedObject.spectralType}</p>
                       </div>
                     )}
-                    {selectedObject.discoveryYear && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Discovery Year</h3>
-                        <p className="text-white">
-                          {selectedObject.discoveryYear < 0
-                            ? `${Math.abs(selectedObject.discoveryYear)} BC`
-                            : selectedObject.discoveryYear}
-                        </p>
-                      </div>
-                    )}
-                    {selectedObject.discoverer && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Discoverer</h3>
-                        <p className="text-white">{selectedObject.discoverer}</p>
-                      </div>
-                    )}
-                    {selectedObject.age && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-400">Age</h3>
-                        <p className="text-white">{selectedObject.age} billion years</p>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Notable Features */}
-                  {selectedObject.notableFeatures && selectedObject.notableFeatures.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-400 mb-2">Notable Features</h3>
-                      <ul className="list-disc list-inside text-gray-300 space-y-1">
-                        {selectedObject.notableFeatures.map((feature, idx) => (
-                          <li key={idx}>{feature}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Scientific Significance */}
-                  {selectedObject.scientificSignificance && (
-                    <div className="bg-purple-600/20 border border-purple-500/30 rounded p-4">
-                      <h3 className="text-sm font-semibold text-purple-400 mb-1">Scientific Significance</h3>
-                      <p className="text-white">{selectedObject.scientificSignificance}</p>
-                    </div>
-                  )}
+                  {/* Actions */}
+                  <div className="flex gap-3 pt-4 border-t border-gray-700">
+                    <Link
+                      href={`/admin/nfts?search=${encodeURIComponent(selectedObject.name)}`}
+                      className="flex-1 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-semibold text-center"
+                    >
+                      View in NFT Manager
+                    </Link>
+                    <button
+                      onClick={() => setSelectedObject(null)}
+                      className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded font-semibold"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

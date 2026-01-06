@@ -2277,7 +2277,8 @@ export function getGenerationLogs(options?: {
     logs = logs.filter(l => l.objectType === options.objectType);
   }
   if (options?.minConfidence !== undefined) {
-    logs = logs.filter(l => l.confidence.score >= options.minConfidence);
+    const minConf = options.minConfidence;
+    logs = logs.filter(l => l.confidence.score >= minConf);
   }
   if (options?.hasWarnings !== undefined) {
     logs = logs.filter(l =>
