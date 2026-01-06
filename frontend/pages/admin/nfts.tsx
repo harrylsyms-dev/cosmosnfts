@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import {
+  TIER_ORDER,
+  TIER_CONFIG,
+  CATEGORY_ORDER,
+  CATEGORY_CONFIG,
+  BadgeTier,
+  MAX_TOTAL_SCORE,
+} from '../../lib/constants';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -707,11 +715,12 @@ export default function AdminNFTs() {
                 onChange={(e) => { setFilterBadge(e.target.value); setPage(1); }}
                 className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
               >
-                <option value="all">All Badges</option>
-                <option value="ELITE">Elite</option>
-                <option value="PREMIUM">Premium</option>
-                <option value="EXCEPTIONAL">Exceptional</option>
-                <option value="STANDARD">Standard</option>
+                <option value="all">All Tiers</option>
+                {TIER_ORDER.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {TIER_CONFIG[tier].icon} {tier}
+                  </option>
+                ))}
               </select>
               <button
                 type="submit"
@@ -817,12 +826,14 @@ export default function AdminNFTs() {
                       <td className="px-4 py-3">#{nft.id}</td>
                       <td className="px-4 py-3 font-medium">{nft.name}</td>
                       <td className="px-4 py-3 text-gray-400">{nft.objectType}</td>
-                      <td className="px-4 py-3">{nft.totalScore}/500</td>
+                      <td className="px-4 py-3">{nft.totalScore}/{MAX_TOTAL_SCORE}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          nft.badgeTier === 'ELITE' ? 'bg-yellow-900 text-yellow-300' :
+                          nft.badgeTier === 'MYTHIC' ? 'bg-yellow-900 text-yellow-300' :
+                          nft.badgeTier === 'LEGENDARY' ? 'bg-purple-900 text-purple-300' :
+                          nft.badgeTier === 'ELITE' ? 'bg-violet-900 text-violet-300' :
                           nft.badgeTier === 'PREMIUM' ? 'bg-blue-900 text-blue-300' :
-                          nft.badgeTier === 'EXCEPTIONAL' ? 'bg-cyan-900 text-cyan-300' :
+                          nft.badgeTier === 'EXCEPTIONAL' ? 'bg-green-900 text-green-300' :
                           'bg-gray-700 text-gray-300'
                         }`}>
                           {nft.badgeTier}
@@ -1064,9 +1075,11 @@ export default function AdminNFTs() {
                             {selectedNft.status}
                           </span>
                           <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                            selectedNft.badgeTier === 'ELITE' ? 'bg-yellow-600 text-white' :
+                            selectedNft.badgeTier === 'MYTHIC' ? 'bg-gradient-to-r from-yellow-500 to-amber-400 text-black' :
+                            selectedNft.badgeTier === 'LEGENDARY' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' :
+                            selectedNft.badgeTier === 'ELITE' ? 'bg-violet-600 text-white' :
                             selectedNft.badgeTier === 'PREMIUM' ? 'bg-blue-600 text-white' :
-                            selectedNft.badgeTier === 'EXCEPTIONAL' ? 'bg-cyan-600 text-white' :
+                            selectedNft.badgeTier === 'EXCEPTIONAL' ? 'bg-green-600 text-white' :
                             'bg-gray-600 text-white'
                           }`}>
                             {selectedNft.badgeTier}

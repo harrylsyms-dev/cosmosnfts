@@ -5,27 +5,27 @@ import Link from 'next/link';
 import Layout from '../../components/Layout';
 import { useCart } from '../../hooks/useCart';
 import { useMetaMask } from '../../hooks/useMetaMask';
+import {
+  TIER_CONFIG,
+  SCORE_METRICS,
+  MAX_TOTAL_SCORE,
+  PRICING,
+  BadgeTier,
+  getCategoryLabel,
+  getCategoryIcon,
+} from '../../lib/constants';
 
-interface ScientificData {
-  distanceLy?: number | null;
-  massSolar?: number | null;
-  ageYears?: number | null;
-  luminosity?: number | null;
-  sizeKm?: number | null;
-  temperatureK?: number | null;
-  discoveryYear?: number | null;
-  paperCount?: number | null;
-}
-
-interface ScoreBreakdownData {
-  distance?: number | null;
-  mass?: number | null;
-  age?: number | null;
-  luminosity?: number | null;
-  size?: number | null;
-  temperature?: number | null;
-  discovery?: number | null;
-  papers?: number | null;
+interface ScoreBreakdown {
+  culturalSignificance?: number;
+  scientificImportance?: number;
+  historicalSignificance?: number;
+  visualImpact?: number;
+  uniqueness?: number;
+  accessibility?: number;
+  proximity?: number;
+  storyFactor?: number;
+  activeRelevance?: number;
+  futurePotential?: number;
 }
 
 interface NFTDetail {
@@ -38,12 +38,15 @@ interface NFTDetail {
   distance?: string;
   score: number;
   badge: string;
+  tierRank?: number;
+  tierTotal?: number;
   displayPrice: string;
+  currentPriceCents?: number;
   basePricePerPoint: number;
+  tierMultiplier?: number;
+  seriesMultiplier?: number;
   status: string;
-  scientificData?: ScientificData;
-  scoreBreakdown?: ScoreBreakdownData;
-  availablePhases: { phase: number; price: string }[];
+  scoreBreakdown?: ScoreBreakdown;
 }
 
 export default function NFTDetail() {
@@ -75,34 +78,37 @@ export default function NFTDetail() {
     }
   }
 
-  function getBadgeStyle(badge: string) {
-    switch (badge) {
-      case 'LEGENDARY':
-        return 'bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-300 text-black';
-      case 'ELITE':
-        return 'badge-elite';
-      case 'PREMIUM':
-        return 'badge-premium';
-      case 'EXCEPTIONAL':
-        return 'badge-exceptional';
-      default:
-        return 'badge-standard';
+  function getTierStyle(tier: string): { bg: string; border: string; text: string } {
+    const config = TIER_CONFIG[tier as BadgeTier];
+    if (!config) {
+      return { bg: 'bg-gray-600', border: 'border-gray-500', text: 'text-gray-300' };
     }
+
+    if (tier === 'MYTHIC') {
+      return {
+        bg: 'bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500',
+        border: 'border-yellow-400',
+        text: 'text-yellow-900',
+      };
+    }
+    if (tier === 'LEGENDARY') {
+      return {
+        bg: 'bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500',
+        border: 'border-purple-400',
+        text: 'text-white',
+      };
+    }
+
+    return {
+      bg: config.bgColor,
+      border: config.borderColor,
+      text: 'text-white',
+    };
   }
 
-  function getBadgeIcon(badge: string) {
-    switch (badge) {
-      case 'LEGENDARY':
-        return '👑';
-      case 'ELITE':
-        return '⭐';
-      case 'PREMIUM':
-        return '💫';
-      case 'EXCEPTIONAL':
-        return '🌟';
-      default:
-        return '🔷';
-    }
+  function getTierIcon(tier: string): string {
+    const config = TIER_CONFIG[tier as BadgeTier];
+    return config?.icon || '○';
   }
 
   if (isLoading) {
@@ -130,6 +136,13 @@ export default function NFTDetail() {
 
   const isAvailable = nft.status === 'AVAILABLE';
   const alreadyInCart = isInCart(nft.nftId);
+  const tierStyle = getTierStyle(nft.badge);
+  const tierConfig = TIER_CONFIG[nft.badge as BadgeTier];
+  const scorePercentage = Math.round((nft.score / MAX_TOTAL_SCORE) * 100);
+  const tierMultiplier = tierConfig?.multiplier || 1;
+  const donationAmount = nft.currentPriceCents
+    ? (nft.currentPriceCents * PRICING.donationPercentage / 100 / 100)
+    : (nft.score * PRICING.baseRatePerPoint * tierMultiplier * PRICING.donationPercentage / 100);
 
   return (
     <Layout>
@@ -145,13 +158,17 @@ export default function NFTDetail() {
             Home
           </Link>
           <span className="text-gray-600 mx-2">/</span>
+          <Link href="/browse" className="text-gray-400 hover:text-white">
+            Browse
+          </Link>
+          <span className="text-gray-600 mx-2">/</span>
           <span className="text-white">{nft.name}</span>
         </nav>
 
         <div className="grid lg:grid-cols-2 gap-12">
           {/* Image */}
           <div className="relative">
-            <div className="aspect-square bg-gray-900 rounded-2xl overflow-hidden">
+            <div className="aspect-square bg-gray-900 rounded-2xl overflow-hidden border border-gray-800">
               <img
                 src={nft.image || '/images/placeholder.svg'}
                 alt={nft.name}
@@ -160,24 +177,44 @@ export default function NFTDetail() {
             </div>
 
             {/* Badge overlay */}
-            <div className={`absolute top-4 right-4 px-4 py-2 rounded-lg font-bold ${getBadgeStyle(nft.badge)}`}>
-              {getBadgeIcon(nft.badge)} {nft.badge}
+            <div
+              className={`absolute top-4 right-4 px-4 py-2 rounded-lg font-bold shadow-lg ${tierStyle.bg} ${tierStyle.border} border ${tierStyle.text}`}
+            >
+              {getTierIcon(nft.badge)} {nft.badge}
             </div>
           </div>
 
           {/* Details */}
           <div>
-            <h1 className="text-4xl font-bold mb-4">{nft.name}</h1>
+            <h1 className="text-4xl font-bold mb-2">{nft.name}</h1>
+
+            {/* Category */}
+            {nft.objectType && (
+              <div className="text-gray-400 text-lg mb-4">
+                {getCategoryIcon(nft.objectType)} {getCategoryLabel(nft.objectType)}
+              </div>
+            )}
+
+            {/* Tier Info */}
+            <div className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg mb-6 ${tierConfig?.borderColor || 'border-gray-700'} border bg-gray-900/50`}>
+              <span className="text-2xl">{getTierIcon(nft.badge)}</span>
+              <div>
+                <div className={`font-bold ${tierConfig?.textColor || 'text-gray-400'}`}>
+                  {nft.badge}
+                  {nft.tierRank && nft.tierTotal && (
+                    <span className="text-gray-400 font-normal ml-2">
+                      #{nft.tierRank} of {nft.tierTotal}
+                    </span>
+                  )}
+                </div>
+                <div className="text-gray-500 text-sm">{tierConfig?.description}</div>
+              </div>
+            </div>
 
             <p className="text-gray-300 text-lg mb-6">{nft.description}</p>
 
             {/* Object Metadata */}
             <div className="flex flex-wrap gap-3 mb-6">
-              {nft.objectType && (
-                <span className="px-3 py-1 bg-blue-900/50 border border-blue-500/50 rounded-full text-blue-300 text-sm">
-                  {nft.objectType}
-                </span>
-              )}
               {nft.constellation && (
                 <span className="px-3 py-1 bg-purple-900/50 border border-purple-500/50 rounded-full text-purple-300 text-sm">
                   {nft.constellation}
@@ -190,17 +227,65 @@ export default function NFTDetail() {
               )}
             </div>
 
+            {/* Score */}
+            <div className="bg-gray-900 rounded-xl p-6 mb-6 border border-gray-800">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">Overall Score</h3>
+                <div className="text-right">
+                  <span className="text-2xl font-bold text-white">{nft.score}</span>
+                  <span className="text-gray-400">/{MAX_TOTAL_SCORE}</span>
+                  <span className="text-gray-500 ml-2">({scorePercentage}%)</span>
+                </div>
+              </div>
+              <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all"
+                  style={{ width: `${scorePercentage}%` }}
+                />
+              </div>
+            </div>
+
             {/* Price */}
-            <div className="bg-gray-900 rounded-xl p-6 mb-6">
-              <div className="text-gray-400 text-sm mb-1">Current Price</div>
-              <div className="text-4xl font-bold text-white mb-1">
+            <div className="bg-gray-900 rounded-xl p-6 mb-6 border border-gray-800">
+              <div className="text-gray-400 text-sm mb-1">Price</div>
+              <div className="text-4xl font-bold text-white mb-4">
                 {nft.displayPrice}
               </div>
-              <div className="text-blue-400 text-sm mb-2 font-mono">
-                ${nft.basePricePerPoint?.toFixed(2) || '0.10'} × {nft.score} = {nft.displayPrice}
+
+              {/* Price Breakdown */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="text-gray-400 text-sm mb-2">How this price is calculated:</div>
+                <div className="space-y-1 text-sm font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Base Rate</span>
+                    <span className="text-green-400">${PRICING.baseRatePerPoint.toFixed(2)} per point</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Score</span>
+                    <span className="text-blue-400">{nft.score} points</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Tier Multiplier</span>
+                    <span className="text-purple-400">{tierMultiplier}x ({nft.badge})</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Series Multiplier</span>
+                    <span className="text-pink-400">{nft.seriesMultiplier || 1.0}x (Series 1)</span>
+                  </div>
+                  <div className="border-t border-gray-700 mt-2 pt-2">
+                    <div className="flex justify-between text-white">
+                      <span>${PRICING.baseRatePerPoint} × {nft.score} × {tierMultiplier} × {nft.seriesMultiplier || 1.0} =</span>
+                      <span className="font-bold">{nft.displayPrice}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="text-gray-400 text-sm">
-                Cosmic Score: {nft.score}/500
+
+              <div className="text-green-400 text-sm flex items-center gap-2">
+                <span>🚀</span>
+                <span>
+                  {PRICING.donationPercentage}% (${donationAmount.toFixed(2)}) supports space exploration
+                </span>
               </div>
             </div>
 
@@ -211,14 +296,14 @@ export default function NFTDetail() {
                   {alreadyInCart ? (
                     <Link
                       href="/cart"
-                      className="block w-full btn-success text-center text-lg"
+                      className="block w-full bg-green-600 hover:bg-green-700 text-white text-center text-lg py-4 rounded-xl font-semibold transition-colors"
                     >
                       View in Cart
                     </Link>
                   ) : (
                     <button
                       onClick={() => addToCart(nft.nftId)}
-                      className="w-full btn-primary text-lg"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg py-4 rounded-xl font-semibold transition-colors"
                     >
                       Add to Cart
                     </button>
@@ -227,168 +312,64 @@ export default function NFTDetail() {
                   {!isConnected && (
                     <button
                       onClick={connect}
-                      className="w-full btn-secondary text-lg"
+                      className="w-full bg-gray-800 hover:bg-gray-700 text-white text-lg py-4 rounded-xl font-semibold transition-colors border border-gray-700"
                     >
                       Connect Wallet to Receive NFT
                     </button>
                   )}
                 </>
               ) : (
-                <div className="bg-gray-800 text-gray-400 py-4 px-6 rounded-lg text-center text-lg">
-                  {nft.status === 'SOLD' ? 'Sold' :
-                   nft.status === 'AUCTION_RESERVED' ? 'Reserved for Auction' : 'Reserved'}
+                <div className="bg-gray-800 text-gray-400 py-4 px-6 rounded-xl text-center text-lg">
+                  {nft.status === 'SOLD'
+                    ? 'Sold'
+                    : nft.status === 'AUCTION_RESERVED'
+                    ? 'Reserved for Auction'
+                    : 'Reserved'}
                 </div>
               )}
             </div>
-
-            {/* Scientific Data - only show if any data exists */}
-            {nft.scientificData && Object.values(nft.scientificData).some(v => v != null) && (
-              <div className="bg-gray-900 rounded-xl p-6 mb-6">
-                <h3 className="text-xl font-semibold mb-4">Scientific Properties</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {nft.scientificData.distanceLy != null && (
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs uppercase">Distance</div>
-                      <div className="text-white font-semibold">
-                        {nft.scientificData.distanceLy.toLocaleString()} ly
-                      </div>
-                    </div>
-                  )}
-                  {nft.scientificData.massSolar != null && (
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs uppercase">Mass</div>
-                      <div className="text-white font-semibold">
-                        {nft.scientificData.massSolar.toLocaleString()} M☉
-                      </div>
-                    </div>
-                  )}
-                  {nft.scientificData.ageYears != null && (
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs uppercase">Age</div>
-                      <div className="text-white font-semibold">
-                        {(nft.scientificData.ageYears / 1e9).toFixed(2)} billion years
-                      </div>
-                    </div>
-                  )}
-                  {nft.scientificData.sizeKm != null && (
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs uppercase">Size</div>
-                      <div className="text-white font-semibold">
-                        {nft.scientificData.sizeKm.toLocaleString()} km
-                      </div>
-                    </div>
-                  )}
-                  {nft.scientificData.temperatureK != null && (
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs uppercase">Temperature</div>
-                      <div className="text-white font-semibold">
-                        {nft.scientificData.temperatureK.toLocaleString()} K
-                      </div>
-                    </div>
-                  )}
-                  {nft.scientificData.discoveryYear != null && (
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs uppercase">Discovered</div>
-                      <div className="text-white font-semibold">
-                        {nft.scientificData.discoveryYear}
-                      </div>
-                    </div>
-                  )}
-                  {nft.scientificData.paperCount != null && (
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs uppercase">Scientific Papers</div>
-                      <div className="text-white font-semibold">
-                        {nft.scientificData.paperCount.toLocaleString()}
-                      </div>
-                    </div>
-                  )}
-                  {nft.scientificData.luminosity != null && (
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs uppercase">Luminosity</div>
-                      <div className="text-white font-semibold">
-                        {nft.scientificData.luminosity.toLocaleString()} L☉
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Score Breakdown - only show if any scores exist */}
-            {nft.scoreBreakdown && Object.values(nft.scoreBreakdown).some(v => v != null) ? (
-              <div className="bg-gray-900 rounded-xl p-6 mb-6">
-                <h3 className="text-xl font-semibold mb-4">Score Breakdown</h3>
-                <div className="space-y-3">
-                  {[
-                    { key: 'distance', label: 'Distance', score: nft.scoreBreakdown.distance },
-                    { key: 'mass', label: 'Mass', score: nft.scoreBreakdown.mass },
-                    { key: 'age', label: 'Age', score: nft.scoreBreakdown.age },
-                    { key: 'luminosity', label: 'Luminosity', score: nft.scoreBreakdown.luminosity },
-                    { key: 'size', label: 'Size', score: nft.scoreBreakdown.size },
-                    { key: 'temperature', label: 'Temperature', score: nft.scoreBreakdown.temperature },
-                    { key: 'discovery', label: 'Discovery Year', score: nft.scoreBreakdown.discovery },
-                    { key: 'papers', label: 'Scientific Papers', score: nft.scoreBreakdown.papers },
-                  ]
-                    .filter(item => item.score != null)
-                    .map(({ key, label, score }) => (
-                      <div key={key} className="flex items-center gap-3">
-                        <div className="w-28 text-gray-400 text-sm">{label}</div>
-                        <div className="flex-1 bg-gray-800 rounded-full h-3 overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-full transition-all"
-                            style={{ width: `${score}%` }}
-                          />
-                        </div>
-                        <div className="w-12 text-right text-white font-semibold text-sm">
-                          {score?.toFixed(0)}/100
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ) : (
-              <div className="bg-gray-900 rounded-xl p-6 mb-6">
-                <h3 className="text-xl font-semibold mb-2">Cosmic Score</h3>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 bg-gray-800 rounded-full h-4 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-purple-600 to-pink-500 rounded-full transition-all"
-                      style={{ width: `${(nft.score / 500) * 100}%` }}
-                    />
-                  </div>
-                  <div className="text-2xl font-bold text-white">{nft.score}/500</div>
-                </div>
-                <p className="text-gray-500 text-sm mt-3">
-                  Detailed score breakdown will be available once scientific data is populated.
-                </p>
-              </div>
-            )}
-
-            {/* Price Projection */}
-            {nft.availablePhases && nft.availablePhases.length > 0 && (
-              <div className="bg-gray-900 rounded-xl p-6">
-                <h3 className="text-xl font-semibold mb-4">Price Over Time</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  {nft.availablePhases.slice(0, 6).map((phase) => (
-                    <div
-                      key={phase.phase}
-                      className={`p-3 rounded-lg text-center ${
-                        phase.phase === 1
-                          ? 'bg-blue-900/50 border border-blue-500'
-                          : 'bg-gray-800'
-                      }`}
-                    >
-                      <div className="text-gray-400 text-xs">Phase {phase.phase}</div>
-                      <div className="font-semibold">{phase.price}</div>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-gray-400 text-sm mt-4">
-                  Prices increase 7.5% each phase. Buy early for the best price!
-                </p>
-              </div>
-            )}
           </div>
+        </div>
+
+        {/* Score Breakdown Section */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold mb-6">Score Breakdown</h2>
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+            <div className="grid md:grid-cols-2 gap-4">
+              {SCORE_METRICS.map((metric) => {
+                const value = nft.scoreBreakdown?.[metric.key as keyof ScoreBreakdown] ?? 0;
+                const percentage = (value / metric.max) * 100;
+
+                return (
+                  <div key={metric.key} className="bg-gray-800 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="text-white font-medium">{metric.label}</div>
+                        <div className="text-gray-500 text-xs">{metric.tooltip}</div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-white font-bold">{value}</span>
+                        <span className="text-gray-400">/{metric.max}</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Back Link */}
+        <div className="mt-12 pt-8 border-t border-gray-800">
+          <Link href="/browse" className="text-blue-400 hover:underline">
+            &larr; Back to Browse
+          </Link>
         </div>
       </div>
     </Layout>
