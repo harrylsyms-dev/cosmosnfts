@@ -1,97 +1,109 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import type { Phase } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { BASE_PRICE_PER_SCORE, TIER_MULTIPLIERS, DEFAULT_SERIES_MULTIPLIER } from '../../lib/pricing';
+import { SERIES_CONFIG } from '../../lib/constants';
 
-// Base price per score point: $0.10
-const BASE_PRICE_PER_SCORE = 0.10;
-
+/**
+ * Pricing API - Returns current Series/Phase pricing information
+ *
+ * Formula: Price = $0.10 × Score × Tier Multiplier × Series Multiplier
+ *
+ * NO per-phase multiplier - pricing is flat within a Series
+ * Series multiplier is based on previous series sell-through rate
+ */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Get site settings for phase increase percent
+    // Get site settings
     const siteSettings = await prisma.siteSettings.findUnique({
       where: { id: 'main' },
     });
-    const phaseIncreasePercent = siteSettings?.phaseIncreasePercent || 7.5;
 
-    // Get active tier from database
-    let activeTier = await prisma.tier.findFirst({
-      where: { active: true },
+    // Get active series with its phases
+    const activeSeries = await prisma.series.findFirst({
+      where: { status: 'ACTIVE' },
+      include: {
+        phases: {
+          orderBy: { phaseNumber: 'asc' },
+        },
+      },
     });
 
-    if (!activeTier) {
-      // Default to phase 1 if no active tier
-      const phase1 = await prisma.tier.findFirst({
-        where: { phase: 1 },
+    // Get active phase
+    const activePhase = activeSeries?.phases.find((p: Phase) => p.status === 'ACTIVE');
+
+    if (!activeSeries || !activePhase) {
+      // Return default Series 1, Phase 1 pricing
+      return res.json({
+        basePrice: BASE_PRICE_PER_SCORE,
+        displayPrice: BASE_PRICE_PER_SCORE.toFixed(2),
+        seriesMultiplier: DEFAULT_SERIES_MULTIPLIER,
+        tierMultipliers: TIER_MULTIPLIERS,
+        currentSeries: 1,
+        currentPhase: 1,
+        isPaused: siteSettings?.phasePaused || false,
+        pausedAt: siteSettings?.pausedAt || null,
+        phaseEndDate: null,
+        config: {
+          nftsPerPhase: SERIES_CONFIG.nftsPerPhase,
+          phaseDurationDays: SERIES_CONFIG.phaseDurationDays,
+        },
       });
-
-      if (!phase1) {
-        // Return default Phase 1 pricing if no tiers configured
-        return res.json({
-          currentPrice: (BASE_PRICE_PER_SCORE * 1e18).toString(),
-          displayPrice: BASE_PRICE_PER_SCORE.toFixed(2),
-          timeUntilNextTier: 0,
-          quantityAvailable: 20000,
-          tierIndex: 0,
-          phaseName: 'Phase 1',
-          phaseIncreasePercent,
-          isPaused: siteSettings?.phasePaused || false,
-          pausedAt: siteSettings?.pausedAt || null,
-          tier: {
-            price: (BASE_PRICE_PER_SCORE * 1e18).toString(),
-            quantityAvailable: 20000,
-            quantitySold: 0,
-            startTime: Math.floor(Date.now() / 1000),
-            duration: 2419200,
-            active: true,
-          },
-        });
-      }
-
-      // Activate phase 1
-      await prisma.tier.update({
-        where: { id: phase1.id },
-        data: { active: true },
-      });
-
-      activeTier = { ...phase1, active: true };
     }
 
-    // Calculate phase multiplier: (1 + phaseIncreasePercent/100)^(phase-1)
-    const phaseMultiplier = Math.pow(1 + phaseIncreasePercent / 100, activeTier.phase - 1);
+    // Get series multiplier (1.0 for Series 1, calculated for later series)
+    const seriesMultiplier = activeSeries.multiplier
+      ? Number(activeSeries.multiplier)
+      : DEFAULT_SERIES_MULTIPLIER;
 
-    // Current price per score = $0.10 × phase multiplier
-    const currentPricePerScore = BASE_PRICE_PER_SCORE * phaseMultiplier;
+    // Calculate phase end date
+    let phaseEndDate: Date | null = null;
+    if (activePhase.startTime && activePhase.endTime) {
+      const endTime = new Date(activePhase.endTime);
+      const pauseDuration = siteSettings?.pauseDurationMs || 0;
+      phaseEndDate = new Date(endTime.getTime() + pauseDuration);
 
-    // Calculate time until tier ends (accounting for pause duration)
-    const tierEndTime = new Date(activeTier.startTime.getTime() + activeTier.duration * 1000);
-    const adjustedEndTime = new Date(tierEndTime.getTime() + (siteSettings?.pauseDurationMs || 0));
-    const timeUntilNextTier = Math.max(0, Math.floor((adjustedEndTime.getTime() - Date.now()) / 1000));
+      // Adjust for ongoing pause
+      if (siteSettings?.phasePaused && siteSettings?.pausedAt) {
+        const pauseStart = new Date(siteSettings.pausedAt);
+        const timeSincePause = Date.now() - pauseStart.getTime();
+        phaseEndDate = new Date(phaseEndDate.getTime() + timeSincePause);
+      }
+    }
 
     // Get count of available NFTs
     const availableCount = await prisma.nFT.count({
       where: { status: 'AVAILABLE' },
     });
 
+    // Get sold count for series progress
+    const soldCount = await prisma.nFT.count({
+      where: { status: 'SOLD' },
+    });
+
     res.json({
-      currentPrice: (currentPricePerScore * 1e18).toString(),
-      displayPrice: currentPricePerScore.toFixed(2),
-      timeUntilNextTier,
-      quantityAvailable: availableCount,
-      tierIndex: activeTier.phase - 1,
-      phaseName: `Phase ${activeTier.phase}`,
-      phaseIncreasePercent,
+      basePrice: BASE_PRICE_PER_SCORE,
+      displayPrice: BASE_PRICE_PER_SCORE.toFixed(2),
+      seriesMultiplier,
+      tierMultipliers: TIER_MULTIPLIERS,
+      currentSeries: activeSeries.seriesNumber,
+      currentPhase: activePhase.phaseNumber,
+      seriesName: activeSeries.name,
+      phaseName: activePhase.name,
       isPaused: siteSettings?.phasePaused || false,
       pausedAt: siteSettings?.pausedAt || null,
-      tier: {
-        price: (currentPricePerScore * 1e18).toString(),
-        quantityAvailable: availableCount,
-        quantitySold: 20000 - availableCount,
-        startTime: Math.floor(activeTier.startTime.getTime() / 1000),
-        duration: activeTier.duration,
-        active: activeTier.active,
+      phaseEndDate: phaseEndDate?.toISOString() || null,
+      quantityAvailable: availableCount,
+      quantitySold: soldCount,
+      config: {
+        nftsPerPhase: SERIES_CONFIG.nftsPerPhase,
+        phaseDurationDays: SERIES_CONFIG.phaseDurationDays,
+        nftsPerSeries: SERIES_CONFIG.nftsPerSeries,
+        totalSeries: SERIES_CONFIG.totalSeries,
       },
     });
   } catch (error) {

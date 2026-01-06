@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
+import { calculatePrice, getCurrentSeriesMultiplier } from '../../../lib/pricing';
+import { BadgeTier } from '@prisma/client';
 
 const CART_EXPIRY_MINUTES = 30;
 const MAX_CART_ITEMS = 5;
@@ -65,20 +67,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'NFT already in cart' });
     }
 
-    // Get current phase multiplier for pricing with dynamic percentage
-    const [activeTier, siteSettings] = await Promise.all([
-      prisma.tier.findFirst({ where: { active: true } }),
-      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
-    ]);
-    const currentPhase = activeTier?.phase || 1;
-    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
-    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), currentPhase - 1);
+    // Get current series multiplier for pricing
+    // Price = $0.10 × Score × Tier Multiplier × Series Multiplier
+    const seriesMultiplier = await getCurrentSeriesMultiplier(prisma);
 
-    // Calculate price: $0.10 × Score × Phase Multiplier
-    // Use cents to avoid floating point issues, then convert to dollars
-    const score = nft.totalScore || nft.cosmicScore || 0;
-    const priceInCents = Math.round(10 * score * phaseMultiplier);
-    const calculatedPrice = priceInCents / 100;
+    // Calculate price using the correct Series-based pricing formula
+    const score = nft.totalScore || 0;
+    const badgeTier = (nft.badgeTier as BadgeTier) || 'STANDARD';
+    const priceCalculation = calculatePrice(score, badgeTier, seriesMultiplier);
+    const calculatedPrice = priceCalculation.priceUsd;
 
     // Add to cart and reserve NFT
     await prisma.$transaction([

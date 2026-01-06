@@ -1,36 +1,20 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../lib/adminAuth';
+import { calculatePrice, getCurrentSeriesMultiplier, TIER_MULTIPLIERS } from '../../../../lib/pricing';
+import { BadgeTier } from '@prisma/client';
 
-// Calculate current phase based on NFTs sold
-async function getCurrentPhaseInfo() {
+// Get current series pricing info
+async function getSeriesPricingInfo() {
   try {
-    // Get site settings for phase pause state
-    const settings = await prisma.siteSettings.findUnique({ where: { id: 'main' } });
-
-    // Get scoring config for base price per point
-    const scoringConfig = await prisma.scoringConfig.findUnique({ where: { id: 'main' } });
-    const basePricePerPoint = scoringConfig?.basePricePerPoint || 0.10;
-
-    // Get active tier info
-    const activeTier = await prisma.tier.findFirst({
-      where: { active: true },
-      orderBy: { phase: 'asc' },
-    });
-
-    // Calculate phase multiplier (7.5% increase per phase after phase 1)
-    const phaseIncreasePercent = settings?.phaseIncreasePercent || 7.5;
-    const currentPhase = activeTier?.phase || 1;
-    const phaseMultiplier = currentPhase === 1 ? 1 : Math.pow(1 + (phaseIncreasePercent / 100), currentPhase - 1);
+    // Get current series multiplier (1.0 for Series 1)
+    const seriesMultiplier = await getCurrentSeriesMultiplier(prisma);
 
     return {
-      currentPhase,
-      phaseMultiplier,
-      basePricePerPoint,
-      isPaused: settings?.phasePaused || false,
+      seriesMultiplier,
     };
   } catch {
-    return { currentPhase: 1, phaseMultiplier: 1, basePricePerPoint: 0.10, isPaused: false };
+    return { seriesMultiplier: 1.0 };
   }
 }
 
@@ -91,8 +75,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get total count
     const total = await prisma.nFT.count({ where });
 
-    // Get current phase info for dynamic pricing
-    const phaseInfo = await getCurrentPhaseInfo();
+    // Get current series pricing info
+    const pricingInfo = await getSeriesPricingInfo();
 
     // Get NFTs with pagination
     const nfts = await prisma.nFT.findMany({
@@ -114,18 +98,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // Calculate dynamic prices for each NFT
+    // Calculate prices for each NFT using correct Series-based pricing
+    // Formula: Price = $0.10 × Score × Tier Multiplier × Series Multiplier
     const nftsWithDynamicPricing = nfts.map((nft: any) => {
-      // Dynamic price = basePricePerPoint × score × phaseMultiplier
-      const dynamicPrice = phaseInfo.basePricePerPoint * nft.totalScore * phaseInfo.phaseMultiplier;
-      const displayPrice = `$${dynamicPrice.toFixed(2)}`;
-      const priceFormula = phaseInfo.currentPhase === 1
-        ? `$${phaseInfo.basePricePerPoint.toFixed(2)} × ${nft.totalScore}`
-        : `$${phaseInfo.basePricePerPoint.toFixed(2)} × ${nft.totalScore} × ${phaseInfo.phaseMultiplier.toFixed(3)}`;
+      const badgeTier = (nft.badgeTier as BadgeTier) || 'STANDARD';
+      const tierMultiplier = TIER_MULTIPLIERS[badgeTier];
+      const priceCalc = calculatePrice(nft.totalScore, badgeTier, pricingInfo.seriesMultiplier);
+      const displayPrice = `$${priceCalc.priceUsd.toFixed(2)}`;
+      const priceFormula = pricingInfo.seriesMultiplier === 1.0
+        ? `$0.10 × ${nft.totalScore} × ${tierMultiplier}x (${badgeTier})`
+        : `$0.10 × ${nft.totalScore} × ${tierMultiplier}x (${badgeTier}) × ${pricingInfo.seriesMultiplier}x`;
 
       return {
         ...nft,
-        currentPrice: dynamicPrice,
+        currentPrice: priceCalc.priceUsd,
         displayPrice,
         priceFormula,
       };
@@ -138,10 +124,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-      phaseInfo: {
-        currentPhase: phaseInfo.currentPhase,
-        phaseMultiplier: phaseInfo.phaseMultiplier.toFixed(3),
-        basePricePerPoint: phaseInfo.basePricePerPoint,
+      pricingInfo: {
+        seriesMultiplier: pricingInfo.seriesMultiplier.toFixed(2),
       },
     });
   } catch (error: any) {

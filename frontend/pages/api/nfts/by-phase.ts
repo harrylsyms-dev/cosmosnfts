@@ -1,7 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { BadgeTier } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import {
+  BASE_PRICE_PER_SCORE,
+  TIER_MULTIPLIERS,
+  calculatePrice,
+  getCurrentSeriesMultiplier,
+} from '../../../lib/pricing';
 
-function getBadgeForScore(score: number): string {
+function getBadgeForScore(score: number): BadgeTier {
+  if (score >= 450) return 'LEGENDARY';
   if (score >= 425) return 'ELITE';
   if (score >= 400) return 'PREMIUM';
   if (score >= 375) return 'EXCEPTIONAL';
@@ -47,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     };
 
-    const [total, nfts, siteSettings] = await Promise.all([
+    const [total, nfts, seriesMultiplier] = await Promise.all([
       prisma.nFT.count({ where }),
       prisma.nFT.findMany({
         where,
@@ -55,35 +63,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         skip: offsetNum,
         take: limitNum,
       }),
-      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
+      getCurrentSeriesMultiplier(prisma),
     ]);
-
-    // Calculate phase price multiplier with dynamic percentage
-    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
-    const phaseMultiplier = Math.pow(1 + (increasePercent / 100), phaseNum - 1);
 
     res.status(200).json({
       phase: phaseNum,
-      phaseMultiplier: phaseMultiplier.toFixed(4),
+      seriesMultiplier,
       idRange: { min: actualMinId, max: actualMaxId },
       total,
       limit: limitNum,
       offset: offsetNum,
       items: nfts.map((nft: { id: number; name: string; image: string | null; imageIpfsHash: string | null; totalScore: number | null; cosmicScore: number | null; badgeTier: string | null; objectType: string | null; constellation: string | null; distance: string | null; status: string }) => {
         const score = nft.totalScore || nft.cosmicScore || 0;
-        const price = 0.10 * score * phaseMultiplier;
+        const badge = (nft.badgeTier as BadgeTier) || getBadgeForScore(score);
+        const priceCalc = calculatePrice(score, badge, seriesMultiplier);
+        const tierMultiplier = TIER_MULTIPLIERS[badge];
         return {
           id: nft.id,
           name: nft.name,
           image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
           score,
-          badge: nft.badgeTier || getBadgeForScore(score),
+          badge,
           objectType: nft.objectType,
           constellation: nft.constellation,
           distance: nft.distance,
           status: nft.status,
-          displayPrice: `$${price.toFixed(2)}`,
-          priceFormula: `$0.10 × ${score} × ${phaseMultiplier.toFixed(4)}`,
+          displayPrice: `$${priceCalc.priceUsd.toFixed(2)}`,
+          priceFormula: `$${BASE_PRICE_PER_SCORE.toFixed(2)} x ${score} x ${tierMultiplier} x ${seriesMultiplier}`,
         };
       }),
     });

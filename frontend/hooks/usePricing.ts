@@ -1,23 +1,29 @@
 import useSWR from 'swr';
+import { BadgeTier } from '@prisma/client';
 
 interface PricingData {
-  currentPrice: string;
+  basePrice: number;
   displayPrice: string;
-  timeUntilNextTier: number;
-  quantityAvailable: number;
-  tierIndex: number;
-  phaseName: string;
-  phaseIncreasePercent: number;
+  seriesMultiplier: number;
+  tierMultipliers: Record<BadgeTier, number>;
+  currentSeries: number;
+  currentPhase: number;
+  seriesName?: string;
+  phaseName?: string;
   isPaused: boolean;
   pausedAt: string | null;
-  tier: {
-    price: string;
-    quantityAvailable: number;
-    quantitySold: number;
-    startTime: number;
-    duration: number;
-    active: boolean;
+  phaseEndDate: string | null;
+  quantityAvailable: number;
+  quantitySold: number;
+  config: {
+    nftsPerPhase: number;
+    phaseDurationDays: number;
+    nftsPerSeries?: number;
+    totalSeries?: number;
   };
+  // Legacy fields for backwards compatibility
+  tierIndex?: number;
+  timeUntilNextTier?: number;
 }
 
 interface UsePricingReturn {

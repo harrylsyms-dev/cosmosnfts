@@ -1,202 +1,128 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import Layout from '../components/Layout';
-import { usePricing } from '../hooks/usePricing';
+import {
+  TIER_CONFIG,
+  TIER_ORDER,
+  SERIES_CONFIG,
+  PRICING,
+  calculatePrice,
+  calculateTrajectory,
+  BadgeTier,
+} from '../lib/constants';
 
-const phases = [
-  { phase: 1, baseRate: 0.10, increase: '-', note: 'Launch phase' },
-  { phase: 2, baseRate: 0.1075, increase: '7.5%', note: '' },
-  { phase: 3, baseRate: 0.1156, increase: '7.5%', note: '' },
-  { phase: 4, baseRate: 0.1243, increase: '7.5%', note: '' },
-  { phase: 5, baseRate: 0.1336, increase: '7.5%', note: '' },
-  { phase: 6, baseRate: 0.1436, increase: '7.5%', note: '' },
-  { phase: 7, baseRate: 0.1544, increase: '7.5%', note: '' },
-  { phase: 8, baseRate: 0.1660, increase: '7.5%', note: '' },
-  { phase: 9, baseRate: 0.1784, increase: '7.5%', note: '' },
-  { phase: 10, baseRate: 0.1918, increase: '7.5%', note: 'Final phase' },
-];
-
+// Example NFTs showing different tiers
 const exampleNFTs = [
-  { name: 'Alpha Centauri', score: 425, badge: 'ELITE' },
-  { name: 'Kepler-442b', score: 400, badge: 'PREMIUM' },
-  { name: 'NGC 6302', score: 380, badge: 'EXCEPTIONAL' },
-  { name: 'Asteroid 2024 AB', score: 355, badge: 'STANDARD' },
+  { name: 'Sagittarius A*', score: 280, tier: 'MYTHIC' as BadgeTier },
+  { name: 'Andromeda Galaxy', score: 260, tier: 'LEGENDARY' as BadgeTier },
+  { name: 'Crab Nebula', score: 240, tier: 'ELITE' as BadgeTier },
+  { name: 'Kepler-442b', score: 220, tier: 'PREMIUM' as BadgeTier },
+  { name: 'Comet Hale-Bopp', score: 180, tier: 'EXCEPTIONAL' as BadgeTier },
+  { name: 'Asteroid Bennu', score: 150, tier: 'STANDARD' as BadgeTier },
 ];
 
 export default function Pricing() {
-  const { pricing, isLoading } = usePricing();
-
   return (
     <Layout>
       <Head>
         <title>Pricing - CosmoNFT</title>
-        <meta name="description" content="Understand CosmoNFT's dynamic pricing system - Phase-based pricing, score-based calculations, and early buyer advantages." />
+        <meta name="description" content="Understand CosmoNFT's pricing system - Tier-based multipliers, Score-based calculations, and Series progression." />
       </Head>
 
       <div className="max-w-5xl mx-auto px-4 py-12">
         {/* Hero */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Dynamic Pricing System
+            Transparent Pricing System
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Our unique pricing model rewards early buyers while ensuring fair value
-            based on each celestial object's Cosmic Score.
+            Our pricing model rewards collectors based on NFT rarity and score.
+            No hidden fees, no per-phase price increases.
           </p>
         </div>
 
-        {/* Current Phase Status */}
+        {/* Pricing Formula */}
         <section className="mb-16">
           <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-8 border border-blue-500/30">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-              <div>
-                <p className="text-gray-400 mb-1">Current Phase</p>
-                <h2 className="text-4xl font-bold text-blue-400">
-                  {isLoading ? '...' : `Phase ${pricing?.tierIndex || 1}`}
-                </h2>
-              </div>
-              <div className="text-center">
-                <p className="text-gray-400 mb-1">Current Base Rate</p>
-                <div className="text-4xl font-bold text-green-400">
-                  ${isLoading ? '...' : pricing?.displayPrice || '0.10'}
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-gray-400 mb-1">Status</p>
-                <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                  pricing?.isPaused
-                    ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30'
-                    : 'bg-green-900/50 text-green-300 border border-green-500/30'
-                }`}>
-                  {pricing?.isPaused ? 'Timer Paused' : 'Active'}
-                </div>
-              </div>
+            <h2 className="text-2xl font-bold text-center mb-6">The Pricing Formula</h2>
+            <div className="bg-gray-800 rounded-lg p-6 font-mono text-center text-xl">
+              <span className="text-blue-400">Price</span> = $0.10 x <span className="text-green-400">Score</span> x <span className="text-purple-400">Tier Multiplier</span> x <span className="text-yellow-400">Series Multiplier</span>
             </div>
+            <p className="text-gray-400 text-center mt-4">
+              Base rate: <span className="text-white font-bold">${PRICING.baseRatePerPoint}</span> per score point
+            </p>
           </div>
         </section>
 
         {/* How It Works */}
         <section className="mb-16">
           <h2 className="text-3xl font-bold mb-8 text-center">How Pricing Works</h2>
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-gray-900 rounded-lg p-6">
-              <div className="text-4xl mb-4">📊</div>
-              <h3 className="text-xl font-semibold mb-3">Score-Based Calculation</h3>
-              <p className="text-gray-300 mb-4">
-                Each NFT's price is calculated by multiplying the current base rate by its Cosmic Score.
+              <div className="text-4xl mb-4">1</div>
+              <h3 className="text-xl font-semibold mb-3 text-green-400">Score (1-300)</h3>
+              <p className="text-gray-300">
+                Each NFT has a Cosmic Score based on 10 metrics including cultural significance,
+                scientific importance, and uniqueness. Higher scores = higher prices.
               </p>
-              <div className="bg-gray-800 rounded-lg p-4 font-mono text-center">
-                <span className="text-blue-400">Price</span> = Base Rate × Cosmic Score
-              </div>
             </div>
 
             <div className="bg-gray-900 rounded-lg p-6">
-              <div className="text-4xl mb-4">⏰</div>
-              <h3 className="text-xl font-semibold mb-3">Phase-Based Increases</h3>
-              <p className="text-gray-300 mb-4">
-                The base rate increases by 7.5% with each phase. Early buyers lock in lower prices.
+              <div className="text-4xl mb-4">2</div>
+              <h3 className="text-xl font-semibold mb-3 text-purple-400">Tier Multiplier</h3>
+              <p className="text-gray-300">
+                Rarer tiers have higher multipliers. A MYTHIC NFT (200x) costs 200 times more
+                than a STANDARD NFT (1x) with the same score.
               </p>
-              <div className="bg-gray-800 rounded-lg p-4 font-mono text-center">
-                <span className="text-yellow-400">+7.5%</span> per phase
-              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-6">
+              <div className="text-4xl mb-4">3</div>
+              <h3 className="text-xl font-semibold mb-3 text-yellow-400">Series Multiplier</h3>
+              <p className="text-gray-300">
+                Series 1 has a 1.0x multiplier. Future series may have higher multipliers (1.5x-3.0x)
+                based on demand and sell-through rates.
+              </p>
             </div>
           </div>
         </section>
 
-        {/* Pricing Formula */}
+        {/* Tier Multipliers */}
         <section className="mb-16">
-          <h2 className="text-3xl font-bold mb-8 text-center">Pricing Examples</h2>
+          <h2 className="text-3xl font-bold mb-8 text-center">Tier Multipliers</h2>
           <div className="bg-gray-900 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-800">
-                    <th className="px-6 py-4 text-left">NFT Example</th>
-                    <th className="px-6 py-4 text-center">Score</th>
-                    <th className="px-6 py-4 text-center">Badge</th>
-                    <th className="px-6 py-4 text-center">Phase 1 Price</th>
-                    <th className="px-6 py-4 text-center">Phase 5 Price</th>
-                    <th className="px-6 py-4 text-center">Phase 10 Price</th>
+                    <th className="px-6 py-4 text-left">Tier</th>
+                    <th className="px-6 py-4 text-center">Multiplier</th>
+                    <th className="px-6 py-4 text-center">Count</th>
+                    <th className="px-6 py-4 text-center">Rarity</th>
+                    <th className="px-6 py-4 text-left">Description</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                  {exampleNFTs.map((nft) => (
-                    <tr key={nft.name}>
-                      <td className="px-6 py-4 font-medium">{nft.name}</td>
-                      <td className="px-6 py-4 text-center text-blue-400">{nft.score}</td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          nft.badge === 'ELITE' ? 'badge-elite' :
-                          nft.badge === 'PREMIUM' ? 'badge-premium' :
-                          nft.badge === 'EXCEPTIONAL' ? 'badge-exceptional' :
-                          'badge-standard'
-                        }`}>
-                          {nft.badge}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-green-400">
-                        ${(0.10 * nft.score).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-center text-yellow-400">
-                        ${(0.1336 * nft.score).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-center text-red-400">
-                        ${(0.1918 * nft.score).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <p className="text-gray-500 text-sm mt-4 text-center">
-            * Prices shown are base calculations. Actual prices may vary based on current phase.
-          </p>
-        </section>
-
-        {/* Phase Schedule */}
-        <section className="mb-16">
-          <h2 className="text-3xl font-bold mb-8 text-center">Phase Schedule</h2>
-          <div className="bg-gray-900 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-800">
-                    <th className="px-6 py-4 text-left">Phase</th>
-                    <th className="px-6 py-4 text-center">Base Rate</th>
-                    <th className="px-6 py-4 text-center">Increase</th>
-                    <th className="px-6 py-4 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {phases.map((phase) => {
-                    const isCurrent = pricing?.tierIndex === phase.phase;
-                    const isPast = pricing && pricing.tierIndex > phase.phase;
+                  {TIER_ORDER.map((tier) => {
+                    const config = TIER_CONFIG[tier];
                     return (
-                      <tr
-                        key={phase.phase}
-                        className={isCurrent ? 'bg-blue-900/30' : ''}
-                      >
+                      <tr key={tier} className="hover:bg-gray-800/50">
                         <td className="px-6 py-4">
-                          <span className="font-semibold">Phase {phase.phase}</span>
-                          {phase.note && (
-                            <span className="ml-2 text-gray-500 text-sm">({phase.note})</span>
-                          )}
+                          <span className={`px-3 py-1 rounded-full text-sm font-bold ${config.bgColor} ${config.textColor}`}>
+                            {config.icon} {tier}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 text-center font-mono">
-                          ${phase.baseRate.toFixed(4)}
+                        <td className="px-6 py-4 text-center text-2xl font-bold text-white">
+                          {config.multiplier}x
                         </td>
-                        <td className="px-6 py-4 text-center text-yellow-400">
-                          {phase.increase}
+                        <td className="px-6 py-4 text-center text-gray-300">
+                          {config.count.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          {isCurrent ? (
-                            <span className="px-3 py-1 bg-blue-600 rounded-full text-sm">Current</span>
-                          ) : isPast ? (
-                            <span className="text-gray-500">Completed</span>
-                          ) : (
-                            <span className="text-gray-400">Upcoming</span>
-                          )}
+                        <td className="px-6 py-4 text-center text-gray-400">
+                          {config.rarity}
+                        </td>
+                        <td className="px-6 py-4 text-gray-400">
+                          {config.description}
                         </td>
                       </tr>
                     );
@@ -207,22 +133,95 @@ export default function Pricing() {
           </div>
         </section>
 
-        {/* Early Bird Benefits */}
+        {/* Pricing Examples */}
         <section className="mb-16">
-          <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 rounded-xl p-8">
-            <h2 className="text-3xl font-bold mb-6 text-center">Early Bird Advantage</h2>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="text-5xl font-bold text-green-400 mb-2">92%</div>
-                <p className="text-gray-300">Maximum savings from Phase 1 to Phase 10</p>
+          <h2 className="text-3xl font-bold mb-8 text-center">Pricing Examples</h2>
+          <div className="bg-gray-900 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-800">
+                    <th className="px-6 py-4 text-left">NFT Example</th>
+                    <th className="px-6 py-4 text-center">Score</th>
+                    <th className="px-6 py-4 text-center">Tier</th>
+                    <th className="px-6 py-4 text-center">Multiplier</th>
+                    <th className="px-6 py-4 text-center">Series 1 Price</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {exampleNFTs.map((nft) => {
+                    const config = TIER_CONFIG[nft.tier];
+                    const price = calculatePrice(nft.score, nft.tier, 1.0);
+                    return (
+                      <tr key={nft.name}>
+                        <td className="px-6 py-4 font-medium">{nft.name}</td>
+                        <td className="px-6 py-4 text-center text-blue-400 font-bold">{nft.score}</td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${config.bgColor}`}>
+                            {nft.tier}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center text-purple-400">
+                          {config.multiplier}x
+                        </td>
+                        <td className="px-6 py-4 text-center text-green-400 font-bold text-lg">
+                          ${price.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-gray-500 text-sm mt-4 text-center">
+            Formula: $0.10 x Score x Tier Multiplier x Series Multiplier (1.0 for Series 1)
+          </p>
+        </section>
+
+        {/* Series Structure */}
+        <section className="mb-16">
+          <h2 className="text-3xl font-bold mb-8 text-center">Series Structure</h2>
+          <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl p-8 border border-purple-500/30">
+            <div className="grid md:grid-cols-4 gap-6 text-center">
+              <div>
+                <div className="text-5xl font-bold text-purple-400 mb-2">{SERIES_CONFIG.totalSeries}</div>
+                <p className="text-gray-300">Total Series</p>
               </div>
-              <div className="text-center">
-                <div className="text-5xl font-bold text-blue-400 mb-2">10</div>
-                <p className="text-gray-300">Total phases in the pricing cycle</p>
+              <div>
+                <div className="text-5xl font-bold text-blue-400 mb-2">{SERIES_CONFIG.phasesPerSeries}</div>
+                <p className="text-gray-300">Phases per Series</p>
               </div>
-              <div className="text-center">
-                <div className="text-5xl font-bold text-purple-400 mb-2">7.5%</div>
-                <p className="text-gray-300">Price increase per phase</p>
+              <div>
+                <div className="text-5xl font-bold text-green-400 mb-2">{SERIES_CONFIG.nftsPerPhase.toLocaleString()}</div>
+                <p className="text-gray-300">NFTs per Phase</p>
+              </div>
+              <div>
+                <div className="text-5xl font-bold text-yellow-400 mb-2">{SERIES_CONFIG.nftsPerSeries.toLocaleString()}</div>
+                <p className="text-gray-300">NFTs per Series</p>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-gray-700">
+              <h3 className="text-xl font-semibold mb-4 text-center">Series Multiplier Progression</h3>
+              <p className="text-gray-400 text-center mb-4">
+                Series multipliers are determined by sell-through rates. Higher demand = higher multipliers for future series.
+              </p>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="text-green-400 font-bold mb-1">Series 1</div>
+                  <div className="text-2xl font-bold text-white">1.0x</div>
+                  <div className="text-gray-500 text-sm">Base pricing</div>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="text-yellow-400 font-bold mb-1">Series 2+</div>
+                  <div className="text-2xl font-bold text-white">1.5x - 3.0x</div>
+                  <div className="text-gray-500 text-sm">Based on demand</div>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4 md:col-span-2 lg:col-span-1">
+                  <div className="text-blue-400 font-bold mb-1">Key Point</div>
+                  <div className="text-sm text-gray-300">No per-phase price increases within a series</div>
+                </div>
               </div>
             </div>
           </div>
@@ -259,11 +258,11 @@ export default function Pricing() {
         <section className="mb-16">
           <div className="bg-purple-900/30 rounded-xl p-8 border border-purple-500/30">
             <div className="flex items-center justify-center gap-4 mb-4">
-              <span className="text-4xl">💜</span>
-              <h2 className="text-2xl font-bold">30% to Space Exploration</h2>
+              <span className="text-4xl">*</span>
+              <h2 className="text-2xl font-bold">{PRICING.donationPercentage}% to Space Exploration</h2>
             </div>
             <p className="text-gray-300 text-center max-w-2xl mx-auto">
-              From every purchase, 30% of net proceeds goes directly to verified space exploration
+              From every purchase, {PRICING.donationPercentage}% of net proceeds goes directly to verified space exploration
               and research charities. Your purchase helps fund humanity's journey to the stars.
             </p>
             <div className="text-center mt-6">
@@ -281,7 +280,7 @@ export default function Pricing() {
         <section className="text-center">
           <h2 className="text-2xl font-bold mb-4">Ready to Start Collecting?</h2>
           <p className="text-gray-400 mb-6">
-            Lock in current phase pricing before the next increase.
+            Browse our collection of {(SERIES_CONFIG.totalSeries * SERIES_CONFIG.nftsPerSeries).toLocaleString()} unique cosmic NFTs.
           </p>
           <Link
             href="/browse"

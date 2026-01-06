@@ -1,7 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { BadgeTier } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import {
+  BASE_PRICE_PER_SCORE,
+  TIER_MULTIPLIERS,
+  calculatePrice,
+  getCurrentSeriesMultiplier,
+  SERIES_MULTIPLIER_THRESHOLDS,
+} from '../../../lib/pricing';
 
-function getBadgeForScore(score: number): string {
+function getBadgeForScore(score: number): BadgeTier {
   if (score >= 450) return 'LEGENDARY';
   if (score >= 425) return 'ELITE';
   if (score >= 400) return 'PREMIUM';
@@ -30,31 +38,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    // Get current phase multiplier with dynamic percentage and scoring config
-    const [activeTier, siteSettings, scoringConfig] = await Promise.all([
-      prisma.tier.findFirst({ where: { active: true } }),
-      prisma.siteSettings.findUnique({ where: { id: 'main' } }),
-      prisma.scoringConfig.findUnique({ where: { id: 'main' } }),
-    ]);
-
-    const currentPhase = activeTier?.phase || 1;
-    const increasePercent = siteSettings?.phaseIncreasePercent || 7.5;
-    const multiplierBase = 1 + (increasePercent / 100);
-    const phaseMultiplier = Math.pow(multiplierBase, currentPhase - 1);
-    const basePricePerPoint = scoringConfig?.basePricePerPoint ?? 0.10;
+    // Get current series multiplier
+    const seriesMultiplier = await getCurrentSeriesMultiplier(prisma);
 
     // Use scientific scores if available, fall back to legacy scores
     const totalScore = nft.totalScore || nft.cosmicScore || 0;
-    const currentPrice = basePricePerPoint * totalScore * phaseMultiplier;
+    const badge = (nft.badgeTier as BadgeTier) || getBadgeForScore(totalScore);
+    const tierMultiplier = TIER_MULTIPLIERS[badge];
+    const priceCalc = calculatePrice(totalScore, badge, seriesMultiplier);
 
-    // Calculate price projections for future phases (77 total phases)
-    const projections = [1, 2, 5, 10, 20, 30, 50, 77].map((phase) => {
-      const mult = Math.pow(multiplierBase, phase - 1);
-      const price = basePricePerPoint * totalScore * mult;
+    // Calculate price projections for future series (based on sell-through rates)
+    const projections = SERIES_MULTIPLIER_THRESHOLDS.map((threshold) => {
+      const futurePrice = calculatePrice(totalScore, badge, threshold.multiplier);
       return {
-        phase,
-        price: `$${price.toFixed(2)}`,
-        multiplier: mult.toFixed(4),
+        sellThroughRate: `${(threshold.minSellThrough * 100).toFixed(0)}%+`,
+        multiplier: threshold.multiplier,
+        price: `$${futurePrice.priceUsd.toFixed(2)}`,
       };
     });
 
@@ -67,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       constellation: nft.constellation,
       distance: nft.distance,
       score: totalScore,
-      badge: nft.badgeTier || getBadgeForScore(totalScore),
+      badge,
 
       // Scientific data (objective measurements)
       scientificData: {
@@ -94,14 +93,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
 
       // Pricing info
-      currentPhase,
-      phaseMultiplier: phaseMultiplier.toFixed(4),
-      basePricePerPoint,
-      currentPrice,
-      displayPrice: `$${currentPrice.toFixed(2)}`,
-      priceFormula: `$${basePricePerPoint.toFixed(2)} × ${totalScore} × ${phaseMultiplier.toFixed(4)}`,
+      seriesMultiplier,
+      tierMultiplier,
+      basePricePerPoint: BASE_PRICE_PER_SCORE,
+      currentPrice: priceCalc.priceUsd,
+      displayPrice: `$${priceCalc.priceUsd.toFixed(2)}`,
+      priceFormula: `$${BASE_PRICE_PER_SCORE.toFixed(2)} x ${totalScore} x ${tierMultiplier} x ${seriesMultiplier}`,
       status: nft.status,
-      availablePhases: projections,
       priceProjections: projections,
     });
   } catch (error) {

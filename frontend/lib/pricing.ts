@@ -20,7 +20,8 @@
  * - Series 1: 1.0x (default)
  */
 
-import { BadgeTier, PrismaClient } from '@prisma/client';
+import { BadgeTier } from '@prisma/client';
+import type { prisma as PrismaInstance } from './prisma';
 import { Decimal } from '@prisma/client/runtime/library';
 
 // Base price per score point
@@ -191,7 +192,7 @@ export function calculateExamplePrices(
 /**
  * Get current series multiplier from database
  */
-export async function getCurrentSeriesMultiplier(prisma: PrismaClient): Promise<number> {
+export async function getCurrentSeriesMultiplier(prisma: typeof PrismaInstance): Promise<number> {
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'main' },
     select: { currentSeriesId: true },
@@ -221,7 +222,7 @@ export async function getCurrentSeriesMultiplier(prisma: PrismaClient): Promise<
  * etc.
  */
 export async function calculateCumulativeMultiplier(
-  prisma: PrismaClient,
+  prisma: typeof PrismaInstance,
   targetSeriesNumber: number
 ): Promise<{
   multiplier: number;

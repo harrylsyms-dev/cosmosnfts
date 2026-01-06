@@ -7,6 +7,7 @@ import {
   TIER_CONFIG,
   CATEGORY_ORDER,
   CATEGORY_CONFIG,
+  SERIES_CONFIG,
   BadgeTier,
   MAX_TOTAL_SCORE,
 } from '../../lib/constants';
@@ -48,8 +49,10 @@ interface NFTDetail {
   currentPrice: number;
   displayPrice: string;
   priceFormula: string;
+  currentSeries: number;
   currentPhase: number;
-  phaseMultiplier: string;
+  tierMultiplier: number;
+  seriesMultiplier: number;
   image: string | null;
   imageIpfsHash: string | null;
   metadataIpfsHash: string | null;
@@ -1127,9 +1130,13 @@ export default function AdminNFTs() {
                         <div className="text-3xl font-bold text-green-400 mb-2">
                           {selectedNft.displayPrice}
                         </div>
-                        <div className="text-sm text-gray-400">
-                          <p>Formula: {selectedNft.priceFormula}</p>
-                          <p>Phase: {selectedNft.currentPhase} | Multiplier: {selectedNft.phaseMultiplier}x</p>
+                        <div className="text-sm text-gray-400 space-y-1">
+                          <p>Formula: $0.10 x Score x Tier x Series</p>
+                          <p>Tier: {selectedNft.badgeTier} ({selectedNft.tierMultiplier || TIER_CONFIG[selectedNft.badgeTier as BadgeTier]?.multiplier || 1}x)</p>
+                          <p>Series {selectedNft.currentSeries || 1}, Phase {selectedNft.currentPhase || 1}</p>
+                          {selectedNft.seriesMultiplier && selectedNft.seriesMultiplier > 1 && (
+                            <p className="text-yellow-400">Series Multiplier: {selectedNft.seriesMultiplier}x</p>
+                          )}
                         </div>
                       </div>
 

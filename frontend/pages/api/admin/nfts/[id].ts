@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../lib/adminAuth';
+import { calculatePrice, getCurrentSeriesMultiplier, TIER_MULTIPLIERS } from '../../../../lib/pricing';
+import { BadgeTier } from '@prisma/client';
 
 // Auction schedule for looking up starting bids
 const AUCTION_SCHEDULE: Record<string, number> = {
@@ -26,32 +28,12 @@ const AUCTION_SCHEDULE: Record<string, number> = {
   'triangulum galaxy': 200000,
 };
 
-// Get current phase and multiplier
-async function getPricingInfo() {
+// Get current series multiplier for pricing
+async function getSeriesMultiplier() {
   try {
-    const settings = await prisma.siteSettings.findUnique({
-      where: { id: 'main' },
-    });
-
-    const activeTier = await prisma.tier.findFirst({
-      where: { active: true },
-    });
-
-    if (!activeTier) {
-      return { currentPhase: 1, currentMultiplier: 1.0, increasePercent: 7.5 };
-    }
-
-    const increasePercent = settings?.phaseIncreasePercent || 7.5;
-    // Calculate multiplier based on phase and increase percent
-    const currentMultiplier = Math.pow(1 + (increasePercent / 100), activeTier.phase - 1);
-
-    return {
-      currentPhase: activeTier.phase,
-      currentMultiplier,
-      increasePercent
-    };
+    return await getCurrentSeriesMultiplier(prisma);
   } catch {
-    return { currentPhase: 1, currentMultiplier: 1.0, increasePercent: 7.5 };
+    return 1.0;
   }
 }
 
@@ -157,10 +139,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'NFT not found' });
     }
 
-    // Get pricing info
-    const { currentPhase, currentMultiplier } = await getPricingInfo();
-    const basePrice = 0.10; // $0.10 per score point
-    const calculatedPrice = nft.totalScore * basePrice * currentMultiplier;
+    // Get series multiplier for pricing
+    // Price = $0.10 × Score × Tier Multiplier × Series Multiplier
+    const seriesMultiplier = await getSeriesMultiplier();
+    const badgeTier = (nft.badgeTier as BadgeTier) || 'STANDARD';
+    const tierMultiplier = TIER_MULTIPLIERS[badgeTier];
+    const priceCalc = calculatePrice(nft.totalScore, badgeTier, seriesMultiplier);
+    const calculatedPrice = priceCalc.priceUsd;
 
     // Get auction starting bid if this is an auction-reserved NFT
     let auctionStartingBid: number | null = null;
@@ -203,9 +188,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       displayPrice,
       priceFormula: isAuctionNft
         ? `Auction Starting Bid`
-        : `$0.10 × ${nft.totalScore} Score × ${currentMultiplier.toFixed(2)}x`,
-      currentPhase,
-      phaseMultiplier: currentMultiplier.toFixed(2),
+        : seriesMultiplier === 1.0
+          ? `$0.10 × ${nft.totalScore} Score × ${tierMultiplier}x (${badgeTier})`
+          : `$0.10 × ${nft.totalScore} Score × ${tierMultiplier}x (${badgeTier}) × ${seriesMultiplier}x`,
+      seriesMultiplier: seriesMultiplier.toFixed(2),
+      tierMultiplier,
       // Include both prices for auction NFTs
       auctionStartingBid,
       auctionStartingBidDisplay,

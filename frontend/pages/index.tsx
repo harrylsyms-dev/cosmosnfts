@@ -147,8 +147,8 @@ export default function Home() {
             <div className="text-gray-400">Base Rate × Score</div>
           </div>
           <div>
-            <div className="text-4xl font-bold text-purple-400">{pricing?.phaseIncreasePercent || 7.5}%</div>
-            <div className="text-gray-400">Per Phase Increase</div>
+            <div className="text-4xl font-bold text-purple-400">4 x 5</div>
+            <div className="text-gray-400">Series x Phases</div>
           </div>
           <div>
             <div className="text-4xl font-bold text-yellow-400">30%</div>
@@ -279,12 +279,12 @@ export default function Home() {
       <section className="relative py-20 px-4 bg-gradient-to-r from-blue-900/50 via-purple-900/50 to-blue-900/50">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-bold mb-6">
-            Prices Go Up Every Phase
+            Series {pricing?.currentSeries || 1} Now Live
           </h2>
           <p className="text-xl text-gray-300 mb-8">
             {pricing?.isPaused
               ? 'Timer is paused. Prices are locked until resumed.'
-              : `Don't miss Phase ${pricing?.tierIndex || 1} pricing. Once it ends, prices increase ${pricing?.phaseIncreasePercent || 7.5}%.`}
+              : `Buy now at ${pricing?.seriesMultiplier || 1.0}x multiplier. Prices increase with each series based on demand.`}
           </p>
 
           {pricing && (
@@ -293,15 +293,15 @@ export default function Home() {
                 <div className="inline-flex items-center gap-3 bg-yellow-900/30 border border-yellow-500/30 px-6 py-4 rounded-xl">
                   <span className="text-yellow-400 text-2xl">⏸️</span>
                   <span className="text-yellow-300 font-medium">
-                    Timer paused - price will not increase until resumed
+                    Timer paused - sales continue at current price
                   </span>
                 </div>
-              ) : (
+              ) : pricing.phaseEndDate ? (
                 <CountdownTimer
-                  targetTime={Date.now() + pricing.timeUntilNextTier * 1000}
+                  targetTime={new Date(pricing.phaseEndDate).getTime()}
                   onComplete={() => window.location.reload()}
                 />
-              )}
+              ) : null}
             </div>
           )}
 
