@@ -1,3 +1,10 @@
 .vercel
 .env*.local
 .env.vercel
+
+# Large staging files
+staging/*.json
+generated-images/
+image-generation-output/
+*.csv
+SYSTEM_REPORT.txt

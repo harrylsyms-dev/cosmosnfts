@@ -23,7 +23,9 @@
  * - SIMBAD: Scientific data cross-reference
  */
 
-import { BadgeTier, ObjectCategory } from '@prisma/client';
+import { BadgeTier, ObjectCategory, PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // ============================================================
 // INTERFACES
@@ -784,6 +786,79 @@ Breakdown:
   Active Relevance:       ${result.activeRelevance.toString().padStart(2)}/15
   Future Potential:       ${result.futurePotential.toString().padStart(2)}/15
 `.trim();
+}
+
+// ============================================================
+// DATABASE RECALCULATION FUNCTIONS
+// ============================================================
+
+/**
+ * Recalculate score for a single NFT by ID
+ */
+export async function recalculateNFTScore(nftId: number): Promise<ScoringResult> {
+  const nft = await prisma.nFT.findUnique({ where: { id: nftId } });
+  if (!nft) {
+    throw new Error(`NFT not found: ${nftId}`);
+  }
+
+  const data: ObjectScientificData = {
+    name: nft.name,
+    category: nft.objectCategory as ObjectCategory,
+    wikipediaPageViews: nft.wikipediaPageViews ?? undefined,
+    wikidataSitelinks: nft.wikidataSitelinks ?? undefined,
+    distanceLy: nft.distanceLy ?? undefined,
+    apparentMagnitude: nft.apparentMagnitude ?? undefined,
+    hasImages: nft.hasImages ?? undefined,
+    namedByAncients: nft.namedByAncients ?? undefined,
+    discoveryYear: nft.discoveryYear ?? undefined,
+    hasActiveMission: nft.hasActiveMission ?? undefined,
+    plannedMission: nft.plannedMission ?? undefined,
+    isHabitable: nft.isHabitable ?? undefined,
+    isInSolarSystem: nft.isInSolarSystem ?? undefined,
+  };
+
+  const result = calculateTotalScore(data);
+
+  await prisma.nFT.update({
+    where: { id: nftId },
+    data: { totalScore: result.totalScore },
+  });
+
+  return result;
+}
+
+/**
+ * Recalculate scores for all NFTs in batches
+ */
+export async function recalculateAllScores(batchSize: number = 100): Promise<{ processed: number; errors: number }> {
+  let processed = 0;
+  let errors = 0;
+  let skip = 0;
+
+  while (true) {
+    const nfts = await prisma.nFT.findMany({
+      skip,
+      take: batchSize,
+      orderBy: { id: 'asc' },
+    });
+
+    if (nfts.length === 0) break;
+
+    for (const nft of nfts) {
+      try {
+        await recalculateNFTScore(nft.id);
+        processed++;
+      } catch (e) {
+        console.error(`Error recalculating NFT ${nft.id}:`, e);
+        errors++;
+      }
+    }
+
+    skip += batchSize;
+    console.log(`Processed ${processed} NFTs...`);
+  }
+
+  return { processed, errors };
 }
 
 // ============================================================
