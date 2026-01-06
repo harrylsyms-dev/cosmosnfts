@@ -59,6 +59,7 @@ model NFT {
   temperatureK            Float?    @map("temperature_k")       // Temperature in Kelvin
   luminosity              Float?    @map("luminosity_value")    // Luminosity value
   notableFeatures         String?   @map("notable_features")    // JSON array of notable features
+  visualFeatures          String?   @map("visual_features")     // JSON array of visual characteristics for prompt enhancement
 
   // Image generation prompts (pre-generated using astronomical templates)
   imagePrompt             String?   @map("image_prompt") @db.Text       // Full Leonardo AI prompt

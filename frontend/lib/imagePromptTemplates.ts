@@ -29,6 +29,468 @@ export function getStarColor(spectralType?: string): string {
 }
 
 // ============================================
+// STAR-SPECIFIC CHARACTERISTICS (Based on Jan 2026 Optimization Report)
+// ============================================
+
+// Temperature descriptions by spectral type
+export function getStarTemperatureDesc(spectralType?: string): string {
+  if (!spectralType) return '';
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+  switch (firstLetter) {
+    case 'O':
+    case 'B':
+    case 'A':
+      return 'hot';
+    case 'F':
+    case 'G':
+      return 'warm';
+    case 'K':
+    case 'M':
+    case 'L':
+    case 'T':
+    case 'Y':
+      return ''; // Don't say "hot" for cool stars - say nothing
+    default:
+      return '';
+  }
+}
+
+// Granulation type by spectral type
+export function getStarGranulationType(spectralType?: string, luminosityClass?: string): string {
+  if (!spectralType) return 'visible';
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+  const isSupergiant = luminosityClass?.includes('I') && !luminosityClass?.includes('V');
+
+  // Supergiants have giant convection cells
+  if (isSupergiant) return 'giant coarse mottled';
+
+  switch (firstLetter) {
+    case 'O':
+    case 'B':
+    case 'A':
+      return 'fine subtle'; // Hot stars have smaller convection cells
+    case 'F':
+    case 'G':
+      return 'visible clear'; // Sun-like granulation
+    case 'K':
+    case 'M':
+      return 'prominent'; // Cooler stars have more visible granulation
+    default:
+      return 'visible';
+  }
+}
+
+// Starspot description by spectral type and activity
+export function getStarspotDesc(spectralType?: string, isFlare?: boolean): string {
+  if (!spectralType) return 'scattered dark starspots';
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+
+  // M-type red dwarfs (especially flare stars) have huge starspots
+  if (firstLetter === 'M' || isFlare) {
+    return 'large dark starspot groups covering significant surface area';
+  }
+
+  switch (firstLetter) {
+    case 'O':
+    case 'B':
+    case 'A':
+      return 'few small starspots'; // Hot stars are relatively calm
+    case 'F':
+    case 'G':
+      return 'scattered dark starspots';
+    case 'K':
+      return 'moderate dark starspot activity';
+    default:
+      return 'scattered dark starspots';
+  }
+}
+
+// Prominence description by spectral type
+export function getProminenceDesc(spectralType?: string, isFlare?: boolean, isSupergiant?: boolean): string {
+  if (isFlare) {
+    return 'extensive magnetic loop prominences erupting from limb, violent surface activity';
+  }
+  if (isSupergiant) {
+    return 'dramatic magnetic prominences, faint dusty envelope from mass loss visible at limb';
+  }
+  if (!spectralType) return 'magnetic prominences at limb';
+
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+  switch (firstLetter) {
+    case 'O':
+    case 'B':
+      return 'intense stellar wind creating subtle haze at limb, magnetic prominences';
+    case 'A':
+      return 'delicate wispy magnetic prominences at limb';
+    case 'F':
+    case 'G':
+      return 'moderate magnetic prominences at limb';
+    case 'K':
+    case 'M':
+      return 'prominent magnetic loop prominences';
+    default:
+      return 'magnetic prominences at limb';
+  }
+}
+
+// Primary color by spectral type
+export function getStarPrimaryColor(spectralType?: string): string {
+  if (!spectralType) return 'orange-yellow';
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+  switch (firstLetter) {
+    case 'O': return 'intense blue-white';
+    case 'B': return 'blue-white with subtle violet undertones';
+    case 'A': return 'brilliant white';
+    case 'F': return 'warm cream-white';
+    case 'G': return 'golden-yellow';
+    case 'K': return 'warm orange';
+    case 'M': return 'deep scarlet-orange';
+    default: return 'orange-yellow';
+  }
+}
+
+// Limb color by spectral type
+export function getStarLimbColor(spectralType?: string): string {
+  if (!spectralType) return 'orange';
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+  switch (firstLetter) {
+    case 'O': return 'blue';
+    case 'B': return 'blue-violet';
+    case 'A': return 'ice-blue';
+    case 'F': return 'pale golden-yellow';
+    case 'G': return 'amber';
+    case 'K': return 'deep orange';
+    case 'M': return 'rust-crimson';
+    default: return 'orange';
+  }
+}
+
+// Accent colors by spectral type
+export function getStarAccentColor(spectralType?: string): string {
+  if (!spectralType) return 'orange granulation hints';
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+  switch (firstLetter) {
+    case 'O':
+    case 'B': return 'orange-gold magnetic active regions contrasting against blue disk';
+    case 'A': return 'faint orange-copper hints in rare active regions';
+    case 'F': return 'orange granulation cells, bright white active regions';
+    case 'G': return 'orange granulation hints, bright plage regions';
+    case 'K': return 'darker rust-brown granulation boundaries';
+    case 'M': return 'darker rust-brown convection cell boundaries, bright orange-yellow hot spots';
+    default: return 'orange granulation hints';
+  }
+}
+
+// Frame fill percentage by star type
+export function getStarFrameFill(spectralType?: string, isSupergiant?: boolean): number {
+  if (isSupergiant) return 80; // Show more detail on supergiants
+  if (!spectralType) return 75;
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+  switch (firstLetter) {
+    case 'O':
+    case 'B':
+    case 'A':
+      return 70; // Hot stars - slightly less fill
+    case 'F':
+    case 'G':
+    case 'K':
+      return 75;
+    case 'M':
+      return 75; // Red dwarfs - show activity
+    default:
+      return 75;
+  }
+}
+
+// Wavelength by spectral type
+export function getStarWavelength(spectralType?: string): string {
+  if (!spectralType) return 'visible';
+  const firstLetter = spectralType.charAt(0).toUpperCase();
+  switch (firstLetter) {
+    case 'O':
+    case 'B':
+    case 'A':
+      return 'ultraviolet';
+    case 'F':
+    case 'G':
+      return 'visible';
+    case 'K':
+    case 'M':
+    case 'L':
+    case 'T':
+    case 'Y':
+      return 'infrared';
+    default:
+      return 'visible';
+  }
+}
+
+// ============================================
+// NEBULA-SPECIFIC CHARACTERISTICS (Based on Jan 2026 Optimization Report)
+// ============================================
+
+// Famous nebula features - specific structures that make each nebula unique
+export const FAMOUS_NEBULA_FEATURES: Record<string, {
+  specificFeatures: string;
+  colorNotes?: string;
+  structureType?: string;
+}> = {
+  // Emission Nebulae
+  'orion': {
+    specificFeatures: 'Trapezium star cluster illuminating central cavity, M43 companion nebula, dark Horsehead silhouette region nearby',
+    colorNotes: 'Red hydrogen-alpha dominant, blue reflection regions, golden ionization fronts',
+    structureType: 'star-forming region with dense cloud pillars',
+  },
+  'eagle': {
+    specificFeatures: 'iconic Pillars of Creation - three towering dark dust columns backlit by stellar radiation, evaporating gaseous globules (EGGs)',
+    colorNotes: 'Red hydrogen emission, blue oxygen III, dark silhouetted pillars against glowing background',
+    structureType: 'star-forming pillars with sculpted edges',
+  },
+  'm16': { // Eagle Nebula alternate name
+    specificFeatures: 'iconic Pillars of Creation - three towering dark dust columns backlit by stellar radiation, evaporating gaseous globules (EGGs)',
+    colorNotes: 'Red hydrogen emission, blue oxygen III, dark silhouetted pillars against glowing background',
+    structureType: 'star-forming pillars with sculpted edges',
+  },
+  'lagoon': {
+    specificFeatures: 'Hourglass region near center with intense star formation, dark Bok globules, bright rimmed clouds',
+    colorNotes: 'Pink-red hydrogen dominant, blue reflection nebulosity around hot stars',
+    structureType: 'large emission complex with dark lanes',
+  },
+  'm8': { // Lagoon alternate name
+    specificFeatures: 'Hourglass region near center with intense star formation, dark Bok globules, bright rimmed clouds',
+    colorNotes: 'Pink-red hydrogen dominant, blue reflection nebulosity around hot stars',
+    structureType: 'large emission complex with dark lanes',
+  },
+  'trifid': {
+    specificFeatures: 'three distinct lobes divided by dark dust lanes, blue reflection region adjacent to red emission region',
+    colorNotes: 'Red emission section, blue reflection section, dark trisecting dust lanes',
+    structureType: 'tri-lobed structure bisected by dust',
+  },
+  'm20': { // Trifid alternate name
+    specificFeatures: 'three distinct lobes divided by dark dust lanes, blue reflection region adjacent to red emission region',
+    colorNotes: 'Red emission section, blue reflection section, dark trisecting dust lanes',
+    structureType: 'tri-lobed structure bisected by dust',
+  },
+  'carina': {
+    specificFeatures: 'Mystic Mountain pillar, Keyhole dark region, Eta Carinae hypergiant at center, dramatic sculpted edges',
+    colorNotes: 'Intense red-orange hydrogen, deep blue oxygen regions, dramatic dark silhouettes',
+    structureType: 'massive star-forming complex with extreme radiation sculpting',
+  },
+  'rosette': {
+    specificFeatures: 'circular ring structure around central star cluster NGC 2244, radial dark globules pointing inward',
+    colorNotes: 'Deep red hydrogen ring, central blue star cluster, dark cometary globules',
+    structureType: 'circular shell around open cluster',
+  },
+
+  // Planetary Nebulae
+  'ring': {
+    specificFeatures: 'distinct torus ring structure, faint outer halo, bright central white dwarf star, inner blue-green core',
+    colorNotes: 'Green-blue oxygen core, red outer hydrogen ring, white central star',
+    structureType: 'barrel/ring shape viewed face-on',
+  },
+  'm57': { // Ring Nebula alternate name
+    specificFeatures: 'distinct torus ring structure, faint outer halo, bright central white dwarf star, inner blue-green core',
+    colorNotes: 'Green-blue oxygen core, red outer hydrogen ring, white central star',
+    structureType: 'barrel/ring shape viewed face-on',
+  },
+  'helix': {
+    specificFeatures: 'large apparent size, cometary knots with tails pointing away from center, inner disk structure, red outer ring',
+    colorNotes: 'Blue-green inner region, red outer ring, thousands of cometary knots',
+    structureType: 'double helix structure viewed face-on',
+  },
+  'ngc 7293': { // Helix alternate name
+    specificFeatures: 'large apparent size, cometary knots with tails pointing away from center, inner disk structure, red outer ring',
+    colorNotes: 'Blue-green inner region, red outer ring, thousands of cometary knots',
+    structureType: 'double helix structure viewed face-on',
+  },
+  'dumbbell': {
+    specificFeatures: 'distinctive apple-core or hourglass shape, two bright lobes connected by fainter waist',
+    colorNotes: 'Green-cyan oxygen dominant, red hydrogen outer regions',
+    structureType: 'bipolar hourglass shape',
+  },
+  'm27': { // Dumbbell alternate name
+    specificFeatures: 'distinctive apple-core or hourglass shape, two bright lobes connected by fainter waist',
+    colorNotes: 'Green-cyan oxygen dominant, red hydrogen outer regions',
+    structureType: 'bipolar hourglass shape',
+  },
+  'cat\'s eye': {
+    specificFeatures: 'complex nested shells, multiple concentric rings, intricate central structure with jets',
+    colorNotes: 'Blue-green oxygen core, red outer halos, complex multi-shell structure',
+    structureType: 'multi-shell with bilateral symmetry',
+  },
+  'ngc 6543': { // Cat's Eye alternate name
+    specificFeatures: 'complex nested shells, multiple concentric rings, intricate central structure with jets',
+    colorNotes: 'Blue-green oxygen core, red outer halos, complex multi-shell structure',
+    structureType: 'multi-shell with bilateral symmetry',
+  },
+  'owl': {
+    specificFeatures: 'two dark circular regions resembling eyes within bright nebula, faint outer halo',
+    colorNotes: 'Green-blue overall with dark "eye" regions',
+    structureType: 'circular with two dark cavities',
+  },
+  'm97': { // Owl alternate name
+    specificFeatures: 'two dark circular regions resembling eyes within bright nebula, faint outer halo',
+    colorNotes: 'Green-blue overall with dark "eye" regions',
+    structureType: 'circular with two dark cavities',
+  },
+
+  // Supernova Remnants
+  'crab': {
+    specificFeatures: 'central pulsar, complex filamentary structure, synchrotron nebula, expanding debris cloud',
+    colorNotes: 'Blue synchrotron core, red filamentary outer shell, green oxygen filaments',
+    structureType: 'chaotic expanding filamentary shell',
+  },
+  'm1': { // Crab alternate name
+    specificFeatures: 'central pulsar, complex filamentary structure, synchrotron nebula, expanding debris cloud',
+    colorNotes: 'Blue synchrotron core, red filamentary outer shell, green oxygen filaments',
+    structureType: 'chaotic expanding filamentary shell',
+  },
+  'veil': {
+    specificFeatures: 'delicate arc of shocked gas filaments, part of larger Cygnus Loop, intricate lacework structure',
+    colorNotes: 'Red hydrogen, blue oxygen, green sulfur in separate filament regions',
+    structureType: 'arc segment of spherical shell',
+  },
+  'cassiopeia a': {
+    specificFeatures: 'young remnant with bright knots, visible neutron star, fast-moving debris clumps',
+    colorNotes: 'Multi-colored with distinct element regions - iron, silicon, sulfur in different colors',
+    structureType: 'roughly spherical expanding shell',
+  },
+  'cas a': { // Cassiopeia A alternate name
+    specificFeatures: 'young remnant with bright knots, visible neutron star, fast-moving debris clumps',
+    colorNotes: 'Multi-colored with distinct element regions - iron, silicon, sulfur in different colors',
+    structureType: 'roughly spherical expanding shell',
+  },
+};
+
+// Get nebula-specific features based on name matching
+export function getNebulaSpecificFeatures(name: string): {
+  specificFeatures: string;
+  colorNotes?: string;
+  structureType?: string;
+} | null {
+  const lowerName = name.toLowerCase();
+
+  // Check each known nebula
+  for (const [key, features] of Object.entries(FAMOUS_NEBULA_FEATURES)) {
+    if (lowerName.includes(key)) {
+      return features;
+    }
+  }
+
+  return null;
+}
+
+// ============================================
+// BLACK HOLE-SPECIFIC CHARACTERISTICS (Based on Jan 2026 Optimization Report)
+// ============================================
+
+// Famous dwarf planet features - specific characteristics for known dwarf planets
+export const FAMOUS_DWARF_PLANET_FEATURES: Record<string, {
+  specificFeatures: string;
+  colorNotes?: string;
+  surfaceFeatures?: string;
+}> = {
+  'pluto': {
+    specificFeatures: 'heart-shaped nitrogen ice plain (Tombaugh Regio), Sputnik Planitia glacier, rugged water-ice mountains',
+    colorNotes: 'Reddish-brown tholins terrain, bright white nitrogen ice heart, tan and gray cratered regions',
+    surfaceFeatures: 'Heart-shaped Tombaugh Regio ice plain, reddish-brown tholins, cratered highlands, nitrogen glaciers',
+  },
+  'eris': {
+    specificFeatures: 'highly reflective icy surface, possible methane frost, distant scattered disk object',
+    colorNotes: 'Bright white-gray icy surface, possible slight reddish tinge from tholins',
+    surfaceFeatures: 'Smooth highly reflective ice surface, possible frost deposits',
+  },
+  'makemake': {
+    specificFeatures: 'reddish-brown surface with bright patches, possible nitrogen ice',
+    colorNotes: 'Reddish-brown surface with bright white patches',
+    surfaceFeatures: 'Reddish-brown terrain with bright ice patches',
+  },
+  'haumea': {
+    specificFeatures: 'elongated ellipsoid shape from rapid rotation, dark red spot, two small moons',
+    colorNotes: 'Bright icy surface with dark reddish spot',
+    surfaceFeatures: 'Elongated shape, bright ice with dark red region',
+  },
+  'ceres': {
+    specificFeatures: 'Occator crater with bright salt deposits, Ahuna Mons cryovolcano',
+    colorNotes: 'Dark gray rocky surface with bright white salt deposits',
+    surfaceFeatures: 'Heavily cratered surface, bright salt deposits in Occator crater, cryovolcanic mountain',
+  },
+};
+
+// Get dwarf planet-specific features based on name matching
+export function getDwarfPlanetSpecificFeatures(name: string): {
+  specificFeatures: string;
+  colorNotes?: string;
+  surfaceFeatures?: string;
+} | null {
+  const lowerName = name.toLowerCase();
+
+  for (const [key, features] of Object.entries(FAMOUS_DWARF_PLANET_FEATURES)) {
+    if (lowerName.includes(key)) {
+      return features;
+    }
+  }
+
+  return null;
+}
+
+// Famous black hole features - specific characteristics for known black holes
+export const FAMOUS_BLACK_HOLE_FEATURES: Record<string, {
+  specificFeatures: string;
+  colorNotes?: string;
+  size?: string;
+}> = {
+  'sagittarius a': {
+    specificFeatures: 'Milky Way galactic center supermassive black hole, compact photon ring, dynamic accretion flow with hot spots, 4 million solar masses',
+    colorNotes: 'Orange-red hot accretion plasma, bright photon ring, variable brightness hot spots',
+    size: 'supermassive',
+  },
+  'sgr a': { // Common abbreviation
+    specificFeatures: 'Milky Way galactic center supermassive black hole, compact photon ring, dynamic accretion flow with hot spots, 4 million solar masses',
+    colorNotes: 'Orange-red hot accretion plasma, bright photon ring, variable brightness hot spots',
+    size: 'supermassive',
+  },
+  'm87': {
+    specificFeatures: 'giant elliptical galaxy center black hole, prominent relativistic jet extending thousands of light years, 6.5 billion solar masses, asymmetric bright ring',
+    colorNotes: 'Orange-yellow ring with distinct brightness asymmetry, blue relativistic jet, absolute black shadow',
+    size: 'supermassive',
+  },
+  'cygnus x-1': {
+    specificFeatures: 'stellar-mass black hole in binary system, accretion disk fed by blue supergiant companion star, X-ray bright',
+    colorNotes: 'Intense blue-white X-ray glow, orange-yellow accretion stream from companion star',
+    size: 'stellar-mass',
+  },
+  'grs 1915': {
+    specificFeatures: 'microquasar with superluminal jets, stellar-mass black hole with extreme spin',
+    colorNotes: 'Bright accretion disk, twin relativistic jets',
+    size: 'stellar-mass',
+  },
+  'ton 618': {
+    specificFeatures: 'ultramassive black hole, one of the most massive known, 66 billion solar masses, extremely luminous quasar nucleus',
+    colorNotes: 'Blindingly bright accretion disk, extreme luminosity',
+    size: 'ultramassive',
+  },
+};
+
+// Get black hole-specific features based on name matching
+export function getBlackHoleSpecificFeatures(name: string): {
+  specificFeatures: string;
+  colorNotes?: string;
+  size?: string;
+} | null {
+  const lowerName = name.toLowerCase();
+
+  // Check each known black hole
+  for (const [key, features] of Object.entries(FAMOUS_BLACK_HOLE_FEATURES)) {
+    if (lowerName.includes(key)) {
+      return features;
+    }
+  }
+
+  return null;
+}
+
+// ============================================
 // SUBTYPE DERIVATION FUNCTIONS
 // ============================================
 
@@ -236,17 +698,19 @@ export const UNIVERSAL_NEGATIVES = [
 
 // Object-specific negatives - tailored to each object type's common AI rendering failures
 // Each list targets what Leonardo AI specifically gets wrong for that object type
+// Based on tested prompt optimization report (Jan 2026)
 export const OBJECT_TYPE_NEGATIVES: Record<string, string[]> = {
   // STARS: Main failures are glass balls, cosmic orbs, eclipses, coronas
   // Want: Solid incandescent plasma sphere like SDO solar images
   'Star': [
     'glass', 'crystal ball', 'orb', 'marble', 'sphere inside sphere',
     'transparent', 'translucent', 'see-through',
-    'eclipse', 'corona', 'crescent', 'dark center',
+    'eclipse', 'corona flare', 'solar eclipse', 'crescent', 'dark center',
     'lens flare', 'god rays', 'light beams',
     'galaxy', 'nebula', 'planet', 'moon',
     'sunset', 'sunrise', 'horizon',
     'portal', 'universe inside',
+    'partial star', 'half star', 'cropped',
   ],
 
   // GALAXIES: Main failures are nebula overlays, multiple galaxies, portal swirls
@@ -271,19 +735,20 @@ export const OBJECT_TYPE_NEGATIVES: Record<string, string[]> = {
   ],
 
   // BLACK HOLES: Main failures are portals, eyes, symmetric rings, blue glows
-  // Want: EHT M87 style - asymmetric orange accretion disk, dark void center
+  // Want: EHT M87/Sgr A* style - asymmetric orange accretion disk, dark void center
   'Black Hole': [
     'portal', 'wormhole', 'tunnel', 'gateway',
     'eye', 'iris', 'pupil',
     'symmetric ring', 'perfect circle glow', 'ring of fire',
-    'blue glow', 'purple glow', 'colorful',
-    'galaxy inside', 'universe inside', 'stars inside',
+    'blue glow', 'purple glow', 'colorful rainbow',
+    'galaxy inside', 'universe inside', 'stars inside void',
     'sphere', 'ball', 'orb',
     'planet', 'moon', 'nebula',
     'multiple black holes',
+    'flat 2D ring', 'simple circle', 'neon glow', 'tron style', 'geometric',
   ],
 
-  // NEBULAE: Actually render well - main issues are lens flares, added planets
+  // NEBULAE: Actually render well - main issues are lens flares, added planets, pareidolia
   // Note: Do NOT exclude "transparent" - nebulae ARE gas clouds
   'Nebula': [
     'lens flare', 'light rays', 'god rays',
@@ -291,6 +756,7 @@ export const OBJECT_TYPE_NEGATIVES: Record<string, string[]> = {
     'sharp edges', 'solid object',
     'single star only', 'star focus',
     'galaxy overlay',
+    'human face', 'animal shape', 'pareidolia', 'recognizable figure', 'creature shape',
   ],
 
   // SUPERNOVA REMNANTS: Similar to nebulae but more structured
@@ -408,6 +874,61 @@ export const OBJECT_TYPE_NEGATIVES: Record<string, string[]> = {
     'lens flare',
   ],
 
+  // BROWN DWARFS: Main failures are star-like rendering, too bright
+  // Want: Jupiter-like body with infrared glow, banded atmosphere
+  'Brown Dwarf': [
+    'bright star', 'sun', 'yellow star', 'white hot',
+    'blue star', 'glowing sphere',
+    'nebula', 'galaxy', 'planet rings',
+    'lens flare', 'light rays',
+    'diagram', 'schematic',
+  ],
+
+  // GLOBULAR CLUSTERS: Main failures are single star focus, nebula overlay
+  // Want: Dense spherical concentration of thousands of ancient stars
+  'Globular Cluster': [
+    'single star', 'one star only', 'star focus',
+    'nebula', 'gas cloud', 'emission nebula',
+    'galaxy', 'spiral structure',
+    'lens flare', 'light rays',
+    'uniform color', 'all same color',
+    'sparse stars', 'few stars',
+  ],
+
+  // DWARF PLANETS: Main failures are generic planet look, missing features
+  // Want: Icy/rocky body with specific surface features like New Horizons imagery
+  'Dwarf Planet': [
+    'glass', 'crystal', 'transparent', 'translucent',
+    'orb', 'marble',
+    'rings', 'ring system',
+    'atmosphere', 'clouds', 'thick atmosphere',
+    'alien city', 'alien structures',
+    'lens flare', 'light rays',
+    'Earth-like', 'blue oceans', 'green continents',
+  ],
+
+  // WHITE DWARFS: Main failures are diagram style, wrong size appearance
+  // Want: Small compact intensely luminous stellar sphere
+  'White Dwarf': [
+    'beams', 'radiation beams', 'light beams',
+    'magnetic field lines', 'field lines',
+    'diagram', 'schematic', 'visualization',
+    'nebula around', 'planetary nebula',
+    'accretion disk', 'disk',
+    'large star', 'supergiant', 'red giant',
+    'planet', 'galaxy',
+  ],
+
+  // SUPERNOVAE: Main failures are generic look, no expanding shell
+  // Want: Expanding remnant with filamentary structure
+  'Supernova': [
+    'single star', 'point of light',
+    'planet', 'moon', 'asteroid',
+    'galaxy', 'black hole',
+    'smooth sphere', 'perfect circle',
+    'diagram', 'schematic',
+  ],
+
   // FALLBACK: Generic space object negatives
   'Unknown': [
     'lens flare', 'light rays',
@@ -519,6 +1040,26 @@ export const STYLE_REFERENCES: Record<string, { style: string; medium: string }>
     style: 'NASA spacecraft photography',
     medium: 'Space probe imagery',
   },
+  'Brown Dwarf': {
+    style: 'NASA infrared telescope imagery',
+    medium: 'Infrared space telescope photography',
+  },
+  'Globular Cluster': {
+    style: 'NASA Hubble Space Telescope imagery',
+    medium: 'Space telescope photography',
+  },
+  'Dwarf Planet': {
+    style: 'NASA New Horizons spacecraft photography',
+    medium: 'Space probe photography',
+  },
+  'White Dwarf': {
+    style: 'NASA Hubble Space Telescope stellar imagery',
+    medium: 'Space telescope photography',
+  },
+  'Supernova': {
+    style: 'NASA Hubble Space Telescope imagery',
+    medium: 'Space telescope composite photography',
+  },
   // FALLBACK
   'Unknown': {
     style: 'NASA Hubble Space Telescope imagery',
@@ -564,13 +1105,13 @@ export interface PromptTemplate {
 export const PROMPT_TEMPLATES: Record<string, PromptTemplate> = {
   'Star': {
     realismStatement: 'Photorealistic photograph',
-    objectDescription: 'a hot {subType} stellar surface',
-    visualCharacteristics: 'Brilliant incandescent plasma sphere, visible granulation cells on surface, small dark starspots, solid opaque luminous surface, single star filling 40% of frame, black space background',
+    objectDescription: 'a {temperatureDesc} {subType} stellar surface',
+    visualCharacteristics: 'Brilliant incandescent plasma sphere, {granulationType} granulation texture, {starspotDesc}, {prominenceDesc}, solid opaque luminous disk, single star filling {frameFill}% of frame, black space background',
     styleReference: 'NASA Solar Dynamics Observatory solar imaging',
-    colorDescription: 'Intense white core, {starColor} limb, orange granulation hints',
+    colorDescription: '{primaryColor} surface, {limbColor} limb, {accentColor}',
     lighting: 'Self-luminous stellar surface',
     quality: '8K, ultra high definition',
-    medium: 'Space telescope ultraviolet photography',
+    medium: 'Space telescope {wavelength} photography',
   },
   'Galaxy': {
     realismStatement: 'Photorealistic photograph',
@@ -585,10 +1126,10 @@ export const PROMPT_TEMPLATES: Record<string, PromptTemplate> = {
   'Black Hole': {
     realismStatement: 'Photorealistic photograph',
     objectDescription: 'a {subType} black hole with accretion disk',
-    visualCharacteristics: 'Dark circular void event horizon, bright asymmetric accretion disk with turbulent orange-yellow plasma, gravitational lensing warping background stars, Doppler beaming with one side brighter, single isolated subject filling 40% of frame, black space background',
-    styleReference: 'NASA Event Horizon Telescope M87 imagery',
-    colorDescription: 'Orange-gold accretion disk plasma, absolute black void event horizon',
-    lighting: 'Accretion disk illumination only',
+    visualCharacteristics: 'Dark circular void event horizon surrounded by bright photon ring, asymmetric accretion disk with turbulent orange-yellow plasma, Doppler beaming creating distinct bright side and dim side, gravitational lensing bending background starlight, warped spacetime distortion, single isolated subject filling 40% of frame, pure black space background',
+    styleReference: 'NASA Event Horizon Telescope M87 and Sagittarius A* imagery',
+    colorDescription: 'Bright orange-gold plasma on approaching side, dimmer red on receding side, absolute black void at center, lensed blue-shifted light arcs',
+    lighting: 'Accretion disk self-luminous, asymmetric Doppler brightness',
     quality: '8K, ultra high definition',
     medium: 'Radio telescope composite imagery',
   },
@@ -705,6 +1246,66 @@ export const PROMPT_TEMPLATES: Record<string, PromptTemplate> = {
     quality: '8K, ultra high definition',
     medium: 'Space probe photography',
   },
+  // BROWN DWARF: Jupiter-like failed star with infrared glow
+  // KEY: Avoid "star" terminology - emphasize substellar, failed star appearance
+  'Brown Dwarf': {
+    realismStatement: 'Photorealistic photograph',
+    objectDescription: 'a brown dwarf substellar object',
+    visualCharacteristics: 'Large Jupiter-like body with banded atmosphere, deep magenta-red coloration, faint self-luminous infrared glow, atmospheric storms and cloud bands, solid opaque body, object filling 50% of frame, black space starfield background',
+    styleReference: 'NASA infrared telescope imagery',
+    colorDescription: 'Deep magenta-red to brown surface, darker atmospheric bands, faint warm infrared glow at limb',
+    lighting: 'Self-luminous infrared emission with faint glow',
+    quality: '8K, ultra high definition',
+    medium: 'Infrared space telescope photography',
+  },
+  // GLOBULAR CLUSTER: Dense ancient star concentration
+  // KEY: Emphasize density, thousands of stars, spherical concentration
+  'Globular Cluster': {
+    realismStatement: 'Photorealistic photograph',
+    objectDescription: 'a dense globular star cluster',
+    visualCharacteristics: 'Extremely dense spherical concentration of ancient stars, brilliant crowded core with thousands of individual stars, gradual density falloff toward edges, varied stellar colors from blue stragglers to red giants, cluster filling 50% of frame, black space background',
+    styleReference: 'NASA Hubble Space Telescope star cluster imagery',
+    colorDescription: 'Mixed stellar colors - predominantly warm orange-red ancient stars, scattered blue stragglers, yellow sun-like stars in dense packed arrangement',
+    lighting: 'Natural stellar luminosity from thousands of stars',
+    quality: '8K, ultra high definition',
+    medium: 'Space telescope photography',
+  },
+  // DWARF PLANET: Icy/rocky distant body with specific surface features
+  // KEY: Use New Horizons style, emphasize specific surface features
+  'Dwarf Planet': {
+    realismStatement: 'Photorealistic photograph',
+    objectDescription: 'a dwarf planet surface',
+    visualCharacteristics: '{surfaceFeatures}, solid opaque icy-rocky body, sharp surface detail, dwarf planet filling 60% of frame, sharp terminator line, distant sun illumination, black space background with stars',
+    styleReference: 'NASA New Horizons spacecraft photography',
+    colorDescription: '{planetColor}',
+    lighting: 'Distant sunlight illumination with sharp terminator shadow',
+    quality: '8K, ultra high definition',
+    medium: 'Space probe photography',
+  },
+  // WHITE DWARF: Compact stellar remnant (same approach as neutron star)
+  // KEY: Use "compact hot stellar remnant" to avoid diagram rendering
+  'White Dwarf': {
+    realismStatement: 'Photorealistic photograph',
+    objectDescription: 'a compact hot white dwarf stellar remnant',
+    visualCharacteristics: 'Small intensely luminous solid stellar sphere, brilliant white-blue opaque surface, subtle warm glow halo, clean simple spherical shape, single star filling 30% of frame, black space starfield background',
+    styleReference: 'NASA Hubble Space Telescope stellar imagery',
+    colorDescription: 'Brilliant white-blue stellar surface with soft warm outer glow',
+    lighting: 'Self-luminous stellar surface',
+    quality: '8K, ultra high definition',
+    medium: 'Space telescope photography',
+  },
+  // SUPERNOVA: Use supernova remnant style (expanding shell)
+  // KEY: Historical supernovae show as remnants, not the explosion itself
+  'Supernova': {
+    realismStatement: 'Photorealistic photograph',
+    objectDescription: 'a supernova remnant expanding shell',
+    visualCharacteristics: 'Expanding filamentary shell structure, shocked gas filaments, colorful emission from different elements, possible central neutron star or pulsar, solid gas structures, remnant filling 50% of frame, black space background',
+    styleReference: 'NASA Hubble Space Telescope supernova remnant imagery',
+    colorDescription: 'Multicolored filaments with red hydrogen, blue oxygen, green sulfur emissions',
+    lighting: 'Self-luminous shocked gas',
+    quality: '8K, ultra high definition',
+    medium: 'Space telescope composite photography',
+  },
   // FALLBACK: Default template for unknown object types
   'Unknown': {
     realismStatement: 'Photorealistic photograph',
@@ -737,6 +1338,8 @@ export interface PromptBuildOptions {
   customVisualCharacteristics?: string;
   mass?: number;
   notableFeatures?: string[];
+  // New: Visual features for object-specific characteristics
+  visualFeatures?: string[];
 }
 
 export function buildImagePrompt(options: PromptBuildOptions): { prompt: string; negativePrompt: string } {
@@ -747,6 +1350,7 @@ export function buildImagePrompt(options: PromptBuildOptions): { prompt: string;
     spectralType,
     mass,
     notableFeatures,
+    visualFeatures,
   } = options;
 
   // Auto-derive types if not provided
@@ -780,6 +1384,21 @@ export function buildImagePrompt(options: PromptBuildOptions): { prompt: string;
         break;
       case 'Star Cluster':
         subType = description?.toLowerCase().includes('globular') ? 'globular' : 'open';
+        break;
+      case 'Globular Cluster':
+        subType = 'globular';
+        break;
+      case 'Brown Dwarf':
+        subType = 'brown dwarf';
+        break;
+      case 'Dwarf Planet':
+        subType = 'dwarf planet';
+        break;
+      case 'White Dwarf':
+        subType = 'white dwarf';
+        break;
+      case 'Supernova':
+        subType = 'supernova remnant';
         break;
       default:
         subType = objectType.toLowerCase();
@@ -823,13 +1442,94 @@ export function buildImagePrompt(options: PromptBuildOptions): { prompt: string;
     surfaceFeatures = getPlanetSurfaceFeatures(planetType || 'terrestrial');
   }
 
+  // Star-specific variables (computed from spectral type)
+  let starVars = {
+    temperatureDesc: '',
+    granulationType: 'visible',
+    starspotDesc: 'scattered dark starspots',
+    prominenceDesc: 'magnetic prominences at limb',
+    primaryColor: 'orange-yellow',
+    limbColor: 'orange',
+    accentColor: 'orange granulation hints',
+    frameFill: 75,
+    wavelength: 'visible',
+  };
+
+  if (objectType === 'Star') {
+    const luminosityClass = spectralType?.match(/[IV]+$/)?.[0];
+    const isSupergiant = luminosityClass?.includes('I') && !luminosityClass?.includes('V');
+    const isFlare = name.toLowerCase().includes('flare') ||
+                   description?.toLowerCase().includes('flare star') ||
+                   name.toLowerCase().includes('proxima');
+
+    starVars = {
+      temperatureDesc: getStarTemperatureDesc(spectralType),
+      granulationType: getStarGranulationType(spectralType, luminosityClass),
+      starspotDesc: getStarspotDesc(spectralType, isFlare),
+      prominenceDesc: getProminenceDesc(spectralType, isFlare, isSupergiant),
+      primaryColor: getStarPrimaryColor(spectralType),
+      limbColor: getStarLimbColor(spectralType),
+      accentColor: getStarAccentColor(spectralType),
+      frameFill: getStarFrameFill(spectralType, isSupergiant),
+      wavelength: getStarWavelength(spectralType),
+    };
+  }
+
+  // Nebula-specific enhancements for famous nebulae
+  if (objectType === 'Nebula' || objectType === 'Supernova Remnant') {
+    const nebulaFeatures = getNebulaSpecificFeatures(name);
+    if (nebulaFeatures) {
+      // Enhance structure details with famous nebula's specific features
+      if (!structureDetails || structureDetails === getTypeFeatures(objectType, galaxyType, nebulaType)) {
+        structureDetails = nebulaFeatures.specificFeatures;
+      }
+      // Use the famous nebula's color notes if available
+      if (nebulaFeatures.colorNotes && !colorDescription) {
+        color = nebulaFeatures.colorNotes;
+      }
+    }
+  }
+
+  // Black hole-specific enhancements for famous black holes
+  if (objectType === 'Black Hole') {
+    const bhFeatures = getBlackHoleSpecificFeatures(name);
+    if (bhFeatures) {
+      // Add specific features to structure details
+      if (!structureDetails) {
+        structureDetails = bhFeatures.specificFeatures;
+      }
+      // Use the famous black hole's color notes if available
+      if (bhFeatures.colorNotes && !colorDescription) {
+        color = bhFeatures.colorNotes;
+      }
+    }
+  }
+
+  // Dwarf planet-specific enhancements for known dwarf planets
+  if (objectType === 'Dwarf Planet') {
+    const dpFeatures = getDwarfPlanetSpecificFeatures(name);
+    if (dpFeatures) {
+      // Use specific surface features for known dwarf planets
+      if (dpFeatures.surfaceFeatures && !surfaceFeatures) {
+        surfaceFeatures = dpFeatures.surfaceFeatures;
+      }
+      // Use the dwarf planet's color notes if available
+      if (dpFeatures.colorNotes && !colorDescription) {
+        color = dpFeatures.colorNotes;
+      }
+    }
+  }
+
   // Build object description
   let objectDesc = template.objectDescription
     .replace('{name}', name)
     .replace('{galaxyType}', galaxyType || 'spiral')
     .replace('{nebulaType}', nebulaType || 'emission')
     .replace('{planetType}', planetType || 'planet')
-    .replace('{subType}', subType || '');
+    .replace('{subType}', subType || '')
+    .replace('{temperatureDesc}', starVars.temperatureDesc)
+    .replace(/\s+/g, ' ') // Clean up double spaces from empty temperatureDesc
+    .trim();
 
   // Build visual characteristics
   let visualChars = customVisualCharacteristics || template.visualCharacteristics;
@@ -840,19 +1540,43 @@ export function buildImagePrompt(options: PromptBuildOptions): { prompt: string;
     featuresText = notableFeatures.slice(0, 2).join(', ');
   }
 
+  // Add visual features to structure details if available
+  // Visual features are object-specific visual characteristics (e.g., "Heart-shaped Tombaugh Regio")
+  if (visualFeatures && visualFeatures.length > 0) {
+    const visualFeaturesText = visualFeatures.slice(0, 3).join(', ');
+    if (structureDetails) {
+      structureDetails = `${structureDetails}, ${visualFeaturesText}`;
+    } else {
+      structureDetails = visualFeaturesText;
+    }
+  }
+
   visualChars = visualChars
     .replace('{structureDetails}', structureDetails || 'detailed structure')
     .replace('{surfaceFeatures}', surfaceFeatures || 'detailed surface features')
     .replace('{colorDescription}', color)
     .replace('{typeFeatures}', getTypeFeatures(objectType, galaxyType, nebulaType))
-    .replace('{lightingDescription}', 'natural lighting with visible terminator');
+    .replace('{lightingDescription}', 'natural lighting with visible terminator')
+    // Star-specific placeholders
+    .replace('{granulationType}', starVars.granulationType)
+    .replace('{starspotDesc}', starVars.starspotDesc)
+    .replace('{prominenceDesc}', starVars.prominenceDesc)
+    .replace('{frameFill}', String(starVars.frameFill));
 
   // Build color description
   let colorDesc = template.colorDescription
     .replace('{starColor}', color)
     .replace('{galaxyColor}', color)
     .replace('{nebulaColor}', color)
-    .replace('{planetColor}', color);
+    .replace('{planetColor}', color)
+    // Star-specific color placeholders
+    .replace('{primaryColor}', starVars.primaryColor)
+    .replace('{limbColor}', starVars.limbColor)
+    .replace('{accentColor}', starVars.accentColor);
+
+  // Build medium with star-specific wavelength if applicable
+  let medium = template.medium || styleRef.medium;
+  medium = medium.replace('{wavelength}', starVars.wavelength);
 
   // Construct the full prompt following the document structure
   // CRITICAL: Object name goes in parentheses AFTER the technical description
@@ -869,7 +1593,7 @@ Lighting: ${template.lighting}
 
 Quality: ${template.quality}
 
-Medium: ${styleRef.medium}`;
+Medium: ${medium}`;
 
   // Get negative prompt (pass galaxyType for barred spiral special handling)
   const negativePrompt = getNegativePrompt(objectType, galaxyType);
@@ -988,6 +1712,8 @@ export interface NFTData {
   spectralType?: string;
   massSolar?: number;
   notableFeatures?: string | string[];
+  // New: Visual features for object-specific visual characteristics
+  visualFeatures?: string | string[];
   // Optional overrides
   galaxyType?: string;
   nebulaType?: string;
@@ -1015,6 +1741,20 @@ export function nftToPromptOptions(nft: NFTData): PromptBuildOptions {
     }
   }
 
+  // Parse visualFeatures if it's a string
+  let visualFeatures: string[] | undefined;
+  if (nft.visualFeatures) {
+    if (typeof nft.visualFeatures === 'string') {
+      try {
+        visualFeatures = JSON.parse(nft.visualFeatures);
+      } catch {
+        visualFeatures = [nft.visualFeatures];
+      }
+    } else {
+      visualFeatures = nft.visualFeatures;
+    }
+  }
+
   return {
     name: nft.name,
     objectType: nft.objectType || 'Unknown',
@@ -1022,6 +1762,7 @@ export function nftToPromptOptions(nft: NFTData): PromptBuildOptions {
     spectralType: nft.spectralType,
     mass: nft.massSolar,
     notableFeatures: features,
+    visualFeatures: visualFeatures,
     galaxyType: nft.galaxyType,
     nebulaType: nft.nebulaType,
     planetType: nft.planetType,
@@ -1033,17 +1774,81 @@ export function nftToPromptOptions(nft: NFTData): PromptBuildOptions {
   };
 }
 
-// Generate prompt for a single NFT
-export function generatePromptForNFT(nft: NFTData): {
+// Generate prompt for a single NFT with confidence scoring and logging
+export function generatePromptForNFT(nft: NFTData, options?: {
+  enableLogging?: boolean;
+  deriveFeaturesFromSpectral?: boolean;
+}): {
   prompt: string;
   negativePrompt: string;
   validation: { valid: boolean; warnings: string[] };
+  confidence: PromptConfidence;
 } {
-  const options = nftToPromptOptions(nft);
-  const { prompt, negativePrompt } = buildImagePrompt(options);
+  const startTime = Date.now();
+  const promptOptions = nftToPromptOptions(nft);
+
+  // Derive visual features from spectral type if enabled and no explicit features
+  let derivedFeatures: string[] = [];
+  const shouldDeriveFromSpectral = options?.deriveFeaturesFromSpectral !== false;
+
+  if (shouldDeriveFromSpectral &&
+      !promptOptions.visualFeatures?.length &&
+      promptOptions.spectralType &&
+      promptOptions.objectType === 'Star') {
+    derivedFeatures = deriveVisualFeaturesFromSpectralType(
+      promptOptions.spectralType,
+      promptOptions.name
+    );
+    // Use derived features if we got any
+    if (derivedFeatures.length > 0) {
+      promptOptions.visualFeatures = derivedFeatures;
+    }
+  }
+
+  const { prompt, negativePrompt } = buildImagePrompt(promptOptions);
   const validation = validatePrompt(prompt);
 
-  return { prompt, negativePrompt, validation };
+  // Check for famous object features
+  const hasFamousFeatures = !!(
+    (promptOptions.objectType === 'Nebula' && getNebulaSpecificFeatures(promptOptions.name)) ||
+    (promptOptions.objectType === 'Black Hole' && getBlackHoleSpecificFeatures(promptOptions.name)) ||
+    (promptOptions.objectType === 'Dwarf Planet' && getDwarfPlanetSpecificFeatures(promptOptions.name))
+  );
+
+  // Calculate confidence
+  const confidence = calculateConfidence(promptOptions.objectType, {
+    hasExplicitVisualFeatures: !!(nft.visualFeatures && (
+      typeof nft.visualFeatures === 'string' ? nft.visualFeatures.length > 0 :
+      nft.visualFeatures.length > 0
+    )),
+    hasSpectralType: !!promptOptions.spectralType,
+    hasFamousFeatures,
+    hasColorDescription: !!promptOptions.colorDescription,
+    hasStructureDetails: !!promptOptions.structureDetails,
+    validationWarnings: validation.warnings,
+  });
+
+  // Log generation if enabled
+  if (options?.enableLogging !== false) {
+    const log: PromptGenerationLog = {
+      timestamp: new Date(),
+      nftId: nft.id,
+      nftName: nft.name,
+      objectType: promptOptions.objectType,
+      confidence,
+      promptLength: prompt.length,
+      validationWarnings: validation.warnings,
+      featureSourceDetails: {
+        source: confidence.featureSource,
+        featuresUsed: derivedFeatures.length > 0 ? derivedFeatures :
+          (promptOptions.visualFeatures || []),
+      },
+      duration: Date.now() - startTime,
+    };
+    logPromptGeneration(log);
+  }
+
+  return { prompt, negativePrompt, validation, confidence };
 }
 
 // ============================================
@@ -1058,12 +1863,16 @@ export interface BatchPromptResult {
   negativePrompt: string;
   valid: boolean;
   warnings: string[];
+  confidence: PromptConfidence;
 }
 
-// Generate prompts for multiple NFTs
-export function generatePromptsForBatch(nfts: NFTData[]): BatchPromptResult[] {
+// Generate prompts for multiple NFTs with confidence scoring
+export function generatePromptsForBatch(nfts: NFTData[], options?: {
+  enableLogging?: boolean;
+  deriveFeaturesFromSpectral?: boolean;
+}): BatchPromptResult[] {
   return nfts.map(nft => {
-    const { prompt, negativePrompt, validation } = generatePromptForNFT(nft);
+    const { prompt, negativePrompt, validation, confidence } = generatePromptForNFT(nft, options);
     return {
       nftId: nft.id,
       nftName: nft.name,
@@ -1072,29 +1881,471 @@ export function generatePromptsForBatch(nfts: NFTData[]): BatchPromptResult[] {
       negativePrompt,
       valid: validation.valid,
       warnings: validation.warnings,
+      confidence,
     };
   });
 }
 
-// Get statistics about a batch of prompts
+// Get statistics about a batch of prompts with confidence metrics
 export function getBatchStats(results: BatchPromptResult[]): {
   total: number;
   valid: number;
   withWarnings: number;
   byObjectType: Record<string, number>;
+  confidence: {
+    average: number;
+    min: number;
+    max: number;
+    byFeatureSource: Record<string, number>;
+    lowConfidenceCount: number;  // Below 0.5
+    highConfidenceCount: number; // Above 0.8
+  };
 } {
-  const stats = {
+  if (results.length === 0) {
+    return {
+      total: 0,
+      valid: 0,
+      withWarnings: 0,
+      byObjectType: {},
+      confidence: {
+        average: 0,
+        min: 0,
+        max: 0,
+        byFeatureSource: {},
+        lowConfidenceCount: 0,
+        highConfidenceCount: 0,
+      },
+    };
+  }
+
+  const confidenceScores = results.map(r => r.confidence.score);
+  const byFeatureSource: Record<string, number> = {};
+
+  results.forEach(r => {
+    byFeatureSource[r.confidence.featureSource] =
+      (byFeatureSource[r.confidence.featureSource] || 0) + 1;
+  });
+
+  return {
     total: results.length,
     valid: results.filter(r => r.valid).length,
     withWarnings: results.filter(r => r.warnings.length > 0).length,
-    byObjectType: {} as Record<string, number>,
+    byObjectType: results.reduce((acc, r) => {
+      acc[r.objectType] = (acc[r.objectType] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+    confidence: {
+      average: Math.round((confidenceScores.reduce((a, b) => a + b, 0) / results.length) * 100) / 100,
+      min: Math.min(...confidenceScores),
+      max: Math.max(...confidenceScores),
+      byFeatureSource,
+      lowConfidenceCount: results.filter(r => r.confidence.score < 0.5).length,
+      highConfidenceCount: results.filter(r => r.confidence.score >= 0.8).length,
+    },
+  };
+}
+
+// ============================================
+// CONFIDENCE SCORING SYSTEM
+// ============================================
+
+export interface ConfidenceFactors {
+  hasTemplate: boolean;           // We have a specific template for this object type
+  hasExplicitVisualFeatures: boolean;  // Object has stored visualFeatures[] array
+  hasSpectralType: boolean;       // Can derive features from spectral class
+  hasFamousObjectFeatures: boolean;    // Known object with specific features (e.g., Betelgeuse, Pluto)
+  passesValidation: boolean;      // Prompt passes all validation checks
+  hasColorDescription: boolean;   // Explicit color information available
+  hasStructureDetails: boolean;   // Has specific structure/surface details
+}
+
+export interface PromptConfidence {
+  score: number;                  // 0.0 to 1.0
+  factors: ConfidenceFactors;
+  featureSource: 'explicit' | 'spectral' | 'famous' | 'template' | 'default';
+  recommendations: string[];      // Suggestions to improve confidence
+}
+
+// Calculate confidence score based on available data
+export function calculateConfidence(
+  objectType: string,
+  options: {
+    hasExplicitVisualFeatures: boolean;
+    hasSpectralType: boolean;
+    hasFamousFeatures: boolean;
+    hasColorDescription: boolean;
+    hasStructureDetails: boolean;
+    validationWarnings: string[];
+  }
+): PromptConfidence {
+  const hasTemplate = objectType in PROMPT_TEMPLATES;
+  const passesValidation = options.validationWarnings.length === 0;
+
+  const factors: ConfidenceFactors = {
+    hasTemplate,
+    hasExplicitVisualFeatures: options.hasExplicitVisualFeatures,
+    hasSpectralType: options.hasSpectralType,
+    hasFamousObjectFeatures: options.hasFamousFeatures,
+    passesValidation,
+    hasColorDescription: options.hasColorDescription,
+    hasStructureDetails: options.hasStructureDetails,
   };
 
-  results.forEach(r => {
-    stats.byObjectType[r.objectType] = (stats.byObjectType[r.objectType] || 0) + 1;
-  });
+  // Calculate weighted score
+  let score = 0;
+  const weights = {
+    hasTemplate: 0.15,
+    hasExplicitVisualFeatures: 0.25,  // Highest weight - explicit features are best
+    hasSpectralType: 0.15,
+    hasFamousObjectFeatures: 0.20,
+    passesValidation: 0.10,
+    hasColorDescription: 0.08,
+    hasStructureDetails: 0.07,
+  };
 
-  return stats;
+  for (const [key, weight] of Object.entries(weights)) {
+    if (factors[key as keyof ConfidenceFactors]) {
+      score += weight;
+    }
+  }
+
+  // Determine feature source (priority order)
+  let featureSource: PromptConfidence['featureSource'];
+  if (options.hasExplicitVisualFeatures) {
+    featureSource = 'explicit';
+  } else if (options.hasFamousFeatures) {
+    featureSource = 'famous';
+  } else if (options.hasSpectralType && objectType === 'Star') {
+    featureSource = 'spectral';
+  } else if (hasTemplate) {
+    featureSource = 'template';
+  } else {
+    featureSource = 'default';
+  }
+
+  // Generate recommendations
+  const recommendations: string[] = [];
+  if (!options.hasExplicitVisualFeatures) {
+    recommendations.push('Add explicit visualFeatures[] for best results');
+  }
+  if (!options.hasSpectralType && objectType === 'Star') {
+    recommendations.push('Add spectral type for automatic feature derivation');
+  }
+  if (!passesValidation) {
+    recommendations.push(`Fix ${options.validationWarnings.length} validation warning(s)`);
+  }
+  if (!options.hasColorDescription && !options.hasSpectralType) {
+    recommendations.push('Add color description for accurate rendering');
+  }
+
+  return {
+    score: Math.round(score * 100) / 100,  // Round to 2 decimal places
+    factors,
+    featureSource,
+    recommendations,
+  };
+}
+
+// ============================================
+// SPECTRAL CLASS → VISUAL FEATURES PIPELINE
+// ============================================
+
+// Parse spectral type string into components
+export interface ParsedSpectralType {
+  class: string;           // O, B, A, F, G, K, M, L, T, Y
+  subclass?: number;       // 0-9
+  luminosityClass?: string; // Ia, Ib, II, III, IV, V
+  peculiarities?: string[]; // e (emission), p (peculiar), etc.
+}
+
+export function parseSpectralType(spectralType: string): ParsedSpectralType | null {
+  if (!spectralType) return null;
+
+  const normalized = spectralType.toUpperCase().trim();
+
+  // Match pattern: Letter + optional digit + optional luminosity + optional peculiarities
+  // Examples: G2V, M1-2Ia-Iab, K5III, O9.5Ia, B2Ve
+  const match = normalized.match(/^([OBAFGKMLTY])(\d(?:\.\d)?)?(?:-\d)?([IV]+[a-z]*)?([epnmksvw]*)?$/i);
+
+  if (!match) {
+    // Try simpler pattern
+    const simpleMatch = normalized.match(/^([OBAFGKMLTY])/);
+    if (simpleMatch) {
+      return { class: simpleMatch[1] };
+    }
+    return null;
+  }
+
+  const result: ParsedSpectralType = {
+    class: match[1],
+  };
+
+  if (match[2]) {
+    result.subclass = parseFloat(match[2]);
+  }
+
+  if (match[3]) {
+    result.luminosityClass = match[3];
+  }
+
+  if (match[4]) {
+    result.peculiarities = match[4].split('');
+  }
+
+  return result;
+}
+
+// Derive comprehensive visual features from spectral type
+export function deriveVisualFeaturesFromSpectralType(
+  spectralType: string,
+  objectName?: string
+): string[] {
+  const parsed = parseSpectralType(spectralType);
+  if (!parsed) return [];
+
+  const features: string[] = [];
+
+  // Determine if supergiant/giant/dwarf
+  const lumClass = parsed.luminosityClass?.toUpperCase() || '';
+  const isSupergiant = lumClass.includes('I') && !lumClass.includes('II') && !lumClass.includes('V');
+  const isBrightGiant = lumClass.includes('II') && !lumClass.includes('III');
+  const isGiant = lumClass.includes('III');
+  const isSubgiant = lumClass.includes('IV');
+  const isMainSequence = lumClass.includes('V') || (!lumClass && !isSupergiant && !isGiant);
+
+  // Spectral class-based features
+  switch (parsed.class) {
+    case 'O':
+      features.push('Brilliant intense blue-white plasma sphere');
+      features.push('Fine subtle granulation texture');
+      features.push('Few small starspots from minimal convection');
+      features.push('Intense stellar wind creating subtle haze at limb');
+      if (isSupergiant) {
+        features.push('Massive luminous blue supergiant');
+      }
+      break;
+
+    case 'B':
+      features.push('Blue-white plasma sphere with violet undertones');
+      features.push('Fine subtle granulation texture');
+      features.push('Few small starspots');
+      features.push('Magnetic prominences at limb');
+      if (isSupergiant) {
+        features.push('Blue supergiant with extreme luminosity');
+      }
+      break;
+
+    case 'A':
+      features.push('Brilliant white stellar surface');
+      features.push('Fine subtle granulation texture');
+      features.push('Rare small starspots');
+      features.push('Delicate wispy magnetic prominences at limb');
+      break;
+
+    case 'F':
+      features.push('Warm cream-white plasma sphere');
+      features.push('Visible clear granulation texture');
+      features.push('Scattered dark starspots');
+      features.push('Moderate magnetic prominences at limb');
+      break;
+
+    case 'G':
+      features.push('Golden-yellow plasma sphere');
+      features.push('Visible clear granulation texture like solar imagery');
+      features.push('Scattered dark starspots');
+      features.push('Moderate magnetic prominences');
+      if (isSupergiant) {
+        features.push('Yellow supergiant with expanded atmosphere');
+      }
+      break;
+
+    case 'K':
+      features.push('Warm orange plasma sphere');
+      features.push('Prominent granulation texture');
+      features.push('Moderate dark starspot activity');
+      features.push('Prominent magnetic loop prominences');
+      if (isGiant) {
+        features.push('Orange giant with extended atmosphere');
+      }
+      break;
+
+    case 'M':
+      if (isSupergiant) {
+        features.push('Brilliant incandescent scarlet-orange plasma sphere');
+        features.push('Giant coarse mottled granulation with large convection cells');
+        features.push('Large dark starspot groups covering significant surface area');
+        features.push('Dramatic magnetic prominences, faint dusty envelope from mass loss');
+      } else if (isGiant) {
+        features.push('Deep red-orange giant plasma sphere');
+        features.push('Prominent granulation texture');
+        features.push('Moderate to large starspot groups');
+        features.push('Prominent magnetic loop prominences');
+      } else {
+        // Red dwarf
+        features.push('Deep scarlet-red plasma sphere');
+        features.push('Prominent granulation texture');
+        features.push('Large dark starspot groups covering significant surface area');
+        features.push('Extensive magnetic loop prominences');
+      }
+      break;
+
+    case 'L':
+      features.push('Dark red-brown substellar surface');
+      features.push('Atmospheric bands visible');
+      features.push('Faint self-luminous infrared glow');
+      break;
+
+    case 'T':
+      features.push('Magenta-brown substellar surface');
+      features.push('Strong atmospheric banding');
+      features.push('Methane absorption features');
+      features.push('Faint infrared glow');
+      break;
+
+    case 'Y':
+      features.push('Dark brown substellar surface');
+      features.push('Cloud patterns in atmosphere');
+      features.push('Ammonia and water clouds');
+      features.push('Very faint infrared glow');
+      break;
+  }
+
+  // Add peculiarity features
+  if (parsed.peculiarities) {
+    if (parsed.peculiarities.includes('E')) {
+      features.push('Emission lines indicating active stellar wind');
+    }
+    if (parsed.peculiarities.includes('P')) {
+      features.push('Peculiar spectral features');
+    }
+    if (parsed.peculiarities.includes('V')) {
+      features.push('Variable brightness with periodic fluctuations');
+    }
+  }
+
+  // Check for known flare star indicators
+  const lowerName = (objectName || '').toLowerCase();
+  if (lowerName.includes('proxima') || lowerName.includes('flare') ||
+      lowerName.includes('uv ceti') || lowerName.includes('wolf')) {
+    features.push('Extensive magnetic loop prominences erupting from limb');
+    features.push('Violent surface activity from intense flare episodes');
+  }
+
+  return features;
+}
+
+// ============================================
+// GENERATION LOGGING
+// ============================================
+
+export interface PromptGenerationLog {
+  timestamp: Date;
+  nftId?: number;
+  nftName: string;
+  objectType: string;
+  confidence: PromptConfidence;
+  promptLength: number;
+  validationWarnings: string[];
+  featureSourceDetails: {
+    source: string;
+    featuresUsed: string[];
+  };
+  duration?: number;  // ms
+}
+
+// Simple in-memory log store (can be extended to persist)
+const generationLogs: PromptGenerationLog[] = [];
+const MAX_LOG_SIZE = 10000;
+
+export function logPromptGeneration(log: PromptGenerationLog): void {
+  generationLogs.push(log);
+  // Keep log size bounded
+  if (generationLogs.length > MAX_LOG_SIZE) {
+    generationLogs.shift();
+  }
+}
+
+export function getGenerationLogs(options?: {
+  limit?: number;
+  objectType?: string;
+  minConfidence?: number;
+  hasWarnings?: boolean;
+}): PromptGenerationLog[] {
+  let logs = [...generationLogs];
+
+  if (options?.objectType) {
+    logs = logs.filter(l => l.objectType === options.objectType);
+  }
+  if (options?.minConfidence !== undefined) {
+    logs = logs.filter(l => l.confidence.score >= options.minConfidence);
+  }
+  if (options?.hasWarnings !== undefined) {
+    logs = logs.filter(l =>
+      options.hasWarnings ? l.validationWarnings.length > 0 : l.validationWarnings.length === 0
+    );
+  }
+  if (options?.limit) {
+    logs = logs.slice(-options.limit);
+  }
+
+  return logs;
+}
+
+export function getGenerationStats(): {
+  totalGenerated: number;
+  averageConfidence: number;
+  byObjectType: Record<string, { count: number; avgConfidence: number }>;
+  byFeatureSource: Record<string, number>;
+  warningRate: number;
+} {
+  if (generationLogs.length === 0) {
+    return {
+      totalGenerated: 0,
+      averageConfidence: 0,
+      byObjectType: {},
+      byFeatureSource: {},
+      warningRate: 0,
+    };
+  }
+
+  const byObjectType: Record<string, { count: number; totalConfidence: number }> = {};
+  const byFeatureSource: Record<string, number> = {};
+  let totalConfidence = 0;
+  let withWarnings = 0;
+
+  for (const log of generationLogs) {
+    totalConfidence += log.confidence.score;
+    if (log.validationWarnings.length > 0) withWarnings++;
+
+    if (!byObjectType[log.objectType]) {
+      byObjectType[log.objectType] = { count: 0, totalConfidence: 0 };
+    }
+    byObjectType[log.objectType].count++;
+    byObjectType[log.objectType].totalConfidence += log.confidence.score;
+
+    byFeatureSource[log.confidence.featureSource] =
+      (byFeatureSource[log.confidence.featureSource] || 0) + 1;
+  }
+
+  const result: Record<string, { count: number; avgConfidence: number }> = {};
+  for (const [type, data] of Object.entries(byObjectType)) {
+    result[type] = {
+      count: data.count,
+      avgConfidence: Math.round((data.totalConfidence / data.count) * 100) / 100,
+    };
+  }
+
+  return {
+    totalGenerated: generationLogs.length,
+    averageConfidence: Math.round((totalConfidence / generationLogs.length) * 100) / 100,
+    byObjectType: result,
+    byFeatureSource,
+    warningRate: Math.round((withWarnings / generationLogs.length) * 100) / 100,
+  };
+}
+
+export function clearGenerationLogs(): void {
+  generationLogs.length = 0;
 }
 
 // ============================================
