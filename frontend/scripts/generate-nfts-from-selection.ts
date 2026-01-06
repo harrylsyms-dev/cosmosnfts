@@ -544,15 +544,20 @@ async function main(): Promise<void> {
     let selectedObjects: ScoredObject[];
 
     try {
-      selectedObjects = JSON.parse(fileContent);
+      const parsed = JSON.parse(fileContent);
+      // Handle both formats: raw array or { metadata, objects } wrapper
+      if (Array.isArray(parsed)) {
+        selectedObjects = parsed;
+      } else if (parsed && Array.isArray(parsed.objects)) {
+        selectedObjects = parsed.objects;
+        console.log(`  Metadata: ${parsed.metadata?.actualCount || selectedObjects.length} objects selected`);
+      } else {
+        console.error('\nError: Input file must contain a JSON array or { objects: [...] } structure');
+        process.exit(1);
+      }
     } catch (parseError) {
       console.error(`\nError: Failed to parse input file as JSON`);
       console.error((parseError as Error).message);
-      process.exit(1);
-    }
-
-    if (!Array.isArray(selectedObjects)) {
-      console.error('\nError: Input file must contain a JSON array of objects');
       process.exit(1);
     }
 

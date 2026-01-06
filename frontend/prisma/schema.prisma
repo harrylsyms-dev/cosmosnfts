@@ -10,73 +10,207 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// NFT Model - Celestial objects (20,000 total)
+// ============================================
+// ENUMS
+// ============================================
+
+// Badge Tier - 6 tiers based on score rank
+enum BadgeTier {
+  MYTHIC      // Top 20 (0.10%) - 200x multiplier
+  LEGENDARY   // Next 100 (0.50%) - 100x multiplier
+  ELITE       // Next 400 (2.00%) - 50x multiplier
+  PREMIUM     // Next 1,000 (5.00%) - 20x multiplier
+  EXCEPTIONAL // Next 2,000 (10.00%) - 5x multiplier
+  STANDARD    // Remaining 16,480 (82.40%) - 1x multiplier
+}
+
+// Object Category - 19 categories (removed OTHER and COSMIC_FEATURE)
+enum ObjectCategory {
+  STAR
+  GALAXY
+  NEBULA
+  EXOPLANET
+  STAR_CLUSTER
+  ASTEROID
+  MOON
+  COMET
+  PULSAR
+  BLACK_HOLE
+  QUASAR
+  SUPERNOVA_REMNANT
+  WHITE_DWARF
+  NEUTRON_STAR
+  BROWN_DWARF
+  DWARF_PLANET
+  PLANET
+  MAGNETAR
+  SPACECRAFT
+}
+
+// NFT Status
+enum NFTStatus {
+  UNASSIGNED      // Not yet assigned to series/phase
+  AVAILABLE       // Ready for purchase
+  RESERVED        // In someone's cart
+  AUCTION_ACTIVE  // Currently being auctioned
+  SOLD            // Purchased
+  MINTED          // Minted to blockchain
+}
+
+// NFT Model - Celestial objects (20,000 total hard cap)
 model NFT {
-  id                      Int       @id @default(autoincrement())
-  tokenId                 Int       @unique @map("token_id")
+  id                      Int            @id @default(autoincrement())
+  tokenId                 Int            @unique @map("token_id")
   name                    String
-  description             String
-  image                   String?   // Direct image URL
-  imageIpfsHash           String?   @map("image_ipfs_hash")
-  metadataIpfsHash        String?   @map("metadata_ipfs_hash")
+  description             String?
 
-  // Scientific scoring categories (0-100 each)
-  fameVisibility          Int       @default(0) @map("fame_visibility")
-  scientificSignificance  Int       @default(0) @map("scientific_significance")
-  rarity                  Int       @default(0)
-  discoveryRecency        Int       @default(0) @map("discovery_recency")
-  culturalImpact          Int       @default(0) @map("cultural_impact")
-  discoveryYear           Int?      @map("discovery_year")
+  // ============================================
+  // CATEGORY
+  // ============================================
+  objectType              String?        @map("object_type")      // Legacy string field
+  objectCategory          ObjectCategory @default(STAR)           // Proper category (no OTHER)
 
-  // Calculated score (sum of categories, max 500)
-  totalScore              Int       @default(0) @map("total_score")
-  cosmicScore             Int       @default(0) @map("cosmic_score")
+  // ============================================
+  // NEW 10-METRIC SCORING SYSTEM (max 300 total)
+  // ============================================
+  culturalSignificance    Int            @default(0) @map("cultural_significance")    // 0-60: Public recognition, "household name"
+  scientificImportance    Int            @default(0) @map("scientific_importance")    // 0-50: Research papers, discoveries
+  historicalSignificance  Int            @default(0) @map("historical_significance")  // 0-40: Discovery importance, firsts
+  visualImpact            Int            @default(0) @map("visual_impact")            // 0-30: How spectacular it looks
+  uniqueness              Int            @default(0) @map("uniqueness_score")         // 0-30: One of a kind, rare type
+  accessibility           Int            @default(0) @map("accessibility_score")      // 0-20: Can we see/visit/study it
+  proximity               Int            @default(0) @map("proximity_score")          // 0-20: Distance relevance
+  storyFactor             Int            @default(0) @map("story_factor")             // 0-20: Mythology, cultural stories
+  activeRelevance         Int            @default(0) @map("active_relevance")         // 0-15: Current missions, in the news
+  futurePotential         Int            @default(0) @map("future_potential")         // 0-15: Upcoming missions, habitability
 
-  // Pricing
-  basePriceCents          Int       @default(0) @map("base_price_cents")
-  currentPrice            Float     @default(0) @map("current_price")
-  currentTier             Int       @default(1) @map("current_tier")
+  totalScore              Int            @default(0) @map("total_score")              // Sum of above (0-300)
 
-  // Status: AVAILABLE, RESERVED, AUCTIONED, MINTED, SOLD
-  status                  String    @default("AVAILABLE")
+  // Legacy scoring fields (kept for migration, will be deprecated)
+  fameVisibility          Int            @default(0) @map("fame_visibility")
+  rarity                  Int            @default(0)
+  discoveryRecency        Int            @default(0) @map("discovery_recency")
+  cosmicScore             Int            @default(0) @map("cosmic_score")
 
-  // Badge tier: STANDARD, EXCEPTIONAL, PREMIUM, ELITE
-  badgeTier               String?   @map("badge_tier")
+  // ============================================
+  // TIER SYSTEM
+  // ============================================
+  badgeTier               BadgeTier      @default(STANDARD) @map("badge_tier_enum")
+  badgeTierLegacy         String?        @map("badge_tier")        // Legacy string field
+  tierMultiplier          Int            @default(1) @map("tier_multiplier")          // 200, 100, 50, 20, 5, 1
+  tierRank                Int?           @map("tier_rank")                            // Rank within tier (e.g., #5 of 20 MYTHIC)
 
-  // Blockchain data (after minting)
-  transactionHash         String?   @map("transaction_hash")
-  ownerAddress            String?   @map("owner_address")
+  // ============================================
+  // SERIES & PHASE ASSIGNMENT
+  // ============================================
+  seriesId                String?        @map("series_id")
+  series                  Series?        @relation("SeriesNFTs", fields: [seriesId], references: [id])
+  seriesNumber            Int?           @map("series_number")                        // 1, 2, 3, or 4
 
-  // Metadata
-  objectType              String?   @map("object_type")
-  constellation           String?   // Constellation location (e.g., "Orion", "Cygnus")
-  distance                String?   // Distance from Earth (e.g., "4.24 ly", "2.5M ly")
+  phaseId                 String?        @map("phase_id")
+  phase                   Phase?         @relation("PhaseNFTs", fields: [phaseId], references: [id])
+  phaseNumber             Int?           @map("phase_number")                         // 1-5 within series
 
-  // Scientific data for prompt generation
-  spectralType            String?   @map("spectral_type")      // e.g., "G2V", "M1Ia"
-  distanceLy              Float?    @map("distance_ly")         // Distance in light years
-  massSolar               Float?    @map("mass_solar")          // Mass in solar masses
-  temperatureK            Float?    @map("temperature_k")       // Temperature in Kelvin
-  luminosity              Float?    @map("luminosity_value")    // Luminosity value
-  notableFeatures         String?   @map("notable_features")    // JSON array of notable features
-  visualFeatures          String?   @map("visual_features")     // JSON array of visual characteristics for prompt enhancement
+  // Auction assignment (for MYTHIC items)
+  auctionPhase            Phase?         @relation("PhaseAuction")
+  isAuctionItem           Boolean        @default(false) @map("is_auction_item")
 
-  // Image generation prompts (pre-generated using astronomical templates)
-  imagePrompt             String?   @map("image_prompt") @db.Text       // Full Leonardo AI prompt
-  imageNegativePrompt     String?   @map("image_negative_prompt") @db.Text // Negative prompt
-  promptGeneratedAt       DateTime? @map("prompt_generated_at")  // When prompt was generated
-  // Reference images from NASA/ESA/Hubble for Leonardo AI style guidance
-  referenceImageUrl       String?   @map("reference_image_url")          // Source URL from NASA/ESA
-  referenceImageSource    String?   @map("reference_image_source")       // "NASA", "ESA", "Hubble", "ESO"
-  leonardoRefImageId      String?   @map("leonardo_ref_image_id")        // Leonardo AI uploaded image ID
+  // ============================================
+  // PRICING
+  // ============================================
+  currentPriceCents       BigInt?        @map("current_price_cents")                  // Calculated: $0.10 × score × tierMult × seriesMult
+  basePriceCents          Int            @default(0) @map("base_price_cents")         // Legacy
+  currentPrice            Float          @default(0) @map("current_price")            // Legacy
 
-  // Timestamps
-  createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @updatedAt @map("updated_at")
-  mintedAt                DateTime? @map("minted_at")
-  soldAt                  DateTime? @map("sold_at")
+  // ============================================
+  // STATUS
+  // ============================================
+  status                  String         @default("AVAILABLE")                        // Legacy string status
+  nftStatus               NFTStatus      @default(UNASSIGNED) @map("nft_status_enum") // New enum status
 
-  // Relations
+  // ============================================
+  // CURATION
+  // ============================================
+  isCurated               Boolean        @default(false) @map("is_curated")           // Hand-scored (~200 objects)
+  curatedAt               DateTime?      @map("curated_at")
+  curatedBy               String?        @map("curated_by")                           // Admin who curated
+
+  // ============================================
+  // SCIENTIFIC DATA (from catalogs like HYG, SIMBAD)
+  // ============================================
+  spectralType            String?        @map("spectral_type")
+  distanceLy              Float?         @map("distance_ly")
+  massSolar               Float?         @map("mass_solar")
+  temperatureK            Float?         @map("temperature_k")
+  luminosity              Float?         @map("luminosity_value")
+  apparentMagnitude       Float?         @map("apparent_magnitude")
+  absoluteMagnitude       Float?         @map("absolute_magnitude")
+  discoveryYear           Int?           @map("discovery_year")
+  constellation           String?
+  distance                String?
+  notableFeatures         String?        @map("notable_features")
+  visualFeatures          String?        @map("visual_features")
+
+  // ============================================
+  // EXTERNAL API DATA (for scoring)
+  // ============================================
+  // Wikipedia API data
+  wikipediaPageViews      Int?           @map("wikipedia_page_views")
+  wikipediaArticleLength  Int?           @map("wikipedia_article_length")
+
+  // NASA ADS API data
+  totalPaperCount         Int?           @map("total_paper_count")
+  recentPaperCount        Int?           @map("recent_paper_count")
+
+  // Wikidata API data
+  wikidataSitelinks       Int?           @map("wikidata_sitelinks")
+  wikidataCulturalRefs    Int?           @map("wikidata_cultural_refs")
+  wikidataId              String?        @map("wikidata_id")
+
+  // Data collection tracking
+  dataCollectedAt         DateTime?      @map("data_collected_at")
+  dataCompleteness        Int?           @map("data_completeness")   // 0-100%
+  lowConfidence           Boolean        @default(false) @map("low_confidence")
+
+  // Additional scoring-relevant flags
+  hasImages               Boolean        @default(false) @map("has_images")
+  namedByAncients         Boolean        @default(false) @map("named_by_ancients")
+  hasActiveMission        Boolean        @default(false) @map("has_active_mission")
+  plannedMission          Boolean        @default(false) @map("planned_mission")
+  isHabitable             Boolean        @default(false) @map("is_habitable")
+  isInSolarSystem         Boolean        @default(false) @map("is_in_solar_system")
+
+  // ============================================
+  // IMAGE GENERATION
+  // ============================================
+  image                   String?
+  imageIpfsHash           String?        @map("image_ipfs_hash")
+  metadataIpfsHash        String?        @map("metadata_ipfs_hash")
+  imagePrompt             String?        @map("image_prompt") @db.Text
+  imageNegativePrompt     String?        @map("image_negative_prompt") @db.Text
+  promptGeneratedAt       DateTime?      @map("prompt_generated_at")
+  referenceImageUrl       String?        @map("reference_image_url")
+  referenceImageSource    String?        @map("reference_image_source")
+  leonardoRefImageId      String?        @map("leonardo_ref_image_id")
+
+  // ============================================
+  // BLOCKCHAIN / OWNERSHIP
+  // ============================================
+  transactionHash         String?        @map("transaction_hash")
+  ownerAddress            String?        @map("owner_address")
+  currentTier             Int            @default(1) @map("current_tier")             // Legacy pricing tier
+
+  // ============================================
+  // TIMESTAMPS
+  // ============================================
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+  mintedAt                DateTime?      @map("minted_at")
+  soldAt                  DateTime?      @map("sold_at")
+
+  // ============================================
+  // RELATIONS
+  // ============================================
   cartItems               CartItem[]
   auctions                Auction[]
   listings                Listing[]
@@ -84,10 +218,13 @@ model NFT {
   scheduledAuction        ScheduledAuction?
 
   @@index([status])
+  @@index([nftStatus])
   @@index([totalScore])
-  @@index([cosmicScore])
   @@index([badgeTier])
-  @@index([currentTier])
+  @@index([objectCategory])
+  @@index([seriesId])
+  @@index([phaseId])
+  @@index([isCurated])
   @@map("nfts")
 }
 
@@ -152,7 +289,7 @@ model Purchase {
   @@map("purchases")
 }
 
-// Pricing Tiers
+// Pricing Tiers (DEPRECATED - kept for migration reference)
 model Tier {
   id                Int      @id @default(autoincrement())
   phase             Int      @unique
@@ -167,6 +304,94 @@ model Tier {
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("tiers")
+}
+
+// ============================================
+// NEW SERIES & PHASE SYSTEM
+// ============================================
+
+// Series - 4 series of 5,000 NFTs each (20,000 total)
+model Series {
+  id                  String        @id @default(cuid())
+  seriesNumber        Int           @unique @map("series_number") // 1, 2, 3, 4
+  multiplier          Decimal       @default(1.0) @db.Decimal(10, 2) // 1.0, 1.5, 2.0, 2.5, 3.0+
+  status              SeriesStatus  @default(PLANNED)
+
+  // Inventory
+  totalNFTs           Int           @default(5000) @map("total_nfts")
+  soldCount           Int           @default(0) @map("sold_count")
+
+  // Calculated sell-through rate (0.00 to 1.00)
+  sellThroughRate     Decimal?      @map("sell_through_rate") @db.Decimal(5, 4)
+
+  // Timing
+  startDate           DateTime?     @map("start_date")
+  endDate             DateTime?     @map("end_date")
+
+  // Revenue tracking (in cents)
+  totalRevenueCents   BigInt        @default(0) @map("total_revenue_cents")
+  donationAmountCents BigInt        @default(0) @map("donation_amount_cents") // 30% of revenue
+
+  // Relations
+  phases              Phase[]
+  nfts                NFT[]         @relation("SeriesNFTs")
+
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  @@map("series")
+}
+
+enum SeriesStatus {
+  PLANNED     // Not yet started
+  ACTIVE      // Currently selling
+  COMPLETED   // All phases done
+  PAUSED      // Temporarily stopped
+}
+
+// Phase - 5 phases per series, 1,000 NFTs each
+model Phase {
+  id                  String        @id @default(cuid())
+  seriesId            String        @map("series_id")
+  series              Series        @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  phaseNumber         Int           @map("phase_number") // 1-5 within series
+  status              PhaseStatus   @default(PENDING)
+
+  // Inventory
+  totalNFTs           Int           @default(1000) @map("total_nfts")
+  soldCount           Int           @default(0) @map("sold_count")
+
+  // Timing (in days)
+  durationDays        Int           @default(14) @map("duration_days")
+  startDate           DateTime?     @map("start_date")
+  endDate             DateTime?     @map("end_date") // Calculated: startDate + durationDays
+
+  // Pause handling
+  isPaused            Boolean       @default(false) @map("is_paused")
+  pausedAt            DateTime?     @map("paused_at")
+  totalPausedMs       BigInt        @default(0) @map("total_paused_ms")
+
+  // Auction - one NFT per phase selected for auction
+  auctionNFTId        Int?          @unique @map("auction_nft_id")
+  auctionNFT          NFT?          @relation("PhaseAuction", fields: [auctionNFTId], references: [id])
+
+  // Relations
+  nfts                NFT[]         @relation("PhaseNFTs")
+
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  @@unique([seriesId, phaseNumber])
+  @@index([status])
+  @@map("phases")
+}
+
+enum PhaseStatus {
+  PENDING     // Not yet started
+  ACTIVE      // Currently open
+  COMPLETED   // Closed
+  PAUSED      // Temporarily stopped
 }
 
 // Chargeback Evidence
@@ -358,14 +583,46 @@ model SiteSettings {
   // Leonardo AI global prompt
   leonardoPrompt      String?   @map("leonardo_prompt")
 
-  // Phase timer controls
+  // ============================================
+  // CURRENT SERIES/PHASE STATE
+  // ============================================
+  currentSeriesId     String?   @map("current_series_id")
+  currentPhaseId      String?   @map("current_phase_id")
+
+  // Phase timer controls (legacy)
   phasePaused       Boolean   @default(false) @map("phase_paused")
   pausedAt          DateTime? @map("paused_at")
   pauseDurationMs   Int       @default(0) @map("pause_duration_ms")
   contractPaused    Boolean   @default(false) @map("contract_paused")
 
-  // Phase pricing configuration
+  // Phase pricing configuration (legacy)
   phaseIncreasePercent  Float     @default(7.5) @map("phase_increase_percent")
+
+  // ============================================
+  // TIER MULTIPLIERS
+  // ============================================
+  mythicMultiplier      Int       @default(200) @map("mythic_multiplier")
+  legendaryMultiplier   Int       @default(100) @map("legendary_multiplier")
+  eliteMultiplier       Int       @default(50) @map("elite_multiplier")
+  premiumMultiplier     Int       @default(20) @map("premium_multiplier")
+  exceptionalMultiplier Int       @default(5) @map("exceptional_multiplier")
+  standardMultiplier    Int       @default(1) @map("standard_multiplier")
+
+  // ============================================
+  // PRICING CONFIGURATION
+  // ============================================
+  maxPossibleScore      Int       @default(300) @map("max_possible_score")
+  basePricePerScore     Decimal   @default(0.10) @map("base_price_per_score") @db.Decimal(10, 4)
+
+  // ============================================
+  // TIER DISTRIBUTION TARGETS
+  // ============================================
+  mythicCount           Int       @default(20) @map("mythic_count")
+  legendaryCount        Int       @default(100) @map("legendary_count")
+  eliteCount            Int       @default(400) @map("elite_count")
+  premiumCount          Int       @default(1000) @map("premium_count")
+  exceptionalCount      Int       @default(2000) @map("exceptional_count")
+  standardCount         Int       @default(16480) @map("standard_count")
 
   // Sandbox/Testing Mode
   sandboxMode           Boolean   @default(false) @map("sandbox_mode")
