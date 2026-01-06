@@ -84,7 +84,10 @@ export default function BenefactorDashboard() {
 
       if (dashboardRes.ok) {
         const data = await dashboardRes.json();
-        setTotalDonated(data.totalDonated);
+        // Validate the response has the expected structure
+        if (data.totalDonated?.grandTotal?.formatted && data.totalDonated?.manual?.formatted) {
+          setTotalDonated(data.totalDonated);
+        }
       }
 
       if (breakdownRes.ok) {

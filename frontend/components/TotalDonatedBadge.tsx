@@ -51,7 +51,10 @@ export default function TotalDonatedBadge({
       const res = await fetch(`${apiUrl}/api/benefactor/total-donated`);
       if (res.ok) {
         const result = await res.json();
-        setData(result);
+        // Validate the response has the expected structure
+        if (result?.grandTotal?.formatted && result?.manual?.formatted && result?.crypto?.formattedEth) {
+          setData(result);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch total donated:', error);
