@@ -9,6 +9,8 @@ import NFTCard from '../components/NFTCard';
 import CountdownTimer from '../components/CountdownTimer';
 import PricingDisplay from '../components/PricingDisplay';
 import CosmicBackground from '../components/CosmicBackground';
+import SeriesProgress from '../components/SeriesProgress';
+import { TIER_CONFIG, TIER_ORDER, MAX_TOTAL_SCORE } from '../lib/constants';
 
 interface NFT {
   id: number;
@@ -155,6 +157,13 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Series Progress Section */}
+      <section className="relative py-12 px-4 bg-gray-950">
+        <div className="max-w-4xl mx-auto">
+          <SeriesProgress variant="full" showTrajectory={true} showCountdown={true} />
+        </div>
+      </section>
+
       {/* NFT Grid Section */}
       <section id="nfts" className="relative py-16 px-4 bg-gray-950">
         <div className="max-w-7xl mx-auto">
@@ -196,7 +205,7 @@ export default function Home() {
               <h3 className="text-xl font-semibold mb-2">Browse & Select</h3>
               <p className="text-gray-400">
                 Explore our collection of scientifically scored celestial objects.
-                Each has a unique Cosmic Score based on 5 factors.
+                Each has a unique Cosmic Score based on 10 metrics.
               </p>
             </div>
 
@@ -223,53 +232,45 @@ export default function Home() {
 
       {/* Badge Explanation */}
       <section className="relative py-16 px-4 bg-gray-950">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Badge Tiers</h2>
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-4">6 Rarity Tiers</h2>
+          <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
+            Each NFT is assigned a rarity tier based on its score ranking.
+            Higher tiers have price multipliers that reflect their rarity.
+          </p>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-gray-900 rounded-lg p-6 border border-yellow-600">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">⭐</span>
-                <span className="badge-elite px-3 py-1 rounded font-bold">ELITE</span>
-              </div>
-              <p className="text-gray-300">Score 425+</p>
-              <p className="text-gray-400 text-sm mt-2">
-                Top-tier celestial objects. Rare finds with highest scores across multiple categories.
-              </p>
-            </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {TIER_ORDER.map((tier) => {
+              const config = TIER_CONFIG[tier];
+              return (
+                <div
+                  key={tier}
+                  className={`bg-gray-900 rounded-lg p-5 border ${config.borderColor}`}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-3xl">{config.icon}</span>
+                    <div>
+                      <span className={`font-bold text-lg ${config.textColor}`}>{tier}</span>
+                      <span className="text-gray-500 text-sm ml-2">{config.multiplier}x</span>
+                    </div>
+                  </div>
+                  <p className="text-gray-300 text-sm">{config.rarity}</p>
+                  <p className="text-gray-500 text-xs mt-2">{config.description}</p>
+                </div>
+              );
+            })}
+          </div>
 
-            <div className="bg-gray-900 rounded-lg p-6 border border-blue-600">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">💫</span>
-                <span className="badge-premium px-3 py-1 rounded font-bold">PREMIUM</span>
-              </div>
-              <p className="text-gray-300">Score 400-424</p>
-              <p className="text-gray-400 text-sm mt-2">
-                The sweet spot. Most popular purchases with excellent balance of quality and value.
-              </p>
-            </div>
-
-            <div className="bg-gray-900 rounded-lg p-6 border border-cyan-600">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">🌟</span>
-                <span className="badge-exceptional px-3 py-1 rounded font-bold">EXCEPTIONAL</span>
-              </div>
-              <p className="text-gray-300">Score 375-399</p>
-              <p className="text-gray-400 text-sm mt-2">
-                Solid, respectable quality. Great foundation for building your collection.
-              </p>
-            </div>
-
-            <div className="bg-gray-900 rounded-lg p-6 border border-gray-600">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">🔷</span>
-                <span className="badge-standard px-3 py-1 rounded font-bold">STANDARD</span>
-              </div>
-              <p className="text-gray-300">Score 350-374</p>
-              <p className="text-gray-400 text-sm mt-2">
-                Entry-level celestial objects. Perfect for starting your cosmic journey.
-              </p>
-            </div>
+          <div className="mt-8 text-center">
+            <Link
+              href="/scoring"
+              className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Learn more about scoring & pricing
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </Link>
           </div>
         </div>
       </section>

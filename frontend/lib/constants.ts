@@ -431,3 +431,136 @@ export function normalizeCategory(category: string): ObjectCategory | null {
   };
   return legacyMap[category] || null;
 }
+
+// ============================================
+// SERIES & PHASES
+// ============================================
+
+export const SERIES_CONFIG = {
+  totalSeries: 4,
+  nftsPerSeries: 5000,
+  phasesPerSeries: 5,
+  nftsPerPhase: 1000,
+  phaseDurationDays: 14,
+  seriesDurationWeeks: 10,
+};
+
+export type TrajectoryLabel =
+  | 'NO_SERIES_2'
+  | 'MINOR_INCREASE'
+  | 'MODERATE_INCREASE'
+  | 'SIGNIFICANT_INCREASE'
+  | 'MAJOR_INCREASE';
+
+export interface TrajectoryThreshold {
+  min: number;
+  max: number;
+  multiplier: number | null;
+  label: TrajectoryLabel;
+  color: string;
+  icon: string;
+  message: string;
+}
+
+export const TRAJECTORY_THRESHOLDS: TrajectoryThreshold[] = [
+  {
+    min: 0,
+    max: 0.25,
+    multiplier: null,
+    label: 'NO_SERIES_2',
+    color: 'gray',
+    icon: '⚫',
+    message: 'Series 2 may not launch if sales remain below 25%',
+  },
+  {
+    min: 0.25,
+    max: 0.50,
+    multiplier: 1.5,
+    label: 'MINOR_INCREASE',
+    color: 'green',
+    icon: '🟢',
+    message: 'Series 2 prices will be 1.5x current prices',
+  },
+  {
+    min: 0.50,
+    max: 0.75,
+    multiplier: 2.0,
+    label: 'MODERATE_INCREASE',
+    color: 'yellow',
+    icon: '🟡',
+    message: 'Series 2 prices will be 2x current prices',
+  },
+  {
+    min: 0.75,
+    max: 0.90,
+    multiplier: 2.5,
+    label: 'SIGNIFICANT_INCREASE',
+    color: 'orange',
+    icon: '🟠',
+    message: 'Series 2 prices will be 2.5x current prices',
+  },
+  {
+    min: 0.90,
+    max: 1.0,
+    multiplier: 3.0,
+    label: 'MAJOR_INCREASE',
+    color: 'red',
+    icon: '🔴',
+    message: 'Series 2 prices will be 3x current prices',
+  },
+];
+
+export interface TrajectoryInfo {
+  multiplier: number | null;
+  label: TrajectoryLabel;
+  color: string;
+  icon: string;
+  message: string;
+  currentThreshold: TrajectoryThreshold;
+  nextThreshold: TrajectoryThreshold | null;
+  percentToNextThreshold: number;
+}
+
+export function calculateTrajectory(sellThroughRate: number): TrajectoryInfo {
+  // Find current threshold
+  const currentThreshold = TRAJECTORY_THRESHOLDS.find(
+    (t) => sellThroughRate >= t.min && sellThroughRate < t.max
+  ) || TRAJECTORY_THRESHOLDS[TRAJECTORY_THRESHOLDS.length - 1];
+
+  // Find next threshold
+  const currentIndex = TRAJECTORY_THRESHOLDS.indexOf(currentThreshold);
+  const nextThreshold = currentIndex < TRAJECTORY_THRESHOLDS.length - 1
+    ? TRAJECTORY_THRESHOLDS[currentIndex + 1]
+    : null;
+
+  // Calculate percent to next threshold
+  const percentToNextThreshold = nextThreshold
+    ? Math.round((nextThreshold.min - sellThroughRate) * 100)
+    : 0;
+
+  return {
+    multiplier: currentThreshold.multiplier,
+    label: currentThreshold.label,
+    color: currentThreshold.color,
+    icon: currentThreshold.icon,
+    message: currentThreshold.message,
+    currentThreshold,
+    nextThreshold,
+    percentToNextThreshold,
+  };
+}
+
+export function getTrajectoryColorClasses(color: string): { bg: string; text: string; border: string } {
+  switch (color) {
+    case 'red':
+      return { bg: 'bg-red-900/30', text: 'text-red-400', border: 'border-red-500' };
+    case 'orange':
+      return { bg: 'bg-orange-900/30', text: 'text-orange-400', border: 'border-orange-500' };
+    case 'yellow':
+      return { bg: 'bg-yellow-900/30', text: 'text-yellow-400', border: 'border-yellow-500' };
+    case 'green':
+      return { bg: 'bg-green-900/30', text: 'text-green-400', border: 'border-green-500' };
+    default:
+      return { bg: 'bg-gray-900/30', text: 'text-gray-400', border: 'border-gray-500' };
+  }
+}
