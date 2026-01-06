@@ -497,13 +497,13 @@ export default function AdminSecurity() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Link
-                    href="/admin/phases"
+                    href="/admin/series"
                     className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 rounded-full ${siteSettings?.phasePaused ? 'bg-yellow-500' : 'bg-green-500'}`} />
                       <div>
-                        <div className="text-white font-semibold">Phase Timer</div>
+                        <div className="text-white font-semibold">Series Management</div>
                         <div className="text-gray-400 text-sm">
                           {siteSettings?.phasePaused ? 'Paused' : 'Running'}
                         </div>

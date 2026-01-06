@@ -381,7 +381,7 @@ export default function AdminSiteManagement() {
               <span className="text-gray-300">Site Management</span>
             </div>
             <nav className="flex gap-4">
-              <Link href="/admin/phases" className="text-gray-400 hover:text-white">Phases</Link>
+              <Link href="/admin/series" className="text-gray-400 hover:text-white">Series</Link>
               <Link href="/admin/users" className="text-gray-400 hover:text-white">Users</Link>
               <Link href="/admin/settings" className="text-gray-400 hover:text-white">Settings</Link>
             </nav>

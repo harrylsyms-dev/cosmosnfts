@@ -311,7 +311,7 @@ export default function AdminTrading() {
               <span className="text-gray-300">Trading & Auctions</span>
             </div>
             <nav className="flex gap-4">
-              <Link href="/admin/phases" className="text-gray-400 hover:text-white">Phases</Link>
+              <Link href="/admin/series" className="text-gray-400 hover:text-white">Series</Link>
               <Link href="/admin/site" className="text-gray-400 hover:text-white">Site</Link>
               <Link href="/admin/auctions" className="text-gray-400 hover:text-white">Scheduled</Link>
             </nav>

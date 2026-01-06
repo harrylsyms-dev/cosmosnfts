@@ -274,7 +274,7 @@ export default function AdminScoring() {
               <span className="text-gray-300">Scoring System</span>
             </div>
             <nav className="flex gap-4">
-              <Link href="/admin/phases" className="text-gray-400 hover:text-white">Phases</Link>
+              <Link href="/admin/series" className="text-gray-400 hover:text-white">Series</Link>
               <Link href="/admin/nfts" className="text-gray-400 hover:text-white">NFTs</Link>
               <Link href="/admin/settings" className="text-gray-400 hover:text-white">Settings</Link>
             </nav>
