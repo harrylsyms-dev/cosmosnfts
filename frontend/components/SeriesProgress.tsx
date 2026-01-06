@@ -229,27 +229,48 @@ export default function SeriesProgress({
 
         {/* Trajectory Indicator */}
         {showTrajectory && (
-          <div className={`rounded-lg p-4 ${trajectoryColors.bg} border ${trajectoryColors.border}`}>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{trajectory.icon}</span>
-              <div className="flex-1">
-                <div className={`font-semibold ${trajectoryColors.text}`}>
-                  {trajectory.multiplier
-                    ? `Series 2: ${trajectory.multiplier}x Prices`
-                    : 'Series 2 Status: TBD'}
-                </div>
-                <div className="text-gray-400 text-sm">{trajectory.message}</div>
-              </div>
-              {trajectory.nextThreshold && (
-                <div className="text-right">
-                  <div className="text-gray-500 text-xs">Next tier at</div>
-                  <div className="text-white font-medium">
-                    {Math.round(trajectory.nextThreshold.min * 100)}%
+          <>
+            {!trajectory.showTrajectoryBar ? (
+              // Just Launched - show positive messaging without trajectory bar
+              <div className={`rounded-lg p-4 ${trajectoryColors.bg} border ${trajectoryColors.border}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{trajectory.icon}</span>
+                  <div>
+                    <p className={`font-bold text-lg ${trajectoryColors.text}`}>{trajectory.message}</p>
+                    <p className="text-gray-400 text-sm">
+                      Be among the first collectors to secure launch pricing.
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      Series 2 pricing will be based on Series 1 demand.
+                    </p>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            ) : (
+              // Show trajectory bar with thresholds
+              <div className={`rounded-lg p-4 ${trajectoryColors.bg} border ${trajectoryColors.border}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{trajectory.icon}</span>
+                  <div className="flex-1">
+                    <div className={`font-semibold ${trajectoryColors.text}`}>
+                      {trajectory.multiplier
+                        ? `Series 2: ${trajectory.multiplier}x Prices`
+                        : 'Series 2 pricing TBD'}
+                    </div>
+                    <div className="text-gray-400 text-sm">{trajectory.message}</div>
+                  </div>
+                  {trajectory.nextThreshold && (
+                    <div className="text-right">
+                      <div className="text-gray-500 text-xs">Next tier at</div>
+                      <div className="text-white font-medium">
+                        {Math.round(trajectory.nextThreshold.min * 100)}%
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

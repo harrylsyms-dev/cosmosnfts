@@ -85,6 +85,28 @@ export default function PriceTrajectory({
   }
 
   // Full variant (default)
+  // At 0-9% sold, show launch message instead of trajectory visualization
+  if (!trajectory.showTrajectoryBar) {
+    return (
+      <div className={`bg-gray-900 rounded-xl border border-gray-800 overflow-hidden ${className}`}>
+        <div className={`p-6 ${trajectoryColors.bg} border ${trajectoryColors.border}`}>
+          <div className="flex items-center gap-4">
+            <span className="text-5xl">{trajectory.icon}</span>
+            <div>
+              <p className={`font-bold text-2xl ${trajectoryColors.text}`}>{trajectory.message}</p>
+              <p className="text-gray-300 mt-2">
+                Be among the first collectors to secure launch pricing.
+              </p>
+              <p className="text-gray-500 text-sm mt-2">
+                Series 2 pricing will be based on Series 1 demand.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`bg-gray-900 rounded-xl border border-gray-800 overflow-hidden ${className}`}>
       {/* Header */}
@@ -103,7 +125,7 @@ export default function PriceTrajectory({
             <div className={`text-2xl font-bold ${trajectoryColors.text}`}>
               {trajectory.multiplier
                 ? `${trajectory.multiplier}x Price Increase`
-                : 'Series 2 Status: Uncertain'}
+                : 'Series 2 Pricing TBD'}
             </div>
             <div className="text-gray-300">{trajectory.message}</div>
           </div>
@@ -113,7 +135,7 @@ export default function PriceTrajectory({
       {/* Trajectory Visualization */}
       <div className="p-6">
         <div className="space-y-3">
-          {TRAJECTORY_THRESHOLDS.map((threshold) => {
+          {TRAJECTORY_THRESHOLDS.filter(t => t.showTrajectoryBar).map((threshold) => {
             const colors = getTrajectoryColorClasses(threshold.color);
             const isActive = sellThroughRate >= threshold.min && sellThroughRate < threshold.max;
             const isPassed = sellThroughRate >= threshold.max;
@@ -136,7 +158,7 @@ export default function PriceTrajectory({
                       {Math.round(threshold.min * 100)}% - {Math.round(threshold.max * 100)}%
                     </span>
                     <span className={`font-bold ${isActive ? colors.text : 'text-gray-500'}`}>
-                      {threshold.multiplier ? `${threshold.multiplier}x` : 'No S2'}
+                      {threshold.multiplier ? `${threshold.multiplier}x` : 'TBD'}
                     </span>
                   </div>
                   {isActive && (
@@ -157,11 +179,11 @@ export default function PriceTrajectory({
         </div>
 
         {/* Progress to next tier */}
-        {trajectory.nextThreshold && (
+        {trajectory.nextThreshold && trajectory.nextThreshold.showTrajectoryBar && (
           <div className="mt-6 pt-6 border-t border-gray-800">
             <div className="flex items-center justify-between mb-2">
               <span className="text-gray-400 text-sm">
-                Progress to {trajectory.nextThreshold.multiplier}x tier
+                Progress to {trajectory.nextThreshold.multiplier ? `${trajectory.nextThreshold.multiplier}x` : 'next'} tier
               </span>
               <span className="text-white font-medium">
                 {trajectory.percentToNextThreshold}% more needed

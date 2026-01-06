@@ -446,11 +446,12 @@ export const SERIES_CONFIG = {
 };
 
 export type TrajectoryLabel =
-  | 'NO_SERIES_2'
-  | 'MINOR_INCREASE'
-  | 'MODERATE_INCREASE'
-  | 'SIGNIFICANT_INCREASE'
-  | 'MAJOR_INCREASE';
+  | 'JUST_LAUNCHED'
+  | 'EARLY_MOMENTUM'
+  | 'SERIES_2_CONFIRMED'
+  | 'STRONG_DEMAND'
+  | 'HIGH_DEMAND'
+  | 'EXCEPTIONAL_DEMAND';
 
 export interface TrajectoryThreshold {
   min: number;
@@ -460,53 +461,69 @@ export interface TrajectoryThreshold {
   color: string;
   icon: string;
   message: string;
+  showTrajectoryBar: boolean;
 }
 
 export const TRAJECTORY_THRESHOLDS: TrajectoryThreshold[] = [
   {
     min: 0,
+    max: 0.10,
+    multiplier: null,
+    label: 'JUST_LAUNCHED',
+    color: 'blue',
+    icon: '🚀',
+    message: 'Series 1 Just Launched!',
+    showTrajectoryBar: false,
+  },
+  {
+    min: 0.10,
     max: 0.25,
     multiplier: null,
-    label: 'NO_SERIES_2',
-    color: 'gray',
-    icon: '⚫',
-    message: 'Series 2 may not launch if sales remain below 25%',
+    label: 'EARLY_MOMENTUM',
+    color: 'green',
+    icon: '🟢',
+    message: 'Early momentum building - Series 2 pricing TBD',
+    showTrajectoryBar: true,
   },
   {
     min: 0.25,
     max: 0.50,
     multiplier: 1.5,
-    label: 'MINOR_INCREASE',
+    label: 'SERIES_2_CONFIRMED',
     color: 'green',
     icon: '🟢',
-    message: 'Series 2 prices will be 1.5x current prices',
+    message: 'Series 2 confirmed at 1.5x',
+    showTrajectoryBar: true,
   },
   {
     min: 0.50,
     max: 0.75,
     multiplier: 2.0,
-    label: 'MODERATE_INCREASE',
+    label: 'STRONG_DEMAND',
     color: 'yellow',
     icon: '🟡',
-    message: 'Series 2 prices will be 2x current prices',
+    message: 'Strong demand - Series 2 at 2.0x',
+    showTrajectoryBar: true,
   },
   {
     min: 0.75,
     max: 0.90,
     multiplier: 2.5,
-    label: 'SIGNIFICANT_INCREASE',
+    label: 'HIGH_DEMAND',
     color: 'orange',
     icon: '🟠',
-    message: 'Series 2 prices will be 2.5x current prices',
+    message: 'High demand - Series 2 at 2.5x',
+    showTrajectoryBar: true,
   },
   {
     min: 0.90,
     max: 1.0,
     multiplier: 3.0,
-    label: 'MAJOR_INCREASE',
+    label: 'EXCEPTIONAL_DEMAND',
     color: 'red',
     icon: '🔴',
-    message: 'Series 2 prices will be 3x current prices',
+    message: 'Exceptional demand - Series 2 at 3.0x',
+    showTrajectoryBar: true,
   },
 ];
 
@@ -516,6 +533,7 @@ export interface TrajectoryInfo {
   color: string;
   icon: string;
   message: string;
+  showTrajectoryBar: boolean;
   currentThreshold: TrajectoryThreshold;
   nextThreshold: TrajectoryThreshold | null;
   percentToNextThreshold: number;
@@ -544,6 +562,7 @@ export function calculateTrajectory(sellThroughRate: number): TrajectoryInfo {
     color: currentThreshold.color,
     icon: currentThreshold.icon,
     message: currentThreshold.message,
+    showTrajectoryBar: currentThreshold.showTrajectoryBar,
     currentThreshold,
     nextThreshold,
     percentToNextThreshold,
@@ -560,6 +579,8 @@ export function getTrajectoryColorClasses(color: string): { bg: string; text: st
       return { bg: 'bg-yellow-900/30', text: 'text-yellow-400', border: 'border-yellow-500' };
     case 'green':
       return { bg: 'bg-green-900/30', text: 'text-green-400', border: 'border-green-500' };
+    case 'blue':
+      return { bg: 'bg-blue-900/30', text: 'text-blue-400', border: 'border-blue-500' };
     default:
       return { bg: 'bg-gray-900/30', text: 'text-gray-400', border: 'border-gray-500' };
   }
