@@ -149,7 +149,7 @@ const faqData: FAQCategory[] = [
       },
       {
         question: 'Which charities do you support?',
-        answer: 'We partner with established organizations focused on space exploration, astronomy research, and science education. Visit our Impact page to see our current beneficiary partners and donation totals.',
+        answer: 'We are currently selecting verified 501(c)(3) space exploration and education charities to partner with. Our beneficiary partners will be announced before the first donation is made. Visit our Impact page for updates.',
       },
       {
         question: 'Can I see proof of donations?',

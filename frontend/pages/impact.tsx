@@ -5,83 +5,72 @@ import Layout from '../components/Layout';
 
 interface DonationStats {
   totalDonated: number;
-  totalSales: number;
+  totalDonatedFormatted: string;
   nftsSold: number;
+  donationPercentage: number;
+  milestones: {
+    launch: { target: number; reached: boolean };
+    orbit: { target: number; reached: boolean };
+    deepSpace: { target: number; reached: boolean };
+    cosmic: { target: number; reached: boolean };
+  };
 }
 
-const beneficiaries = [
-  {
-    name: 'The Planetary Society',
-    logo: '/images/charities/planetary-society.png',
-    description: 'Empowering citizens to advance space science and exploration. Founded by Carl Sagan.',
-    focus: 'Space advocacy, education, and LightSail missions',
-    website: 'https://planetary.org',
-    donated: 25000,
+const defaultStats: DonationStats = {
+  totalDonated: 0,
+  totalDonatedFormatted: '$0',
+  nftsSold: 0,
+  donationPercentage: 30,
+  milestones: {
+    launch: { target: 50000, reached: false },
+    orbit: { target: 100000, reached: false },
+    deepSpace: { target: 250000, reached: false },
+    cosmic: { target: 500000, reached: false },
   },
-  {
-    name: 'Space for Humanity',
-    logo: '/images/charities/space-for-humanity.png',
-    description: 'Democratizing access to space to expand human consciousness and improve life on Earth.',
-    focus: 'Citizen astronaut program and overview effect research',
-    website: 'https://spaceforhumanity.org',
-    donated: 18500,
-  },
-  {
-    name: 'SETI Institute',
-    logo: '/images/charities/seti.png',
-    description: 'Exploring, understanding, and explaining the origin and nature of life in the universe.',
-    focus: 'Search for extraterrestrial intelligence and astrobiology',
-    website: 'https://seti.org',
-    donated: 22000,
-  },
-  {
-    name: 'Students for the Exploration and Development of Space',
-    logo: '/images/charities/seds.png',
-    description: 'Inspiring and empowering students to be leaders in the space community.',
-    focus: 'Student space education and project support',
-    website: 'https://seds.org',
-    donated: 12500,
-  },
-];
+};
 
-const milestones = [
+const milestoneInfo = [
   {
-    amount: 50000,
+    key: 'launch',
     title: 'Launch Milestone',
     description: 'First $50K donated to space charities',
-    achieved: true,
   },
   {
-    amount: 100000,
+    key: 'orbit',
     title: 'Orbit Milestone',
     description: 'Funding complete student research projects',
-    achieved: false,
   },
   {
-    amount: 250000,
+    key: 'deepSpace',
     title: 'Deep Space Milestone',
     description: 'Sponsoring observatory equipment upgrades',
-    achieved: false,
   },
   {
-    amount: 500000,
+    key: 'cosmic',
     title: 'Cosmic Milestone',
     description: 'Funding full scholarship programs',
-    achieved: false,
   },
 ];
 
 export default function Impact() {
-  const [stats, setStats] = useState<DonationStats>({
-    totalDonated: 78000,
-    totalSales: 260000,
-    nftsSold: 3245,
-  });
+  const [stats, setStats] = useState<DonationStats>(defaultStats);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // In production, this would fetch real stats from the API
   useEffect(() => {
-    // Placeholder for API call
-    // fetchDonationStats().then(setStats);
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/donations/stats');
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch donation stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchStats();
   }, []);
 
   return (
@@ -97,7 +86,7 @@ export default function Impact() {
         <div className="max-w-5xl mx-auto text-center relative">
           <div className="inline-flex items-center gap-2 bg-purple-900/30 border border-purple-500/30 rounded-full px-4 py-2 mb-6">
             <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
-            <span className="text-purple-300 text-sm">Making a Difference</span>
+            <span className="text-purple-300 text-sm">Supporting Space Exploration</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold mb-6">
             <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
@@ -117,19 +106,19 @@ export default function Impact() {
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div>
               <div className="text-5xl font-bold text-green-400 mb-2">
-                ${stats.totalDonated.toLocaleString()}
+                {isLoading ? '...' : stats.totalDonatedFormatted}
               </div>
               <div className="text-gray-400">Total Donated</div>
             </div>
             <div>
               <div className="text-5xl font-bold text-blue-400 mb-2">
-                {stats.nftsSold.toLocaleString()}
+                {isLoading ? '...' : stats.nftsSold.toLocaleString()}
               </div>
               <div className="text-gray-400">NFTs Sold</div>
             </div>
             <div>
               <div className="text-5xl font-bold text-purple-400 mb-2">
-                30%
+                {stats.donationPercentage}%
               </div>
               <div className="text-gray-400">Of Every Sale</div>
             </div>
@@ -148,7 +137,7 @@ export default function Impact() {
               </div>
               <h3 className="text-xl font-semibold mb-3">You Purchase</h3>
               <p className="text-gray-400">
-                Buy any NFT from our collection using your credit card.
+                Buy any NFT from our collection.
               </p>
             </div>
             <div className="bg-gray-900 rounded-xl p-6 text-center">
@@ -157,7 +146,7 @@ export default function Impact() {
               </div>
               <h3 className="text-xl font-semibold mb-3">We Donate</h3>
               <p className="text-gray-400">
-                30% of net proceeds automatically go to our charity partners.
+                30% of net proceeds go to space exploration charities.
               </p>
             </div>
             <div className="bg-gray-900 rounded-xl p-6 text-center">
@@ -172,42 +161,33 @@ export default function Impact() {
           </div>
         </section>
 
-        {/* Beneficiary Organizations */}
+        {/* Where Funds Go */}
         <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Our Beneficiary Partners</h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            {beneficiaries.map((org) => (
-              <div
-                key={org.name}
-                className="bg-gray-900 rounded-xl p-6 border border-gray-800 hover:border-purple-500/50 transition-colors"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-2xl">🚀</span>
-                  </div>
-                  <div className="flex-grow">
-                    <h3 className="text-xl font-semibold mb-2">{org.name}</h3>
-                    <p className="text-gray-400 text-sm mb-3">{org.description}</p>
-                    <p className="text-purple-400 text-sm mb-4">
-                      Focus: {org.focus}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-green-400 font-semibold">
-                        ${org.donated.toLocaleString()} donated
-                      </span>
-                      <a
-                        href={org.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline text-sm"
-                      >
-                        Visit website
-                      </a>
-                    </div>
-                  </div>
-                </div>
+          <h2 className="text-3xl font-bold mb-8 text-center">Where Funds Go</h2>
+          <div className="bg-gray-900 rounded-xl p-8 border border-gray-800">
+            <p className="text-gray-300 text-lg mb-6 text-center">
+              We are currently selecting verified 501(c)(3) space exploration and education
+              charities to partner with. Our beneficiary partners will be announced before
+              the first donation is made.
+            </p>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="flex items-start gap-3">
+                <span className="text-purple-400 text-xl">🚀</span>
+                <span className="text-gray-300">Space exploration research and missions</span>
               </div>
-            ))}
+              <div className="flex items-start gap-3">
+                <span className="text-purple-400 text-xl">🎓</span>
+                <span className="text-gray-300">STEM education and outreach programs</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-purple-400 text-xl">📚</span>
+                <span className="text-gray-300">Student scholarships and project grants</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-purple-400 text-xl">🔭</span>
+                <span className="text-gray-300">Public space science initiatives</span>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -219,54 +199,60 @@ export default function Impact() {
             <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-800 md:left-1/2 md:-translate-x-0.5" />
 
             <div className="space-y-8">
-              {milestones.map((milestone, index) => (
-                <div
-                  key={milestone.amount}
-                  className={`relative flex items-center gap-6 ${
-                    index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
-                  }`}
-                >
-                  {/* Dot */}
-                  <div className="absolute left-8 md:left-1/2 -translate-x-1/2">
-                    <div
-                      className={`w-4 h-4 rounded-full border-4 ${
-                        milestone.achieved
-                          ? 'bg-green-500 border-green-400'
-                          : 'bg-gray-800 border-gray-600'
-                      }`}
-                    />
-                  </div>
+              {milestoneInfo.map((milestone, index) => {
+                const milestoneData = stats.milestones[milestone.key as keyof typeof stats.milestones];
+                const isAchieved = milestoneData?.reached || false;
+                const target = milestoneData?.target || 0;
 
-                  {/* Content */}
-                  <div className="flex-1 ml-16 md:ml-0">
-                    <div
-                      className={`bg-gray-900 rounded-xl p-6 ${
-                        milestone.achieved ? 'border border-green-500/30' : ''
-                      } ${index % 2 === 0 ? 'md:mr-8' : 'md:ml-8'}`}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <span
-                          className={`text-2xl font-bold ${
-                            milestone.achieved ? 'text-green-400' : 'text-gray-500'
-                          }`}
-                        >
-                          ${milestone.amount.toLocaleString()}
-                        </span>
-                        {milestone.achieved && (
-                          <span className="px-2 py-1 bg-green-900/50 text-green-400 text-xs rounded-full">
-                            Achieved
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-lg font-semibold mb-1">{milestone.title}</h3>
-                      <p className="text-gray-400 text-sm">{milestone.description}</p>
+                return (
+                  <div
+                    key={milestone.key}
+                    className={`relative flex items-center gap-6 ${
+                      index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
+                    }`}
+                  >
+                    {/* Dot */}
+                    <div className="absolute left-8 md:left-1/2 -translate-x-1/2">
+                      <div
+                        className={`w-4 h-4 rounded-full border-4 ${
+                          isAchieved
+                            ? 'bg-green-500 border-green-400'
+                            : 'bg-gray-800 border-gray-600'
+                        }`}
+                      />
                     </div>
-                  </div>
 
-                  {/* Spacer for alternating layout */}
-                  <div className="hidden md:block flex-1" />
-                </div>
-              ))}
+                    {/* Content */}
+                    <div className="flex-1 ml-16 md:ml-0">
+                      <div
+                        className={`bg-gray-900 rounded-xl p-6 ${
+                          isAchieved ? 'border border-green-500/30' : ''
+                        } ${index % 2 === 0 ? 'md:mr-8' : 'md:ml-8'}`}
+                      >
+                        <div className="flex items-center gap-3 mb-2">
+                          <span
+                            className={`text-2xl font-bold ${
+                              isAchieved ? 'text-green-400' : 'text-gray-500'
+                            }`}
+                          >
+                            ${target.toLocaleString()}
+                          </span>
+                          {isAchieved && (
+                            <span className="px-2 py-1 bg-green-900/50 text-green-400 text-xs rounded-full">
+                              Achieved
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-semibold mb-1">{milestone.title}</h3>
+                        <p className="text-gray-400 text-sm">{milestone.description}</p>
+                      </div>
+                    </div>
+
+                    {/* Spacer for alternating layout */}
+                    <div className="hidden md:block flex-1" />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -275,101 +261,50 @@ export default function Impact() {
         <section className="mb-20">
           <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl p-8 border border-purple-500/30">
             <h2 className="text-3xl font-bold mb-6 text-center">Transparency Commitment</h2>
-            <div className="grid md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="text-xl font-semibold mb-4">What We Promise</h3>
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-300">
-                      Public donation records updated monthly
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-300">
-                      Verified receipts from all beneficiary organizations
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-300">
-                      Annual impact reports showing how funds were used
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-300">
-                      Direct relationships with verified 501(c)(3) organizations
-                    </span>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold mb-4">How Funds Are Allocated</h3>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-400">Research & Missions</span>
-                      <span className="text-white">40%</span>
-                    </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '40%' }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-400">Education & Outreach</span>
-                      <span className="text-white">35%</span>
-                    </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-purple-500 rounded-full" style={{ width: '35%' }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-400">Student Programs</span>
-                      <span className="text-white">25%</span>
-                    </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-pink-500 rounded-full" style={{ width: '25%' }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Impact Stories */}
-        <section className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">Impact Stories</h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-gray-900 rounded-xl p-6">
-              <div className="text-4xl mb-4">🛰️</div>
-              <h3 className="text-xl font-semibold mb-3">LightSail Mission Support</h3>
-              <p className="text-gray-400 mb-4">
-                Our donations to The Planetary Society contributed to the LightSail 2 mission,
-                demonstrating solar sailing technology in Earth orbit.
-              </p>
-              <span className="text-purple-400 text-sm">January 2024</span>
-            </div>
-            <div className="bg-gray-900 rounded-xl p-6">
-              <div className="text-4xl mb-4">🎓</div>
-              <h3 className="text-xl font-semibold mb-3">Student Scholarships</h3>
-              <p className="text-gray-400 mb-4">
-                Funded three SEDS student scholarships for aerospace engineering students,
-                supporting the next generation of space explorers.
-              </p>
-              <span className="text-purple-400 text-sm">March 2024</span>
+            <div className="max-w-2xl mx-auto">
+              <h3 className="text-xl font-semibold mb-4">What We Promise</h3>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-gray-300">
+                    Public donation records updated after each donation
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-gray-300">
+                    Verified receipts from all beneficiary organizations
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-gray-300">
+                    Annual impact reports showing how funds were used
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-gray-300">
+                    Direct relationships with verified 501(c)(3) organizations
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-gray-300">
+                    Beneficiary partners announced before first donation
+                  </span>
+                </li>
+              </ul>
             </div>
           </div>
         </section>
