@@ -59,23 +59,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Trading is currently disabled' });
     }
 
+    // Calculate royalty splits (20% to creator, 80% to seller)
+    const creatorRoyaltyCents = Math.floor(listing.priceCents * 0.20);
+    const sellerProceedsCents = listing.priceCents - creatorRoyaltyCents;
+
     // Create trade record
     const trade = await prisma.trade.create({
       data: {
-        listingId: listing.id,
         tokenId: listing.tokenId,
-        nftId: listing.nftId,
+        tradeType: 'LISTING_SALE',
         sellerAddress: listing.sellerAddress,
         buyerAddress: session.user.walletAddress.toLowerCase(),
         priceCents: listing.priceCents,
-        status: 'PENDING_PAYMENT',
+        creatorRoyaltyCents,
+        sellerProceedsCents,
       },
     });
 
     // Update listing status
     await prisma.listing.update({
       where: { id: listing.id },
-      data: { status: 'PENDING' },
+      data: { status: 'SOLD' },
+    });
+
+    // Update NFT ownership
+    await prisma.nFT.update({
+      where: { tokenId: listing.tokenId },
+      data: { ownerAddress: session.user.walletAddress.toLowerCase() },
     });
 
     res.json({
@@ -83,9 +93,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       trade: {
         id: trade.id,
         priceCents: trade.priceCents,
-        status: trade.status,
+        creatorRoyaltyCents: trade.creatorRoyaltyCents,
+        sellerProceedsCents: trade.sellerProceedsCents,
       },
-      message: 'Trade initiated. Complete payment to finalize.',
+      message: 'Trade completed successfully.',
     });
   } catch (error: any) {
     console.error('Failed to buy listing:', error);

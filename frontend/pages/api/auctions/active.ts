@@ -41,10 +41,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             cosmicScore: true,
             badgeTier: true,
             fameVisibility: true,
-            scientificSignificance: true,
+            scientificImportance: true,
             rarity: true,
             discoveryRecency: true,
-            culturalImpact: true,
+            culturalSignificance: true,
           },
         },
         bids: {
@@ -91,10 +91,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             badgeTier: auction.nft.badgeTier,
             scores: {
               fame: auction.nft.fameVisibility || 0,
-              significance: auction.nft.scientificSignificance || 0,
+              significance: auction.nft.scientificImportance || 0,
               rarity: auction.nft.rarity || 0,
               discoveryRecency: auction.nft.discoveryRecency || 0,
-              culturalImpact: auction.nft.culturalImpact || 0,
+              culturalSignificance: auction.nft.culturalSignificance || 0,
             },
           }
         : null,

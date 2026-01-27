@@ -79,8 +79,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const listing = await prisma.listing.create({
       data: {
         tokenId,
-        nftId: nft.id,
         sellerAddress: session.user.walletAddress.toLowerCase(),
+        sellerEmail: session.user.email || undefined,
         priceCents,
         status: 'ACTIVE',
       },

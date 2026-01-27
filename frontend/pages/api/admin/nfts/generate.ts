@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { BadgeTier } from '@prisma/client';
 import { prisma } from '../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../lib/adminAuth';
 
@@ -184,12 +185,12 @@ function generateScores(objectType: string, seed: number): { fame: number; signi
   };
 }
 
-function getBadgeTier(totalScore: number): string {
-  if (totalScore >= 450) return 'LEGENDARY';
-  if (totalScore >= 425) return 'ELITE';
-  if (totalScore >= 400) return 'PREMIUM';
-  if (totalScore >= 375) return 'EXCEPTIONAL';
-  return 'STANDARD';
+function getBadgeTier(totalScore: number): BadgeTier {
+  if (totalScore >= 450) return BadgeTier.LEGENDARY;
+  if (totalScore >= 425) return BadgeTier.ELITE;
+  if (totalScore >= 400) return BadgeTier.PREMIUM;
+  if (totalScore >= 375) return BadgeTier.EXCEPTIONAL;
+  return BadgeTier.STANDARD;
 }
 
 // Generate unique name based on type
@@ -442,10 +443,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             objectType,
             status: 'AVAILABLE',
             fameVisibility: Math.round(scores.fame),
-            scientificSignificance: Math.round(scores.significance),
+            scientificImportance: Math.round(scores.significance),
             rarity: Math.round(scores.rarity),
             discoveryRecency: Math.round(scores.discovery),
-            culturalImpact: Math.round(scores.cultural),
+            culturalSignificance: Math.round(scores.cultural),
             totalScore,
             badgeTier,
             discoveryYear,

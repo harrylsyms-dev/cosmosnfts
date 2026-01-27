@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const totalDonatedCents = paidPayments._sum?.totalOwedCents || 0;
-    const percentage = settings?.percentage || 5;
+    const percentage = settings?.benefactorSharePercent || 5;
 
     res.json({
       totalDonated: totalDonatedCents / 100,

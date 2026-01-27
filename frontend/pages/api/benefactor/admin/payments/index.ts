@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           where.status = status;
         }
         if (year) {
-          where.month = { startsWith: year as string };
+          where.year = parseInt(year as string, 10);
         }
 
         payments = await prisma.benefactorPayment.findMany({
@@ -49,11 +49,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: true,
         payments: payments.map((p: any) => ({
           id: p.id,
-          month: p.month,
-          amountCents: p.amountCents,
-          amount: (p.amountCents || 0) / 100,
+          month: `${p.year}-${String(p.month).padStart(2, '0')}`,
+          amountCents: p.totalOwedCents,
+          amount: (p.totalOwedCents || 0) / 100,
           status: p.status,
-          paymentMethod: p.paymentMethod,
+          paymentMethod: p.paymentMethodName,
           referenceNumber: p.referenceNumber,
           notes: p.notes,
           paidAt: p.paidAt,
@@ -64,22 +64,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
       // Create a new payment record for a specific month
-      const { month, amountCents, status } = req.body;
+      const { month: monthStr, amountCents, status, primarySalesCents, auctionSalesCents, primaryRevenueCents, auctionRevenueCents } = req.body;
 
-      if (!month) {
+      if (!monthStr) {
         return res.status(400).json({ error: 'Month is required (YYYY-MM format)' });
       }
 
       // Validate month format
-      if (!/^\d{4}-\d{2}$/.test(month)) {
+      if (!/^\d{4}-\d{2}$/.test(monthStr)) {
         return res.status(400).json({ error: 'Month must be in YYYY-MM format' });
       }
+
+      // Parse YYYY-MM into year and month
+      const [yearStr, monthNumStr] = monthStr.split('-');
+      const year = parseInt(yearStr, 10);
+      const month = parseInt(monthNumStr, 10);
+
+      // Calculate due date (10th of the following month)
+      const dueDate = new Date(year, month, 10); // month is 0-indexed, so this is next month
 
       const payment = await prisma.benefactorPayment.create({
         data: {
           month,
-          amountCents: amountCents || 0,
-          status: status || 'PENDING',
+          year,
+          primarySalesCents: primarySalesCents || 0,
+          auctionSalesCents: auctionSalesCents || 0,
+          totalOwedCents: amountCents || 0,
+          primaryRevenueCents: primaryRevenueCents || 0,
+          auctionRevenueCents: auctionRevenueCents || 0,
+          dueDate,
+          status: status || 'UNPAID',
         },
       });
 
@@ -87,8 +101,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: true,
         payment: {
           id: payment.id,
-          month: payment.month,
-          amount: (payment.amountCents || 0) / 100,
+          month: `${payment.year}-${String(payment.month).padStart(2, '0')}`,
+          amount: (payment.totalOwedCents || 0) / 100,
           status: payment.status,
         },
       });

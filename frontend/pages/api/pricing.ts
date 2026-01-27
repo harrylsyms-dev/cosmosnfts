@@ -62,14 +62,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Calculate phase end date
     let phaseEndDate: Date | null = null;
-    if (activePhase.startTime && activePhase.endTime) {
-      const endTime = new Date(activePhase.endTime);
-      const pauseDuration = siteSettings?.pauseDurationMs || 0;
-      phaseEndDate = new Date(endTime.getTime() + pauseDuration);
+    if (activePhase.startDate && activePhase.endDate) {
+      phaseEndDate = new Date(activePhase.endDate);
+
+      // Adjust for paused time
+      if (activePhase.totalPausedMs) {
+        phaseEndDate = new Date(phaseEndDate.getTime() + Number(activePhase.totalPausedMs));
+      }
 
       // Adjust for ongoing pause
-      if (siteSettings?.phasePaused && siteSettings?.pausedAt) {
-        const pauseStart = new Date(siteSettings.pausedAt);
+      if (activePhase.isPaused && activePhase.pausedAt) {
+        const pauseStart = new Date(activePhase.pausedAt);
         const timeSincePause = Date.now() - pauseStart.getTime();
         phaseEndDate = new Date(phaseEndDate.getTime() + timeSincePause);
       }
@@ -92,10 +95,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       tierMultipliers: TIER_MULTIPLIERS,
       currentSeries: activeSeries.seriesNumber,
       currentPhase: activePhase.phaseNumber,
-      seriesName: activeSeries.name,
-      phaseName: activePhase.name,
-      isPaused: siteSettings?.phasePaused || false,
-      pausedAt: siteSettings?.pausedAt || null,
+      seriesName: `Series ${activeSeries.seriesNumber}`,
+      phaseName: `Phase ${activePhase.phaseNumber}`,
+      isPaused: activePhase.isPaused || false,
+      pausedAt: activePhase.pausedAt || null,
       phaseEndDate: phaseEndDate?.toISOString() || null,
       quantityAvailable: availableCount,
       quantitySold: soldCount,

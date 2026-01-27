@@ -53,9 +53,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.json({
       success: true,
       total,
-      typeCounts: typeCounts.map((t: { objectType: string; _count: number }) => ({ objectType: t.objectType, _count: t._count })),
-      tierCounts: tierCounts.map((t: { badgeTier: string; _count: number }) => ({ badgeTier: t.badgeTier, _count: t._count })),
-      statusCounts: statusCounts.map((s: { status: string; _count: number }) => ({ status: s.status, _count: s._count })),
+      typeCounts: typeCounts.map((t) => ({ objectType: t.objectType, _count: t._count })),
+      tierCounts: tierCounts.map((t) => ({ badgeTier: t.badgeTier, _count: t._count })),
+      statusCounts: statusCounts.map((s) => ({ status: s.status, _count: s._count })),
     });
   } catch (error: any) {
     console.error('Failed to fetch NFT stats:', error);

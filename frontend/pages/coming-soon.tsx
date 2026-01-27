@@ -1,16 +1,33 @@
 import Head from 'next/head';
 import { useState, useEffect } from 'react';
 
-interface ComingSoonProps {
-  title?: string;
-  message?: string;
-  launchDate?: string | null;
-}
-
-export default function ComingSoon({ title, message, launchDate }: ComingSoonProps) {
+export default function ComingSoon() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [settings, setSettings] = useState<{
+    title?: string;
+    message?: string;
+    launchDate?: string | null;
+  }>({});
+
+  // Fetch settings from API
+  useEffect(() => {
+    fetch('/api/site-mode')
+      .then(res => res.json())
+      .then(data => {
+        setSettings({
+          title: data.comingSoonTitle,
+          message: data.comingSoonMessage,
+          launchDate: data.launchDate,
+        });
+      })
+      .catch(() => {
+        // Use defaults on error
+      });
+  }, []);
+
+  const { title, message, launchDate } = settings;
 
   useEffect(() => {
     if (!launchDate) return;

@@ -84,6 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: {
           walletAddress,
           email: email || null,
+          nonce: Math.random().toString(36).substring(2, 15),
         },
       });
 

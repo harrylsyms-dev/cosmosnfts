@@ -55,12 +55,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const saltRounds = 10;
     const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
 
-    // Update password and clear mustChangePassword flag
+    // Update password
     await prisma.adminUser.update({
       where: { id: admin.id },
       data: {
         passwordHash: newPasswordHash,
-        mustChangePassword: false,
       },
     });
 

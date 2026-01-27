@@ -26,7 +26,7 @@ function buildAstroDataLookup(): Map<string, AstronomicalObject> {
 function generatePromptForNFT(
   nft: {
     name: string;
-    description: string;
+    description: string | null;
     objectType: string | null;
     spectralType: string | null;
     notableFeatures: string | null;
@@ -41,7 +41,7 @@ function generatePromptForNFT(
   const options: PromptBuildOptions = {
     name: nft.name,
     objectType: nft.objectType || 'Unknown',
-    description: nft.description,
+    description: nft.description ?? undefined,
     spectralType: nft.spectralType || astroData?.spectralType,
     mass: astroData?.mass,
     notableFeatures: nft.notableFeatures

@@ -46,12 +46,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { id: id as string },
       data: {
         status: 'PAID',
-        paymentMethod,
+        paymentMethodName: paymentMethod || null,
         referenceNumber: referenceNumber || null,
         notes: notes || null,
-        amountCents: amountCents || payment.amountCents,
         paidAt: new Date(),
-        paidBy: admin.email,
       },
     });
 
@@ -65,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           details: JSON.stringify({
             paymentId: id,
             month: payment.month,
-            amount: (updated.amountCents || 0) / 100,
+            amount: (updated.totalOwedCents || 0) / 100,
             paymentMethod,
             referenceNumber,
           }),
@@ -82,9 +80,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       payment: {
         id: updated.id,
         month: updated.month,
-        amount: (updated.amountCents || 0) / 100,
+        amount: (updated.totalOwedCents || 0) / 100,
         status: updated.status,
-        paymentMethod: updated.paymentMethod,
+        paymentMethod: updated.paymentMethodName,
         referenceNumber: updated.referenceNumber,
         paidAt: updated.paidAt,
       },

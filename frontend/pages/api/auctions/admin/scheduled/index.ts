@@ -91,10 +91,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         imageIpfsHash: true,
         description: true,
         fameVisibility: true,
-        scientificSignificance: true,
+        scientificImportance: true,
         rarity: true,
         discoveryRecency: true,
-        culturalImpact: true,
+        culturalSignificance: true,
       },
     });
 
@@ -161,10 +161,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               description: nft.description,
               scores: {
                 fame: nft.fameVisibility || 0,
-                significance: nft.scientificSignificance || 0,
+                significance: nft.scientificImportance || 0,
                 rarity: nft.rarity || 0,
                 discoveryRecency: nft.discoveryRecency || 0,
-                culturalImpact: nft.culturalImpact || 0,
+                culturalSignificance: nft.culturalSignificance || 0,
               },
             }
           : null,

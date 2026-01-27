@@ -68,19 +68,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                configuredServices.has('leonardo_ai') ||
                                !!process.env.LEONARDO_AI_API_KEY;
 
-    // Get contract address from settings
-    let contractAddress = process.env.CONTRACT_ADDRESS || null;
-    try {
-      const settings = await prisma.siteSettings.findUnique({
-        where: { id: 'main' },
-        select: { contractAddress: true },
-      });
-      if (settings?.contractAddress) {
-        contractAddress = settings.contractAddress;
-      }
-    } catch {
-      // Settings might not exist
-    }
+    // Get contract address from environment
+    const contractAddress = process.env.CONTRACT_ADDRESS || null;
 
     res.json({
       config: {

@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { BadgeTier } from '@prisma/client';
 import { prisma } from '../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../lib/adminAuth';
 import {
@@ -121,12 +122,12 @@ function calculateScores(obj: AstronomicalObject): {
   };
 }
 
-function getBadgeTier(totalScore: number): string {
-  if (totalScore >= 450) return 'LEGENDARY';
-  if (totalScore >= 425) return 'ELITE';
-  if (totalScore >= 400) return 'PREMIUM';
-  if (totalScore >= 375) return 'EXCEPTIONAL';
-  return 'STANDARD';
+function getBadgeTier(totalScore: number): BadgeTier {
+  if (totalScore >= 450) return BadgeTier.LEGENDARY;
+  if (totalScore >= 425) return BadgeTier.ELITE;
+  if (totalScore >= 400) return BadgeTier.PREMIUM;
+  if (totalScore >= 375) return BadgeTier.EXCEPTIONAL;
+  return BadgeTier.STANDARD;
 }
 
 // Generate image prompt from astronomical object data
@@ -326,14 +327,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             objectType: obj.objectType,
             status: 'AVAILABLE',
             // Scientific scores (repurposing existing fields):
-            // fameVisibility = Distance Score, scientificSignificance = Mass Score
+            // fameVisibility = Distance Score, scientificImportance = Mass Score
             // rarity = Luminosity Score, discoveryRecency = Temperature Score
-            // culturalImpact = Discovery Score
+            // culturalSignificance = Discovery Score
             fameVisibility: scores.distance,
-            scientificSignificance: scores.mass,
+            scientificImportance: scores.mass,
             rarity: scores.luminosity,
             discoveryRecency: scores.temperature,
-            culturalImpact: scores.discovery,
+            culturalSignificance: scores.discovery,
             totalScore,
             badgeTier,
             discoveryYear: obj.discoveryYear || null,

@@ -72,24 +72,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       scientificData: {
         distanceLy: nft.distanceLy,
         massSolar: nft.massSolar,
-        ageYears: nft.ageYears,
         luminosity: nft.luminosity,
-        sizeKm: nft.sizeKm,
         temperatureK: nft.temperatureK,
         discoveryYear: nft.discoveryYear,
-        paperCount: nft.paperCount,
+        spectralType: nft.spectralType,
+        apparentMagnitude: nft.apparentMagnitude,
+        absoluteMagnitude: nft.absoluteMagnitude,
       },
 
-      // Scientific score breakdown (0-100 each)
+      // Score breakdown (new 10-metric system)
       scoreBreakdown: {
-        distance: nft.distanceScore,
-        mass: nft.massScore,
-        age: nft.ageScore,
-        luminosity: nft.luminosityScore,
-        size: nft.sizeScore,
-        temperature: nft.temperatureScore,
-        discovery: nft.discoveryScore,
-        papers: nft.papersScore,
+        culturalSignificance: nft.culturalSignificance,
+        scientificImportance: nft.scientificImportance,
+        historicalSignificance: nft.historicalSignificance,
+        visualImpact: nft.visualImpact,
+        uniqueness: nft.uniqueness,
+        accessibility: nft.accessibility,
+        proximity: nft.proximity,
+        storyFactor: nft.storyFactor,
+        activeRelevance: nft.activeRelevance,
+        futurePotential: nft.futurePotential,
       },
 
       // Pricing info
