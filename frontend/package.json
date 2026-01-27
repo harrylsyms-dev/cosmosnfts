@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "@prisma/extension-accelerate": "^3.0.1",
     "@sendgrid/mail": "^8.1.6",
     "@sentry/nextjs": "^8.0.0",
     "@stripe/react-stripe-js": "^2.4.0",
