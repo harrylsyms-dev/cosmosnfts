@@ -1,7 +1,59 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../../lib/adminAuth';
+import { buildImagePrompt, PromptBuildOptions } from '../../../../../lib/imagePromptTemplates';
+import { getAllAstronomicalObjects, AstronomicalObject } from '../../../../../lib/astronomicalData';
 import crypto from 'crypto';
+
+// Build astronomical data lookup
+function buildAstroLookup(): Map<string, AstronomicalObject> {
+  const allObjects = getAllAstronomicalObjects();
+  const lookup = new Map<string, AstronomicalObject>();
+  for (const obj of allObjects) {
+    lookup.set(obj.name.toLowerCase(), obj);
+    if (obj.alternateNames) {
+      for (const alt of obj.alternateNames) {
+        lookup.set(alt.toLowerCase(), obj);
+      }
+    }
+  }
+  return lookup;
+}
+
+// Generate prompt for an NFT using the robust template system
+function generatePromptForNFT(
+  nft: {
+    name: string;
+    description: string | null;
+    objectType: string | null;
+    spectralType: string | null;
+    notableFeatures: string | null;
+  },
+  astroLookup: Map<string, AstronomicalObject>
+): { prompt: string; negativePrompt: string } {
+  const astroData = astroLookup.get(nft.name.toLowerCase());
+
+  const options: PromptBuildOptions = {
+    name: nft.name,
+    objectType: nft.objectType || 'Unknown',
+    description: nft.description ?? undefined,
+    spectralType: nft.spectralType || astroData?.spectralType,
+    mass: astroData?.mass,
+    notableFeatures: nft.notableFeatures
+      ? JSON.parse(nft.notableFeatures)
+      : astroData?.notableFeatures,
+    galaxyType: astroData?.galaxyType,
+    nebulaType: astroData?.nebulaType,
+    planetType: astroData?.planetType,
+    subType: astroData?.subType,
+    structureDetails: astroData?.structureDetails,
+    surfaceFeatures: astroData?.surfaceFeatures,
+    colorDescription: astroData?.colorDescription,
+    customVisualCharacteristics: astroData?.visualCharacteristics,
+  };
+
+  return buildImagePrompt(options);
+}
 
 // Decrypt API key if encrypted
 function decryptApiKey(encryptedData: string): string {
@@ -357,11 +409,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Find the next NFT that needs image generation in this phase
-    const nft = await prisma.nFT.findFirst({
+    // First, look for any NFT needing generation (with or without prompt)
+    let nft = await prisma.nFT.findFirst({
       where: {
         phaseId,
         imageReviewStatus: 'PENDING_GENERATION',
-        imagePrompt: { not: null },
       },
       orderBy: [
         { totalScore: 'desc' }, // Process highest scoring first
@@ -387,6 +439,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         done: true,
         stats: await getPhaseStats(phaseId),
       });
+    }
+
+    // If NFT doesn't have a prompt, generate one using the template system
+    if (!nft.imagePrompt) {
+      console.log(`NFT #${nft.id} (${nft.name}) missing prompt - generating...`);
+
+      const astroLookup = buildAstroLookup();
+      const promptResult = generatePromptForNFT({
+        name: nft.name,
+        description: nft.description,
+        objectType: nft.objectType,
+        spectralType: nft.spectralType,
+        notableFeatures: nft.notableFeatures,
+      }, astroLookup);
+
+      // Update NFT with generated prompt
+      nft = await prisma.nFT.update({
+        where: { id: nft.id },
+        data: {
+          imagePrompt: promptResult.prompt,
+          imageNegativePrompt: promptResult.negativePrompt,
+          promptGeneratedAt: new Date(),
+        },
+      });
+
+      console.log(`Generated prompt for ${nft.name}: ${promptResult.prompt.substring(0, 100)}...`);
     }
 
     // Mark as generating (in progress)
