@@ -9,29 +9,29 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { phaseId } = req.query;
+  const { phase } = req.query;
 
-  if (!phaseId || typeof phaseId !== 'string') {
+  if (!phase || typeof phase !== 'string') {
     return res.status(400).json({ error: 'Phase ID is required' });
   }
 
   try {
     // Verify phase exists
-    const phase = await prisma.phase.findUnique({
-      where: { id: phaseId },
+    const phaseRecord = await prisma.phase.findUnique({
+      where: { id: phase },
       include: {
         series: { select: { seriesNumber: true } },
       },
     });
 
-    if (!phase) {
+    if (!phaseRecord) {
       return res.status(404).json({ error: 'Phase not found' });
     }
 
     // Reset all NFTs in this phase to PENDING_GENERATION
     // Clear any images that may have been generated
     const resetResult = await prisma.nFT.updateMany({
-      where: { phaseId },
+      where: { phaseId: phase },
       data: {
         imageReviewStatus: 'PENDING_GENERATION',
         reviewedAt: null,
@@ -47,7 +47,7 @@ export default async function handler(
 
     // Reset phase status to PENDING
     await prisma.phase.update({
-      where: { id: phaseId },
+      where: { id: phase },
       data: {
         status: 'PENDING',
         approvedCount: 0,
@@ -60,9 +60,9 @@ export default async function handler(
       success: true,
       message: `Reset ${resetResult.count} NFTs to PENDING_GENERATION`,
       phase: {
-        id: phaseId,
-        seriesNumber: phase.series.seriesNumber,
-        phaseNumber: phase.phaseNumber,
+        id: phase,
+        seriesNumber: phaseRecord.series.seriesNumber,
+        phaseNumber: phaseRecord.phaseNumber,
         status: 'PENDING',
       },
     });
