@@ -62,22 +62,42 @@ export default async function handler(
   }
 
   // Verify admin authentication
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided', hasAuth: !!authHeader });
+  }
+
+  // Manually decode and check token
+  let tokenPayload;
   try {
-    const admin = await validateAdmin(req);
-    if (!admin) {
-      const authHeader = req.headers.authorization;
-      console.error('Admin validation failed:', {
-        hasAuthHeader: !!authHeader,
-        headerStart: authHeader?.substring(0, 20)
-      });
-      return res.status(401).json({
-        error: 'Unauthorized',
-        debug: process.env.NODE_ENV !== 'production' ? { hasAuthHeader: !!authHeader } : undefined
-      });
-    }
-  } catch (authError) {
-    console.error('Admin auth error:', authError);
-    return res.status(401).json({ error: 'Authentication failed' });
+    tokenPayload = JSON.parse(Buffer.from(token, 'base64').toString());
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token format' });
+  }
+
+  if (!tokenPayload.id) {
+    return res.status(401).json({ error: 'Token missing id' });
+  }
+
+  if (tokenPayload.exp < Date.now()) {
+    return res.status(401).json({ error: 'Token expired', exp: tokenPayload.exp, now: Date.now() });
+  }
+
+  // Look up admin
+  const { prisma } = await import('../../../lib/prisma');
+  const admin = await prisma.adminUser.findUnique({
+    where: { id: tokenPayload.id },
+    select: { id: true, email: true, isActive: true },
+  });
+
+  if (!admin) {
+    return res.status(401).json({ error: 'Admin not found', tokenId: tokenPayload.id });
+  }
+
+  if (!admin.isActive) {
+    return res.status(401).json({ error: 'Admin account disabled' });
   }
 
   const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
