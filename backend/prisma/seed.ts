@@ -152,25 +152,16 @@ async function main() {
         name: obj.name,
         description: obj.description,
         objectType: obj.objectType,
-        // Score fields
-        fameScore: obj.fameVisibility,
-        significanceScore: obj.scientificSignificance,
-        rarityScore: obj.rarity,
-        discoveryRecencyScore: obj.discoveryRecency,
-        culturalImpactScore: obj.culturalImpact,
-        // Alternative score fields (for API compatibility)
+        // Score fields (legacy)
         fameVisibility: obj.fameVisibility,
-        scientificSignificance: obj.scientificSignificance,
         rarity: obj.rarity,
         discoveryRecency: obj.discoveryRecency,
-        culturalImpact: obj.culturalImpact,
         // Calculated fields
         totalScore,
         cosmicScore: totalScore,
         basePriceCents,
         currentPrice: nftPrice,
         badgeTier,
-        currentTier: phase,
         // Auction-reserved NFTs are marked but still available until auction starts
         status: isAuctionReserved ? 'AUCTION_RESERVED' : 'AVAILABLE',
         // Store constellation and distance if available
