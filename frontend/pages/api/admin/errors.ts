@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { validateAdmin } from '../../../lib/adminAuth';
 
 /**
  * Admin API: Fetch errors from Sentry
@@ -60,16 +61,11 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Check admin auth
-  const token = req.headers.authorization?.replace('Bearer ', '') ||
-                req.cookies.admin_token;
-
-  if (!token) {
+  // Verify admin authentication
+  const admin = await validateAdmin(req);
+  if (!admin) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-
-  // Verify admin token (simplified - in production use proper verification)
-  // This just checks the token exists; your existing admin auth middleware handles the rest
 
   const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
   const sentryOrg = process.env.SENTRY_ORG || 'cosmo-nfts';
