@@ -198,6 +198,7 @@ model NFT {
   imagePrompt             String?        @map("image_prompt") @db.Text
   imageNegativePrompt     String?        @map("image_negative_prompt") @db.Text
   promptGeneratedAt       DateTime?      @map("prompt_generated_at")
+  leonardoGenerationId    String?        @map("leonardo_generation_id")
   referenceImageUrl       String?        @map("reference_image_url")
   referenceImageSource    String?        @map("reference_image_source")
   leonardoRefImageId      String?        @map("leonardo_ref_image_id")
