@@ -83,7 +83,7 @@ model NFT {
   activeRelevance         Int            @default(0) @map("active_relevance")         // 0-15: Current missions, in the news
   futurePotential         Int            @default(0) @map("future_potential")         // 0-15: Upcoming missions, habitability
 
-  totalScore              Int            @default(0) @map("total_score")              // Sum of above (0-300)
+  totalScore              Int            @default(0) @map("total_score")              // Sum of above (0-500)
 
   // Legacy scoring fields (kept for migration, will be deprecated)
   fameVisibility          Int            @default(0) @map("fame_visibility")
@@ -637,7 +637,7 @@ model SiteSettings {
   // ============================================
   // PRICING CONFIGURATION
   // ============================================
-  maxPossibleScore      Int       @default(300) @map("max_possible_score")
+  maxPossibleScore      Int       @default(500) @map("max_possible_score")
   basePricePerScore     Decimal   @default(0.10) @map("base_price_per_score") @db.Decimal(10, 4)
 
   // ============================================

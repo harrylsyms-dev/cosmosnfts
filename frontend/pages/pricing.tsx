@@ -6,6 +6,7 @@ import {
   TIER_ORDER,
   SERIES_CONFIG,
   PRICING,
+  MAX_TOTAL_SCORE,
   calculatePrice,
   calculateTrajectory,
   BadgeTier,
@@ -60,7 +61,7 @@ export default function Pricing() {
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-gray-900 rounded-lg p-6">
               <div className="text-4xl mb-4">1</div>
-              <h3 className="text-xl font-semibold mb-3 text-green-400">Score (1-300)</h3>
+              <h3 className="text-xl font-semibold mb-3 text-green-400">Score (1-{MAX_TOTAL_SCORE})</h3>
               <p className="text-gray-300">
                 Each NFT has a Cosmic Score based on 10 metrics including cultural significance,
                 scientific importance, and uniqueness. Higher scores = higher prices.

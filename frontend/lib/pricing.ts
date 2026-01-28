@@ -64,7 +64,7 @@ export interface PriceCalculation {
 
 /**
  * Calculate the price for an NFT
- * @param score - The NFT's total score (0-300)
+ * @param score - The NFT's total score (0-500)
  * @param tier - The NFT's badge tier
  * @param seriesMultiplier - The current series multiplier (default 1.0)
  * @returns Price calculation details

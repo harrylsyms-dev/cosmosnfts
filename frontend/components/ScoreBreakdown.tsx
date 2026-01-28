@@ -1,3 +1,5 @@
+import { MAX_TOTAL_SCORE } from '../lib/constants';
+
 interface ScoreBreakdownProps {
   // Accept either individual props or scores object
   fameVisibility?: number;
@@ -93,12 +95,12 @@ export default function ScoreBreakdown(props: ScoreBreakdownProps) {
       <div className="pt-4 border-t border-gray-700">
         <div className="flex justify-between items-center">
           <span className="text-lg font-semibold">Total Cosmic Score</span>
-          <span className="text-2xl font-bold text-blue-400">{totalScore}/500</span>
+          <span className="text-2xl font-bold text-blue-400">{totalScore}/{MAX_TOTAL_SCORE}</span>
         </div>
         <div className="h-3 bg-gray-700 rounded-full overflow-hidden mt-2">
           <div
             className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-500"
-            style={{ width: `${(totalScore / 500) * 100}%` }}
+            style={{ width: `${(totalScore / MAX_TOTAL_SCORE) * 100}%` }}
           />
         </div>
       </div>

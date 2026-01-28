@@ -7,14 +7,7 @@ import {
   calculatePrice,
   getCurrentSeriesMultiplier,
 } from '../../../lib/pricing';
-
-function getBadgeForScore(score: number): BadgeTier {
-  if (score >= 450) return 'LEGENDARY';
-  if (score >= 425) return 'ELITE';
-  if (score >= 400) return 'PREMIUM';
-  if (score >= 375) return 'EXCEPTIONAL';
-  return 'STANDARD';
-}
+import { getBadgeTierFromScore } from '../../../lib/constants';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -138,7 +131,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       currentPhase: currentPhase?.phaseNumber || null,
       items: nfts.map((nft: { id: number; name: string; image: string | null; imageIpfsHash: string | null; totalScore: number | null; cosmicScore: number | null; badgeTier: string | null; objectType: string | null; constellation: string | null; distance: string | null; status: string }) => {
         const score = nft.totalScore || nft.cosmicScore || 0;
-        const badge = (nft.badgeTier as BadgeTier) || getBadgeForScore(score);
+        const badge = (nft.badgeTier as BadgeTier) || getBadgeTierFromScore(score);
         const priceCalc = calculatePrice(score, badge, seriesMultiplier);
         const tierMultiplier = TIER_MULTIPLIERS[badge];
         return {

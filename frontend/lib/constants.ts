@@ -88,6 +88,28 @@ export const TIER_CONFIG: Record<BadgeTier, {
 
 export const TIER_ORDER: BadgeTier[] = ['MYTHIC', 'LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
 
+// Score thresholds for each tier (based on MAX_TOTAL_SCORE = 500)
+// These define the minimum and maximum scores for each badge tier
+export const TIER_SCORE_THRESHOLDS: Record<BadgeTier, { min: number; max: number }> = {
+  MYTHIC: { min: 475, max: 500 },      // Top tier (95%+)
+  LEGENDARY: { min: 450, max: 474 },   // 90-95% of max score
+  ELITE: { min: 425, max: 449 },       // 85-90% of max score
+  PREMIUM: { min: 400, max: 424 },     // 80-85% of max score
+  EXCEPTIONAL: { min: 375, max: 399 }, // 75-80% of max score
+  STANDARD: { min: 0, max: 374 },      // Below 75% of max score
+};
+
+// Helper function to determine badge tier from score
+export function getBadgeTierFromScore(score: number): BadgeTier {
+  for (const tier of TIER_ORDER) {
+    const { min, max } = TIER_SCORE_THRESHOLDS[tier];
+    if (score >= min && score <= max) {
+      return tier;
+    }
+  }
+  return 'STANDARD';
+}
+
 // ============================================
 // OBJECT CATEGORIES (19 types)
 // ============================================
@@ -243,10 +265,10 @@ export const CATEGORY_ORDER: ObjectCategory[] = [
 ];
 
 // ============================================
-// SCORING METRICS (10 metrics, max 300)
+// SCORING METRICS (max 500)
 // ============================================
 
-export const MAX_TOTAL_SCORE = 300;
+export const MAX_TOTAL_SCORE = 500;
 
 export type ScoreMetric =
   | 'culturalSignificance'

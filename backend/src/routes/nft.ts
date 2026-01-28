@@ -59,10 +59,12 @@ router.get('/available', async (req: Request, res: Response) => {
     // Badge filter
     if (badge && badge !== 'All') {
       const badgeRanges: Record<string, { min: number; max: number }> = {
-        ELITE: { min: 425, max: 500 },
+        MYTHIC: { min: 475, max: 500 },
+        LEGENDARY: { min: 450, max: 474 },
+        ELITE: { min: 425, max: 449 },
         PREMIUM: { min: 400, max: 424 },
         EXCEPTIONAL: { min: 375, max: 399 },
-        STANDARD: { min: 250, max: 374 },
+        STANDARD: { min: 0, max: 374 },
       };
       const range = badgeRanges[badge as string];
       if (range) {

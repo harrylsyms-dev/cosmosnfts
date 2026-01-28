@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import { MAX_TOTAL_SCORE } from '../../lib/constants';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -473,7 +474,7 @@ export default function AdminAuctions() {
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="text-gray-400">Cosmic Score</span>
-                            <span className="font-bold text-xl text-purple-400">{selectedAuction.nft.cosmicScore}/500</span>
+                            <span className="font-bold text-xl text-purple-400">{selectedAuction.nft.cosmicScore}/{MAX_TOTAL_SCORE}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-400">Fame</span>

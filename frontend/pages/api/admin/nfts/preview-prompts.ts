@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../lib/prisma';
 import { verifyAdminToken } from '../../../../lib/adminAuth';
+import { MAX_TOTAL_SCORE } from '../../../../lib/constants';
 
 // Default object type configurations (fallback if not configured)
 const defaultObjectTypeConfigs: Record<string, { description: string; visualFeatures: string }> = {
@@ -141,7 +142,7 @@ Quality: ${config.qualityDescriptors}
 Medium: ${config.mediumDescriptors}
 
 ${scoreModifier ? `Quality tier: ${scoreModifier}` : ''}
-${config.includeScoreInPrompt ? `Cosmic Score: ${totalScore}/500` : ''}
+${config.includeScoreInPrompt ? `Cosmic Score: ${totalScore}/${MAX_TOTAL_SCORE}` : ''}
 
 --no ${combinedNegativePrompt}`.trim();
 }

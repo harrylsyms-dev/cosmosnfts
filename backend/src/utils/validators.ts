@@ -30,7 +30,7 @@ export const nftQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   minScore: z.coerce.number().int().min(0).max(500).optional(),
   maxScore: z.coerce.number().int().min(0).max(500).optional(),
-  badge: z.enum(['ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD']).optional(),
+  badge: z.enum(['MYTHIC', 'LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD']).optional(),
   sortBy: z.enum(['score', 'price', 'name']).default('score'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });

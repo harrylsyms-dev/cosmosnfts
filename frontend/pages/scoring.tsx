@@ -55,7 +55,7 @@ export default function Scoring() {
                 <div className="text-gray-400 text-sm">Base Rate Per Point</div>
               </div>
               <div className="bg-gray-900/50 rounded-lg p-4">
-                <div className="text-blue-400 font-bold text-xl">0-300</div>
+                <div className="text-blue-400 font-bold text-xl">0-{MAX_TOTAL_SCORE}</div>
                 <div className="text-gray-400 text-sm">Score (10 Metrics)</div>
               </div>
               <div className="bg-gray-900/50 rounded-lg p-4">
@@ -72,7 +72,7 @@ export default function Scoring() {
 
         {/* Score Breakdown */}
         <section className="mb-16">
-          <h2 className="text-3xl font-bold mb-4 text-center">Score (0-300)</h2>
+          <h2 className="text-3xl font-bold mb-4 text-center">Score (0-{MAX_TOTAL_SCORE})</h2>
           <p className="text-gray-400 text-center mb-8 max-w-2xl mx-auto">
             Each celestial object is evaluated across 10 scientific metrics. Higher scores indicate
             more significant, well-known, or unique objects.

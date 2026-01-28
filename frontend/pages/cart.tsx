@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { useCart } from '../hooks/useCart';
 import { useMetaMask } from '../hooks/useMetaMask';
+import { MAX_TOTAL_SCORE } from '../lib/constants';
 
 export default function Cart() {
   const router = useRouter();
@@ -94,7 +95,7 @@ export default function Cart() {
 
                   <div className="flex-grow">
                     <h3 className="font-semibold text-lg">{item.name}</h3>
-                    <p className="text-gray-400">Score: {item.score}/500</p>
+                    <p className="text-gray-400">Score: {item.score}/{MAX_TOTAL_SCORE}</p>
                   </div>
 
                   <div className="text-right">

@@ -1136,7 +1136,7 @@ export default function AdminNFTs() {
                       <div className="bg-gray-800 rounded-lg p-4">
                         <h3 className="font-semibold text-white mb-3">Score Breakdown</h3>
                         <div className="text-3xl font-bold text-purple-400 mb-4">
-                          {selectedNft.totalScore}/500
+                          {selectedNft.totalScore}/{MAX_TOTAL_SCORE}
                         </div>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">

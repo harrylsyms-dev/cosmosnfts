@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import { MAX_TOTAL_SCORE } from '../../lib/constants';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -258,7 +259,7 @@ export default function ListingDetail() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="text-gray-400 text-sm">Cosmic Score</div>
-                    <div className="text-xl font-bold text-purple-400">{listing.nft.cosmicScore}/500</div>
+                    <div className="text-xl font-bold text-purple-400">{listing.nft.cosmicScore}/{MAX_TOTAL_SCORE}</div>
                   </div>
                   <div>
                     <div className="text-gray-400 text-sm">Fame</div>

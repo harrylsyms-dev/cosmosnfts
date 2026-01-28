@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import { MAX_TOTAL_SCORE } from '../../lib/constants';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -702,7 +703,7 @@ export default function AstronomicalDataAdmin() {
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-400">Total Score</h3>
-                      <p className="text-white">{selectedObject.totalScore}/500</p>
+                      <p className="text-white">{selectedObject.totalScore}/{MAX_TOTAL_SCORE}</p>
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-400">Status</h3>

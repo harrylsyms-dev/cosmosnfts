@@ -109,7 +109,7 @@ const faqData: FAQCategory[] = [
     items: [
       {
         question: 'What is the Cosmic Score?',
-        answer: 'The Cosmic Score is a unique rating system (0-300 points) that evaluates each celestial object across 10 scientific metrics including cultural significance, scientific importance, historical significance, visual impact, uniqueness, accessibility, proximity, story factor, active relevance, and future potential.',
+        answer: 'The Cosmic Score is a unique rating system (0-500 points) that evaluates each celestial object across 10 scientific metrics including cultural significance, scientific importance, historical significance, visual impact, uniqueness, accessibility, proximity, story factor, active relevance, and future potential.',
       },
       {
         question: 'How does the score affect price?',
