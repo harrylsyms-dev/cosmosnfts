@@ -25,6 +25,18 @@ export default function App({ Component, pageProps }: AppProps) {
     setMounted(true);
     setIsHomePage(window.location.pathname === '/');
 
+    // Register service worker for offline support
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => {
+          console.log('SW registered:', registration.scope);
+        })
+        .catch((error) => {
+          console.log('SW registration failed:', error);
+        });
+    }
+
     // Auto-assign NFTs to phases on startup (runs once per session)
     const hasCheckedAutoAssign = sessionStorage.getItem('autoAssignChecked');
     if (!hasCheckedAutoAssign) {

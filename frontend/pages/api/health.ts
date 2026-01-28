@@ -3,11 +3,15 @@ import { prisma } from '../../lib/prisma';
 import { redis, isRedisAvailable } from '../../lib/redis';
 import config from '../../lib/config';
 
+// Track server start time for uptime calculation
+const startTime = Date.now();
+
 interface HealthCheck {
   status: 'healthy' | 'degraded' | 'unhealthy';
   timestamp: string;
   environment: string;
   version: string;
+  uptime: number;
   checks: {
     database: 'healthy' | 'unhealthy' | 'unconfigured';
     redis: 'healthy' | 'unhealthy' | 'unconfigured';
@@ -32,6 +36,7 @@ export default async function handler(
     timestamp: new Date().toISOString(),
     environment: config.environment,
     version: process.env.npm_package_version || '1.0.0',
+    uptime: Math.floor((Date.now() - startTime) / 1000),
     checks: {
       database: 'unconfigured',
       redis: 'unconfigured',
