@@ -6,8 +6,13 @@ const prisma = new PrismaClient();
 // Number of NFTs reserved for auctions (first 20 objects in celestialData)
 const AUCTION_RESERVED_COUNT = 20;
 
-// Get badge tier based on total score
+// Get badge tier based on total score (initial assignment)
+// NOTE: After seeding, run /api/admin/nfts/reassign-tiers to properly assign
+// tiers by RANK (top 20 = MYTHIC, etc.) instead of score thresholds
 function getBadgeTier(totalScore: number): string {
+  // MYTHIC is assigned by rank (top 20), not by score threshold
+  // This threshold is set very high so seeding uses LEGENDARY as max
+  if (totalScore >= 500) return 'MYTHIC';
   if (totalScore >= 450) return 'LEGENDARY';
   if (totalScore >= 425) return 'ELITE';
   if (totalScore >= 400) return 'PREMIUM';

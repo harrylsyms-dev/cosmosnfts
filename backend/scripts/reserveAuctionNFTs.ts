@@ -2,108 +2,126 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// 20 key celestial objects reserved for premium auctions
-// These will NOT be included in regular phase sales
-const AUCTION_RESERVED_OBJECTS = [
-  'Earth',
-  'Sun',
-  'Moon',
-  'Mars',
-  'Venus',
-  'Jupiter',
-  'Saturn',
-  'Uranus',
-  'Neptune',
-  'Andromeda Galaxy',
-  'Milky Way',
-  'Orion Nebula',
-  'Crab Nebula',
-  'Ring Nebula',
-  'Horsehead Nebula',
-  'Eagle Nebula',
-  'Helix Nebula',
-  'Whirlpool Galaxy',
-  'Sombrero Galaxy',
-  'Triangulum Galaxy',
-];
+/**
+ * Reserve the top 20 NFTs (by score) for premium auctions.
+ * These are the MYTHIC tier items and will NOT be included in regular phase sales.
+ *
+ * The auction schedule spreads them across 40 weeks (one every 2 weeks).
+ */
 
-// Auction schedule with starting bids (in cents)
-export const AUCTION_SCHEDULE = [
-  { name: 'Earth', week: 2, startingBidCents: 100000 },      // $1,000
-  { name: 'Sun', week: 4, startingBidCents: 200000 },        // $2,000
-  { name: 'Moon', week: 6, startingBidCents: 150000 },       // $1,500
-  { name: 'Mars', week: 8, startingBidCents: 50000 },        // $500
-  { name: 'Jupiter', week: 10, startingBidCents: 75000 },    // $750
-  { name: 'Venus', week: 12, startingBidCents: 40000 },      // $400
-  { name: 'Saturn', week: 14, startingBidCents: 60000 },     // $600
-  { name: 'Neptune', week: 16, startingBidCents: 35000 },    // $350
-  { name: 'Uranus', week: 18, startingBidCents: 30000 },     // $300
-  { name: 'Andromeda Galaxy', week: 20, startingBidCents: 250000 }, // $2,500
-  { name: 'Milky Way', week: 22, startingBidCents: 300000 }, // $3,000
-  { name: 'Orion Nebula', week: 24, startingBidCents: 100000 }, // $1,000
-  { name: 'Crab Nebula', week: 26, startingBidCents: 80000 },   // $800
-  { name: 'Ring Nebula', week: 28, startingBidCents: 70000 },   // $700
-  { name: 'Horsehead Nebula', week: 30, startingBidCents: 120000 }, // $1,200
-  { name: 'Eagle Nebula', week: 32, startingBidCents: 90000 },  // $900
-  { name: 'Helix Nebula', week: 34, startingBidCents: 85000 },  // $850
-  { name: 'Whirlpool Galaxy', week: 36, startingBidCents: 150000 }, // $1,500
-  { name: 'Sombrero Galaxy', week: 38, startingBidCents: 180000 }, // $1,800
-  { name: 'Triangulum Galaxy', week: 40, startingBidCents: 200000 }, // $2,000
-];
+// Base starting bids based on tier rank
+// Top items get higher starting bids
+function getStartingBid(rank: number): number {
+  if (rank <= 3) return 300000;   // $3,000 - Top 3
+  if (rank <= 5) return 200000;   // $2,000 - Rank 4-5
+  if (rank <= 10) return 150000;  // $1,500 - Rank 6-10
+  if (rank <= 15) return 100000;  // $1,000 - Rank 11-15
+  return 75000;                    // $750 - Rank 16-20
+}
 
 async function main() {
-  console.log('🔒 Reserving 20 celestial objects for premium auctions...\n');
+  console.log('🔒 Reserving top 20 NFTs (MYTHIC tier) for premium auctions...\n');
 
-  let reserved = 0;
-  let notFound = 0;
+  // Get top 20 NFTs by score
+  const topNFTs = await prisma.nFT.findMany({
+    orderBy: { totalScore: 'desc' },
+    take: 20,
+    select: {
+      id: true,
+      tokenId: true,
+      name: true,
+      totalScore: true,
+      badgeTier: true,
+      objectType: true,
+    },
+  });
 
-  for (const objectName of AUCTION_RESERVED_OBJECTS) {
-    // Try to find the NFT by name (case-insensitive partial match)
-    const nft = await prisma.nFT.findFirst({
-      where: {
-        OR: [
-          { name: { equals: objectName, mode: 'insensitive' } },
-          { name: { contains: objectName, mode: 'insensitive' } },
-        ],
+  if (topNFTs.length === 0) {
+    console.log('❌ No NFTs found in database. Run the seed script first.');
+    return;
+  }
+
+  console.log(`Found ${topNFTs.length} top-scoring NFTs:\n`);
+
+  // Reserve each and create auction schedule
+  const auctionSchedule: Array<{
+    name: string;
+    week: number;
+    startingBidCents: number;
+    score: number;
+    id: number;
+  }> = [];
+
+  for (let i = 0; i < topNFTs.length; i++) {
+    const nft = topNFTs[i];
+    const rank = i + 1;
+    const week = rank * 2; // One auction every 2 weeks
+    const startingBidCents = getStartingBid(rank);
+
+    // Update NFT to be auction reserved and MYTHIC tier
+    await prisma.nFT.update({
+      where: { id: nft.id },
+      data: {
+        status: 'AUCTION_RESERVED',
+        nftStatus: 'AUCTION_ACTIVE',
+        badgeTier: 'MYTHIC',
+        tierMultiplier: 200,
+        tierRank: rank,
+        isAuctionItem: true,
       },
     });
 
-    if (nft) {
-      // Mark as AUCTION_RESERVED
-      await prisma.nFT.update({
-        where: { id: nft.id },
-        data: { status: 'AUCTION_RESERVED' },
-      });
+    auctionSchedule.push({
+      name: nft.name,
+      week,
+      startingBidCents,
+      score: nft.totalScore,
+      id: nft.id,
+    });
 
-      const schedule = AUCTION_SCHEDULE.find(s => s.name === objectName);
-      const auctionInfo = schedule
-        ? ` (Week ${schedule.week}, $${(schedule.startingBidCents / 100).toLocaleString()} starting bid)`
-        : '';
-
-      console.log(`✓ Reserved: ${nft.name} (ID: ${nft.id}, Score: ${nft.cosmicScore})${auctionInfo}`);
-      reserved++;
-    } else {
-      console.log(`✗ Not found: ${objectName}`);
-      notFound++;
-    }
+    console.log(
+      `✓ #${rank.toString().padStart(2)} ${nft.name.padEnd(30)} ` +
+      `Score: ${nft.totalScore.toString().padStart(3)} | ` +
+      `Week ${week.toString().padStart(2)} | ` +
+      `$${(startingBidCents / 100).toLocaleString()}`
+    );
   }
 
-  console.log('\n════════════════════════════════════════════');
-  console.log(`Reserved: ${reserved} NFTs`);
-  console.log(`Not found: ${notFound} objects`);
-  console.log('════════════════════════════════════════════');
+  // Clear auction reservations from any NFTs not in top 20
+  const topIds = topNFTs.map(n => n.id);
+  const clearedResult = await prisma.nFT.updateMany({
+    where: {
+      status: 'AUCTION_RESERVED',
+      id: { notIn: topIds },
+    },
+    data: {
+      status: 'AVAILABLE',
+      nftStatus: 'AVAILABLE',
+      isAuctionItem: false,
+    },
+  });
 
-  if (notFound > 0) {
-    console.log('\n⚠️  Some objects were not found in the database.');
-    console.log('   Make sure to run the seed script first to populate NFTs.');
+  console.log('\n════════════════════════════════════════════════════════');
+  console.log(`Reserved: ${topNFTs.length} MYTHIC NFTs for auction`);
+  if (clearedResult.count > 0) {
+    console.log(`Cleared: ${clearedResult.count} old auction reservations`);
+  }
+  console.log('════════════════════════════════════════════════════════');
+
+  // Show auction schedule summary
+  console.log('\n📅 Auction Schedule (Top 20 by Score):');
+  console.log('────────────────────────────────────────────────────────');
+  for (const auction of auctionSchedule) {
+    console.log(
+      `   Week ${auction.week.toString().padStart(2)}: ` +
+      `${auction.name.padEnd(30)} ` +
+      `Score: ${auction.score.toString().padStart(3)} | ` +
+      `$${(auction.startingBidCents / 100).toLocaleString()}`
+    );
   }
 
-  // Show auction schedule
-  console.log('\n📅 Auction Schedule:');
-  console.log('────────────────────────────────────────────');
-  for (const auction of AUCTION_SCHEDULE) {
-    console.log(`   Week ${auction.week.toString().padStart(2)}: ${auction.name.padEnd(20)} - $${(auction.startingBidCents / 100).toLocaleString()}`);
-  }
+  // Export schedule for use elsewhere
+  console.log('\n📝 Auction schedule exported as AUCTION_SCHEDULE');
 }
 
 main()
@@ -114,3 +132,25 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+// Export for use in other modules
+export const getAuctionSchedule = async () => {
+  const topNFTs = await prisma.nFT.findMany({
+    where: { badgeTier: 'MYTHIC' },
+    orderBy: { totalScore: 'desc' },
+    select: {
+      id: true,
+      tokenId: true,
+      name: true,
+      totalScore: true,
+    },
+  });
+
+  return topNFTs.map((nft, i) => ({
+    name: nft.name,
+    week: (i + 1) * 2,
+    startingBidCents: getStartingBid(i + 1),
+    tokenId: nft.tokenId,
+    id: nft.id,
+  }));
+};
