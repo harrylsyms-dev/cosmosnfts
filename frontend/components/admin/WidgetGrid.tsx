@@ -410,6 +410,15 @@ export const DEFAULT_WIDGETS: Widget[] = [
     color: 'border-red-800 hover:border-red-500',
     defaultSize: { cols: 1, rows: 1 },
   },
+  {
+    id: 'discounts',
+    title: 'Discount Codes',
+    description: 'Manage promo codes',
+    icon: '🏷️',
+    href: '/admin/discount-codes',
+    color: 'border-emerald-800 hover:border-emerald-500',
+    defaultSize: { cols: 1, rows: 1 },
+  },
 ];
 
 export const DEFAULT_LAYOUT: DashboardLayout = {
