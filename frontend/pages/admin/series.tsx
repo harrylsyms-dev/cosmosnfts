@@ -310,6 +310,39 @@ export default function SeriesManagement() {
     }
   }
 
+  async function handleResetPhase(phaseId: string) {
+    if (!confirm('Are you sure you want to reset this phase? This will clear all review progress and set all NFTs back to pending generation.')) {
+      return;
+    }
+
+    setActionLoading(`reset-${phaseId}`);
+    setMessage(null);
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${apiUrl}/api/admin/phases/${phaseId}/reset`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setMessage({ type: 'success', text: data.message || 'Phase reset successfully' });
+        await fetchSeries();
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to reset phase' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to reset phase' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function startPhaseReview(phaseId: string, seriesNumber: number, phaseNumber: number) {
     setReviewPhaseId(phaseId);
     setReviewPhaseInfo({ seriesNumber, phaseNumber });
@@ -843,12 +876,22 @@ export default function SeriesManagement() {
                             )}
 
                             {canReview && (
-                              <button
-                                onClick={() => handleReviewPhase(phase, s.seriesNumber)}
-                                className="text-xs text-yellow-400 hover:text-yellow-300 mt-2 block font-semibold"
-                              >
-                                {phase.status === 'PENDING' ? 'Generate & Review' : 'Continue Review'}
-                              </button>
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={() => handleReviewPhase(phase, s.seriesNumber)}
+                                  className="text-xs text-yellow-400 hover:text-yellow-300 font-semibold"
+                                >
+                                  {phase.status === 'PENDING' ? 'Generate & Review' : 'Continue Review'}
+                                </button>
+                                <button
+                                  onClick={() => handleResetPhase(phase.id)}
+                                  disabled={actionLoading === `reset-${phase.id}`}
+                                  className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+                                  title="Reset phase to start fresh"
+                                >
+                                  {actionLoading === `reset-${phase.id}` ? 'Resetting...' : 'Reset'}
+                                </button>
+                              </div>
                             )}
 
                             {phase.startDate && (
