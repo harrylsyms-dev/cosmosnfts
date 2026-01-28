@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    const series = await prisma.series.findMany({
+    const seriesData = await prisma.series.findMany({
       orderBy: { seriesNumber: 'asc' },
       include: {
         phases: {
@@ -53,6 +53,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       },
     });
+
+    // Convert BigInt to Number for JSON serialization
+    const series = seriesData.map(s => ({
+      ...s,
+      phases: s.phases.map(p => ({
+        ...p,
+        totalPausedMs: Number(p.totalPausedMs),
+      })),
+    }));
 
     res.json({ series });
   } catch (error: any) {
