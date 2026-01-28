@@ -23,7 +23,7 @@ interface NFTForSitemap {
 
 interface AuctionForSitemap {
   id: string;
-  updatedAt: Date;
+  createdAt: Date;
 }
 
 function generateSiteMap(
@@ -72,7 +72,7 @@ function generateSiteMap(
       (auction) => `
   <url>
     <loc>${baseUrl}/auctions/${auction.id}</loc>
-    <lastmod>${auction.updatedAt.toISOString().split('T')[0]}</lastmod>
+    <lastmod>${auction.createdAt.toISOString().split('T')[0]}</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.85</priority>
   </url>`
@@ -110,7 +110,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
       where: { status: 'ACTIVE' },
       select: {
         id: true,
-        updatedAt: true,
+        createdAt: true,
       },
     });
 
