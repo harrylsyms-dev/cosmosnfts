@@ -232,7 +232,7 @@ function printStatistics(objects: ScoredObject[]): void {
   const tierDist = getTierDistribution(objects);
   const totalObjects = objects.length;
 
-  const tierOrder = ['LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'] as const;
+  const tierOrder = ['MYTHIC', 'LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'] as const;
 
   for (const tier of tierOrder) {
     const count = tierDist[tier];

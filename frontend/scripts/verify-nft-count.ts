@@ -21,7 +21,7 @@ async function main() {
   console.log('Total NFTs:', total);
 
   console.log('\nBy Tier:');
-  const tierOrder = ['LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
+  const tierOrder = ['MYTHIC', 'LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
   for (const tier of tierOrder) {
     const entry = byTier.find(t => t.badgeTier === tier);
     const count = entry?._count || 0;

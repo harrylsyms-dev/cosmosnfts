@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
 
     // Calculate badge distribution from actual badgeTier field
-    const badges: Record<string, number> = { LEGENDARY: 0, ELITE: 0, PREMIUM: 0, EXCEPTIONAL: 0, STANDARD: 0 };
+    const badges: Record<string, number> = { MYTHIC: 0, LEGENDARY: 0, ELITE: 0, PREMIUM: 0, EXCEPTIONAL: 0, STANDARD: 0 };
     badgeCounts.forEach((item: { badgeTier: string | null; _count: number }) => {
       const tier = item.badgeTier as string;
       if (tier && badges[tier] !== undefined) {

@@ -122,6 +122,7 @@ function createEmptyStats(): GenerationStats {
     failed: 0,
     withWarnings: 0,
     tierCounts: {
+      MYTHIC: 0,
       LEGENDARY: 0,
       ELITE: 0,
       PREMIUM: 0,
@@ -447,7 +448,7 @@ function printStatisticsReport(stats: GenerationStats, options: CLIOptions): voi
 
   // Tier distribution
   console.log('\n--- Tier Distribution ---');
-  const tierOrder = ['LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
+  const tierOrder = ['MYTHIC', 'LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
   for (const tier of tierOrder) {
     const count = stats.tierCounts[tier] || 0;
     const percentage = stats.created > 0 ? Math.round((count / stats.created) * 100) : 0;

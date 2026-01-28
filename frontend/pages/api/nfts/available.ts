@@ -63,18 +63,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where.name = { contains: search as string, mode: 'insensitive' };
     }
 
-    // Badge filter
+    // Badge filter - uses the actual badgeTier field (rank-based assignment)
     if (badge && badge !== 'All') {
-      const badgeRanges: Record<string, { min: number; max: number }> = {
-        LEGENDARY: { min: 450, max: 500 },
-        ELITE: { min: 425, max: 449 },
-        PREMIUM: { min: 400, max: 424 },
-        EXCEPTIONAL: { min: 375, max: 399 },
-        STANDARD: { min: 250, max: 374 },
-      };
-      const range = badgeRanges[badge as string];
-      if (range) {
-        where.totalScore = { gte: range.min, lte: range.max };
+      const validTiers = ['MYTHIC', 'LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
+      if (validTiers.includes(badge as string)) {
+        where.badgeTier = badge as string;
       }
     }
 

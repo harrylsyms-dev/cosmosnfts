@@ -313,7 +313,7 @@ export default function AstronomicalDataAdmin() {
   }
 
   const objectTypes = Object.keys(typeCounts).sort();
-  const tierOrder = ['LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
+  const tierOrder = ['MYTHIC', 'LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
 
   if (isLoading) {
     return (
@@ -362,7 +362,7 @@ export default function AstronomicalDataAdmin() {
           <div className="mb-8 p-6 bg-gradient-to-r from-indigo-900/30 to-purple-900/30 rounded-lg border border-purple-500/30">
             <h2 className="text-lg font-semibold text-purple-400 mb-4">Astronomical Objects in Database</h2>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
               <div className="bg-gray-800/50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-purple-400">
                   {(nftStats?.total ?? 0).toLocaleString()}
@@ -372,6 +372,7 @@ export default function AstronomicalDataAdmin() {
               {tierOrder.map(tier => (
                 <div key={tier} className="bg-gray-800/50 rounded-lg p-4">
                   <div className={`text-2xl font-bold ${
+                    tier === 'MYTHIC' ? 'text-amber-400' :
                     tier === 'LEGENDARY' ? 'text-yellow-400' :
                     tier === 'ELITE' ? 'text-purple-400' :
                     tier === 'PREMIUM' ? 'text-blue-400' :
@@ -615,6 +616,7 @@ export default function AstronomicalDataAdmin() {
                       <div className="flex justify-between items-start">
                         <div className="font-semibold text-white truncate">{obj.name}</div>
                         <span className={`text-xs px-2 py-0.5 rounded ${
+                          obj.badgeTier === 'MYTHIC' ? 'bg-gradient-to-r from-yellow-500 to-amber-400 text-white' :
                           obj.badgeTier === 'LEGENDARY' ? 'bg-yellow-600 text-white' :
                           obj.badgeTier === 'ELITE' ? 'bg-purple-600 text-white' :
                           obj.badgeTier === 'PREMIUM' ? 'bg-blue-600 text-white' :
@@ -675,6 +677,7 @@ export default function AstronomicalDataAdmin() {
                       {selectedObject.objectType}
                     </span>
                     <span className={`inline-block px-3 py-1 rounded-full text-sm ${
+                      selectedObject.badgeTier === 'MYTHIC' ? 'bg-gradient-to-r from-yellow-500 to-amber-400 text-white' :
                       selectedObject.badgeTier === 'LEGENDARY' ? 'bg-yellow-600 text-white' :
                       selectedObject.badgeTier === 'ELITE' ? 'bg-purple-600 text-white' :
                       selectedObject.badgeTier === 'PREMIUM' ? 'bg-blue-600 text-white' :

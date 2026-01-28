@@ -163,11 +163,12 @@ export default function SystemReportAdmin() {
               <h3 className="text-sm font-semibold text-purple-400 mb-2">Quick Stats</h3>
               <div className="space-y-2 text-xs text-gray-300">
                 <div>Total NFTs: 20,000</div>
-                <div>LEGENDARY: 164</div>
-                <div>ELITE: 598</div>
-                <div>PREMIUM: 1,200</div>
-                <div>EXCEPTIONAL: 3,000</div>
-                <div>STANDARD: 15,038</div>
+                <div>MYTHIC: 20</div>
+                <div>LEGENDARY: 100</div>
+                <div>ELITE: 400</div>
+                <div>PREMIUM: 1,000</div>
+                <div>EXCEPTIONAL: 2,000</div>
+                <div>STANDARD: 16,480</div>
               </div>
             </div>
 

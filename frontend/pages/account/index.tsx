@@ -282,6 +282,8 @@ export default function AccountDashboard() {
                         <h3 className="font-bold truncate">{nft.name}</h3>
                         {nft.badgeTier && (
                           <span className={`text-xs px-2 py-1 rounded ${
+                            nft.badgeTier === 'MYTHIC' ? 'bg-gradient-to-r from-yellow-600 to-amber-500 text-white' :
+                            nft.badgeTier === 'LEGENDARY' ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white' :
                             nft.badgeTier === 'ELITE' ? 'bg-purple-900 text-purple-300' :
                             nft.badgeTier === 'PREMIUM' ? 'bg-yellow-900 text-yellow-300' :
                             nft.badgeTier === 'EXCEPTIONAL' ? 'bg-blue-900 text-blue-300' :

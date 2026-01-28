@@ -37,6 +37,9 @@ interface ExoplanetData {
 }
 
 // Target tier distribution (same as original catalog)
+// Note: MYTHIC tier is assigned globally across ALL NFTs by recalculate-scores.ts
+// For individual imports, we assign LEGENDARY as highest since MYTHIC requires
+// global ranking across the entire 20,000 NFT collection
 const TIER_DISTRIBUTION = {
   LEGENDARY: 0.01,    // 1%
   ELITE: 0.03,        // 3%
@@ -44,6 +47,9 @@ const TIER_DISTRIBUTION = {
   EXCEPTIONAL: 0.15,  // 15%
   STANDARD: 0.75,     // 75%
 };
+
+// After importing, run: npx tsx scripts/recalculate-scores.ts --assign-tiers
+// This will reassign tiers globally including MYTHIC for top 20 across all NFTs
 
 const TARGET_TOTAL_NFTS = 20000;
 
@@ -78,7 +84,8 @@ Options:
   --help                Show this help
 
 Note: Total NFTs will remain at ${TARGET_TOTAL_NFTS}. Stars will be removed to make room.
-Tier distribution follows: 1% LEGENDARY, 3% ELITE, 6% PREMIUM, 15% EXCEPTIONAL, 75% STANDARD
+Tier distribution (per-import): 1% LEGENDARY, 3% ELITE, 6% PREMIUM, 15% EXCEPTIONAL, 75% STANDARD
+MYTHIC tier is assigned globally after import via: npx tsx lib/tierAssignment.ts
       `);
       process.exit(0);
     }
@@ -395,7 +402,8 @@ async function main() {
   console.log(`\nTarget: ${TARGET_TOTAL_NFTS} total NFTs`);
   console.log(`Exoplanets to add: ${options.exoplanetCount}`);
   console.log(`Dry run: ${options.dryRun}`);
-  console.log(`\nTier distribution: 1% LEGENDARY, 3% ELITE, 6% PREMIUM, 15% EXCEPTIONAL, 75% STANDARD`);
+  console.log(`\nTier distribution (per-import): 1% LEGENDARY, 3% ELITE, 6% PREMIUM, 15% EXCEPTIONAL, 75% STANDARD`);
+  console.log(`Note: Run 'npx tsx lib/tierAssignment.ts' after import to assign MYTHIC tier globally`);
 
   try {
     // Step 1: Get current database stats
@@ -451,7 +459,7 @@ async function main() {
 
     // Count tiers
     const tierCounts: Record<string, number> = {
-      LEGENDARY: 0, ELITE: 0, PREMIUM: 0, EXCEPTIONAL: 0, STANDARD: 0
+      MYTHIC: 0, LEGENDARY: 0, ELITE: 0, PREMIUM: 0, EXCEPTIONAL: 0, STANDARD: 0
     };
     for (const p of tieredPlanets) {
       tierCounts[p.tier]++;
@@ -577,7 +585,7 @@ async function main() {
 
     console.log('\nFinal tier distribution:');
     for (const tier of finalTiers.sort((a, b) => {
-      const order = ['LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
+      const order = ['MYTHIC', 'LEGENDARY', 'ELITE', 'PREMIUM', 'EXCEPTIONAL', 'STANDARD'];
       return order.indexOf(a.badgeTier) - order.indexOf(b.badgeTier);
     })) {
       const pct = ((tier._count / finalTotal) * 100).toFixed(1);

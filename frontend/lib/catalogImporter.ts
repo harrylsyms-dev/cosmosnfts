@@ -26,7 +26,7 @@ export interface ScoredObject extends AstronomicalObject {
     total: number;         // 0-500
     multiplied: number;    // After type multiplier
   };
-  badgeTier: 'STANDARD' | 'EXCEPTIONAL' | 'PREMIUM' | 'ELITE' | 'LEGENDARY';
+  badgeTier: 'STANDARD' | 'EXCEPTIONAL' | 'PREMIUM' | 'ELITE' | 'LEGENDARY' | 'MYTHIC';
 
   // Quality flags
   qualityFlags: {
@@ -89,7 +89,10 @@ export interface HYGRow {
 // SCORING CONSTANTS
 // ============================================
 
+// Note: MYTHIC tier is assigned globally via rank-based tierAssignment.ts
+// These thresholds are for legacy catalog import compatibility only
 export const TIER_THRESHOLDS = {
+  MYTHIC: 480,      // Approximate - actual assignment is rank-based
   LEGENDARY: 450,
   ELITE: 425,
   PREMIUM: 400,
@@ -121,12 +124,14 @@ export const TYPE_MULTIPLIERS: Record<string, number> = {
 };
 
 // Target tier distribution for selection
+// Note: MYTHIC is assigned globally via rank-based tierAssignment.ts after import
 export const TIER_TARGETS = {
-  LEGENDARY: { count: 200, percent: 1 },
-  ELITE: { count: 600, percent: 3 },
-  PREMIUM: { count: 1200, percent: 6 },
-  EXCEPTIONAL: { count: 3000, percent: 15 },
-  STANDARD: { count: 15000, percent: 75 },
+  MYTHIC: { count: 20, percent: 0.1 },
+  LEGENDARY: { count: 100, percent: 0.5 },
+  ELITE: { count: 400, percent: 2 },
+  PREMIUM: { count: 1000, percent: 5 },
+  EXCEPTIONAL: { count: 2000, percent: 10 },
+  STANDARD: { count: 16480, percent: 82.4 },
 };
 
 // Type quotas per tier (to ensure variety)
@@ -673,6 +678,7 @@ export function processHYGData(csvString: string, limit?: number): ScoredObject[
  */
 export function getTierDistribution(objects: ScoredObject[]): Record<string, number> {
   const dist: Record<string, number> = {
+    MYTHIC: 0,
     LEGENDARY: 0,
     ELITE: 0,
     PREMIUM: 0,

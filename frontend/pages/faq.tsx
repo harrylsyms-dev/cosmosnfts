@@ -109,15 +109,15 @@ const faqData: FAQCategory[] = [
     items: [
       {
         question: 'What is the Cosmic Score?',
-        answer: 'The Cosmic Score is a unique rating system (0-500 points) that evaluates each celestial object across five categories: Fame & Visibility, Scientific Significance, Rarity, Discovery Recency, and Cultural Impact.',
+        answer: 'The Cosmic Score is a unique rating system (0-300 points) that evaluates each celestial object across 10 scientific metrics including cultural significance, scientific importance, historical significance, visual impact, uniqueness, accessibility, proximity, story factor, active relevance, and future potential.',
       },
       {
         question: 'How does the score affect price?',
-        answer: 'Price is calculated as: Base Rate x Cosmic Score. Higher scored objects cost more because they are more significant, rarer, or more culturally important. A 450-score NFT costs 4.5x more than a 100-score NFT.',
+        answer: 'Price is calculated as: $0.10 x Score x Tier Multiplier x Series Multiplier. Higher scored objects cost more because they are more significant, rarer, or more culturally important.',
       },
       {
         question: 'What are the badge tiers?',
-        answer: 'Based on Cosmic Score: ELITE (425+) represents the top-tier objects, PREMIUM (400-424) is the popular sweet spot, EXCEPTIONAL (375-399) offers solid quality, and STANDARD (350-374) is great for starting collectors.',
+        answer: 'There are 6 tiers assigned by score ranking: MYTHIC (top 20, 200x multiplier), LEGENDARY (next 100, 100x), ELITE (next 400, 50x), PREMIUM (next 1,000, 20x), EXCEPTIONAL (next 2,000, 5x), and STANDARD (remaining 16,480, 1x multiplier).',
       },
     ],
   },

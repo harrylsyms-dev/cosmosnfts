@@ -88,9 +88,12 @@ export default function Marketplace() {
   }
 
   function getBadge(score: number): { label: string; color: string } {
-    if (score >= 425) return { label: 'ELITE', color: 'bg-yellow-500' };
-    if (score >= 400) return { label: 'PREMIUM', color: 'bg-purple-500' };
-    if (score >= 375) return { label: 'EXCEPTIONAL', color: 'bg-blue-500' };
+    // Approximate thresholds based on rank-based tier distribution
+    if (score >= 332) return { label: 'MYTHIC', color: 'bg-gradient-to-r from-yellow-500 to-amber-400' };
+    if (score >= 291) return { label: 'LEGENDARY', color: 'bg-gradient-to-r from-purple-500 to-pink-500' };
+    if (score >= 275) return { label: 'ELITE', color: 'bg-violet-500' };
+    if (score >= 263) return { label: 'PREMIUM', color: 'bg-blue-500' };
+    if (score >= 246) return { label: 'EXCEPTIONAL', color: 'bg-green-500' };
     return { label: 'STANDARD', color: 'bg-gray-500' };
   }
 
