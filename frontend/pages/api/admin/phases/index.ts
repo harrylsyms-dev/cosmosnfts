@@ -123,6 +123,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           isPaused: p.isPaused,
           pausedAt: p.pausedAt,
           auctionNFTId: p.auctionNFTId,
+          // Image review tracking
+          approvedCount: p.approvedCount || 0,
+          pendingReviewCount: p.pendingReviewCount || 0,
+          rejectedCount: p.rejectedCount || 0,
         })),
       })),
       // Summary stats

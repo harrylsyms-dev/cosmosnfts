@@ -116,9 +116,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: {
           seriesNumber: seriesNum,
           multiplier: seriesMultipliers[seriesNum - 1],
-          status: seriesNum === 1 ? 'ACTIVE' : 'PLANNED',
+          // All series start as PLANNED - will be activated after image review
+          status: 'PLANNED',
           totalNFTs: 0, // Will update after assignment
-          startDate: seriesNum === 1 ? new Date() : null,
+          startDate: null,
         },
       });
 
@@ -129,17 +130,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           data: {
             seriesId: series.id,
             phaseNumber: phaseNum,
-            status: seriesNum === 1 && phaseNum === 1 ? 'ACTIVE' : 'PENDING',
+            // All phases start as PENDING - require image review before activation
+            status: 'PENDING',
             totalNFTs: 0, // Will update after assignment
             durationDays: 14,
-            startDate: seriesNum === 1 && phaseNum === 1 ? new Date() : null,
+            startDate: null,
+            // Initialize review counts
+            approvedCount: 0,
+            pendingReviewCount: 0,
+            rejectedCount: 0,
           },
         });
         phases.push(phase);
       }
 
       createdSeries.push({ series, phases });
-      console.log(`Created Series ${seriesNum} with 5 phases`);
+      console.log(`Created Series ${seriesNum} with 5 phases (all PENDING for image review)`);
     }
 
     // Assign NFTs to phases using proportional random distribution
@@ -188,6 +194,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               seriesId: series.id,
               phaseNumber: phase.phaseNumber,
               seriesNumber: series.seriesNumber,
+              // All NFTs start as PENDING_GENERATION - images must be reviewed before going live
+              imageReviewStatus: 'PENDING_GENERATION',
             },
           });
 
@@ -221,20 +229,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Update site settings with current series/phase
+    // Update site settings - don't set currentPhaseId until phase is activated after review
+    // currentSeriesId is set to first series but currentPhaseId remains null
     const firstSeries = createdSeries[0].series;
-    const firstPhase = createdSeries[0].phases[0];
 
     await prisma.siteSettings.upsert({
       where: { id: 'main' },
       update: {
         currentSeriesId: firstSeries.id,
-        currentPhaseId: firstPhase.id,
+        // Don't set currentPhaseId - will be set when first phase is activated after image review
+        currentPhaseId: null,
       },
       create: {
         id: 'main',
         currentSeriesId: firstSeries.id,
-        currentPhaseId: firstPhase.id,
+        currentPhaseId: null,
       },
     });
 
@@ -259,16 +268,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     console.log(`Series initialization complete. Assigned ${totalAssigned} NFTs across 20 phases.`);
+    console.log('All phases are PENDING - use Image Review to generate/approve images before activation.');
 
     res.json({
       success: true,
-      message: 'Series system initialized with proportional random distribution',
+      message: 'Series system initialized. All phases require image review before activation.',
+      nextStep: 'Go to Image Review (/admin/image-review) to generate and approve images for Phase 1',
       summary: {
         totalSeries: 4,
         totalPhases: 20,
         totalNFTsAssigned: totalAssigned,
         perPhaseDistribution,
         mythicExcluded: tierCountMap['MYTHIC'] || 20,
+        allPhasesStatus: 'PENDING (awaiting image review)',
       },
       phases: phaseAssignments,
     });

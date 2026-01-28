@@ -6,9 +6,9 @@ import Link from 'next/link';
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface Series {
-  id: number;
+  id: string;
   seriesNumber: number;
-  status: 'PENDING' | 'ACTIVE' | 'COMPLETED';
+  status: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'PAUSED';
   multiplier: number;
   startDate: string | null;
   endDate: string | null;
@@ -16,14 +16,18 @@ interface Series {
 }
 
 interface Phase {
-  id: number;
+  id: string;
   phaseNumber: number;
-  status: 'PENDING' | 'ACTIVE' | 'COMPLETED';
+  status: 'PENDING' | 'GENERATING' | 'PENDING_REVIEW' | 'ACTIVE' | 'COMPLETED' | 'PAUSED';
   startDate: string | null;
   endDate: string | null;
   isPaused: boolean;
   pausedAt: string | null;
   totalPausedMs: number;
+  totalNFTs: number;
+  approvedCount: number;
+  pendingReviewCount: number;
+  rejectedCount: number;
 }
 
 interface PricingInfo {
@@ -233,10 +237,21 @@ export default function SeriesManagement() {
         return 'bg-green-600';
       case 'COMPLETED':
         return 'bg-blue-600';
+      case 'GENERATING':
+        return 'bg-blue-500';
+      case 'PENDING_REVIEW':
+        return 'bg-yellow-600';
+      case 'PAUSED':
+        return 'bg-orange-600';
       case 'PENDING':
       default:
         return 'bg-gray-600';
     }
+  }
+
+  function getPhaseReviewProgress(phase: Phase): number {
+    if (!phase.totalNFTs) return 0;
+    return Math.round((phase.approvedCount / phase.totalNFTs) * 100);
   }
 
   if (isLoading) {
@@ -268,6 +283,7 @@ export default function SeriesManagement() {
                 <h1 className="text-xl font-bold text-white">Series Management</h1>
               </div>
               <nav className="flex gap-4">
+                <Link href="/admin/image-review" className="text-yellow-400 hover:text-yellow-300 font-semibold">Image Review</Link>
                 <Link href="/admin/scoring" className="text-gray-400 hover:text-white">Scoring</Link>
                 <Link href="/admin/nfts" className="text-gray-400 hover:text-white">NFTs</Link>
                 <Link href="/admin/settings" className="text-gray-400 hover:text-white">Settings</Link>
@@ -333,6 +349,26 @@ export default function SeriesManagement() {
             )}
           </div>
 
+          {/* Image Review Banner */}
+          {series.length > 0 && series.some(s => s.phases.some(p => ['PENDING', 'PENDING_REVIEW', 'GENERATING'].includes(p.status))) && (
+            <div className="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 rounded-lg p-6 border border-yellow-500/30 mb-8">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-1">Image Review Required</h3>
+                  <p className="text-gray-400 text-sm">
+                    Phases must have all images reviewed and approved before they can be activated.
+                  </p>
+                </div>
+                <Link
+                  href="/admin/image-review"
+                  className="bg-yellow-600 hover:bg-yellow-500 text-white px-6 py-3 rounded-lg font-semibold"
+                >
+                  Go to Image Review
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 mb-8">
             <h2 className="text-lg font-bold text-white mb-4">Actions</h2>
@@ -343,10 +379,16 @@ export default function SeriesManagement() {
                   disabled={actionLoading === 'initialize'}
                   className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold"
                 >
-                  {actionLoading === 'initialize' ? 'Initializing...' : 'Initialize Series 1'}
+                  {actionLoading === 'initialize' ? 'Initializing...' : 'Initialize Series'}
                 </button>
               ) : (
                 <>
+                  <Link
+                    href="/admin/image-review"
+                    className="bg-yellow-600 hover:bg-yellow-500 text-white px-6 py-3 rounded-lg font-semibold"
+                  >
+                    Image Review Dashboard
+                  </Link>
                   {pricingInfo?.isPaused ? (
                     <button
                       onClick={handleResumePhase}
@@ -359,7 +401,7 @@ export default function SeriesManagement() {
                     <button
                       onClick={handlePausePhase}
                       disabled={actionLoading === 'pause'}
-                      className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold"
+                      className="bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold"
                     >
                       {actionLoading === 'pause' ? 'Pausing...' : 'Pause Phase'}
                     </button>
@@ -409,33 +451,69 @@ export default function SeriesManagement() {
 
                     {/* Phases */}
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {s.phases.map((phase) => (
-                        <div
-                          key={phase.id}
-                          className={`p-3 rounded border ${
-                            phase.status === 'ACTIVE'
-                              ? 'bg-green-900/30 border-green-500'
-                              : phase.status === 'COMPLETED'
-                              ? 'bg-blue-900/30 border-blue-500'
-                              : 'bg-gray-700/50 border-gray-600'
-                          }`}
-                        >
-                          <div className="font-semibold text-white">Phase {phase.phaseNumber}</div>
-                          <div className={`text-xs ${
-                            phase.status === 'ACTIVE' ? 'text-green-400' :
-                            phase.status === 'COMPLETED' ? 'text-blue-400' :
-                            'text-gray-400'
-                          }`}>
-                            {phase.status}
-                            {phase.isPaused && ' (Paused)'}
-                          </div>
-                          {phase.startDate && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Started: {new Date(phase.startDate).toLocaleDateString()}
+                      {s.phases.map((phase) => {
+                        const reviewProgress = getPhaseReviewProgress(phase);
+                        const needsReview = ['PENDING', 'GENERATING', 'PENDING_REVIEW'].includes(phase.status);
+
+                        return (
+                          <div
+                            key={phase.id}
+                            className={`p-3 rounded border ${
+                              phase.status === 'ACTIVE'
+                                ? 'bg-green-900/30 border-green-500'
+                                : phase.status === 'COMPLETED'
+                                ? 'bg-blue-900/30 border-blue-500'
+                                : phase.status === 'PENDING_REVIEW'
+                                ? 'bg-yellow-900/30 border-yellow-500'
+                                : phase.status === 'GENERATING'
+                                ? 'bg-blue-900/20 border-blue-400'
+                                : 'bg-gray-700/50 border-gray-600'
+                            }`}
+                          >
+                            <div className="font-semibold text-white">Phase {phase.phaseNumber}</div>
+                            <div className={`text-xs ${
+                              phase.status === 'ACTIVE' ? 'text-green-400' :
+                              phase.status === 'COMPLETED' ? 'text-blue-400' :
+                              phase.status === 'PENDING_REVIEW' ? 'text-yellow-400' :
+                              phase.status === 'GENERATING' ? 'text-blue-400' :
+                              'text-gray-400'
+                            }`}>
+                              {phase.status.replace('_', ' ')}
+                              {phase.isPaused && ' (Paused)'}
                             </div>
-                          )}
-                        </div>
-                      ))}
+
+                            {/* Review Progress */}
+                            {needsReview && phase.totalNFTs > 0 && (
+                              <div className="mt-2">
+                                <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-green-500 transition-all duration-300"
+                                    style={{ width: `${reviewProgress}%` }}
+                                  />
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {phase.approvedCount || 0}/{phase.totalNFTs} approved
+                                </div>
+                              </div>
+                            )}
+
+                            {phase.status === 'PENDING_REVIEW' && phase.pendingReviewCount > 0 && (
+                              <Link
+                                href={`/admin/image-review/${phase.id}`}
+                                className="text-xs text-yellow-400 hover:text-yellow-300 mt-1 block"
+                              >
+                                Review {phase.pendingReviewCount} pending
+                              </Link>
+                            )}
+
+                            {phase.startDate && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Started: {new Date(phase.startDate).toLocaleDateString()}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
