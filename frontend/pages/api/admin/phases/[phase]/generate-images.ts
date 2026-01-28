@@ -58,12 +58,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Phase not found' });
     }
 
-    // Phase must be PENDING to start generation
-    if (phaseData.status !== 'PENDING') {
+    // Phase must be PENDING or PENDING_REVIEW to start/continue
+    if (phaseData.status !== 'PENDING' && phaseData.status !== 'PENDING_REVIEW') {
       return res.status(400).json({
         error: 'Phase cannot start generation',
         currentStatus: phaseData.status,
-        message: 'Only PENDING phases can start image generation',
+        message: 'Only PENDING or PENDING_REVIEW phases can start image generation',
+      });
+    }
+
+    // If already in PENDING_REVIEW, just return success to continue review
+    if (phaseData.status === 'PENDING_REVIEW') {
+      const stats = await prisma.nFT.groupBy({
+        by: ['imageReviewStatus'],
+        where: { phaseId },
+        _count: true,
+      });
+
+      const statMap: Record<string, number> = {};
+      stats.forEach(s => {
+        statMap[s.imageReviewStatus] = s._count;
+      });
+
+      return res.json({
+        success: true,
+        message: `Continuing review for Series ${phaseData.series.seriesNumber} Phase ${phaseData.phaseNumber}`,
+        phaseId,
+        phaseNumber: phaseData.phaseNumber,
+        seriesNumber: phaseData.series.seriesNumber,
+        status: 'PENDING_REVIEW',
+        stats: {
+          totalNFTs: phaseData.totalNFTs,
+          needingGeneration: statMap['PENDING_GENERATION'] || 0,
+          readyForReview: statMap['PENDING_REVIEW'] || 0,
+        },
       });
     }
 
