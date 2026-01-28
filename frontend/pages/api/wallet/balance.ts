@@ -84,14 +84,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const balanceWei = BigInt(data.result);
     const balanceEth = Number(balanceWei) / 1e18;
 
-    // Format to reasonable decimal places
-    const formattedBalance = balanceEth < 0.0001
-      ? balanceEth.toExponential(2)
-      : balanceEth < 1
-        ? balanceEth.toFixed(4)
-        : balanceEth < 100
-          ? balanceEth.toFixed(2)
-          : balanceEth.toFixed(0);
+    // Format to 6 decimal places
+    const formattedBalance = balanceEth.toFixed(6);
 
     res.json({
       address,
