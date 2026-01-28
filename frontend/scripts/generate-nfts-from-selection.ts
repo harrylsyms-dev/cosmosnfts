@@ -151,10 +151,10 @@ interface NFTCreateData {
   description: string;
   objectType: string;
   fameVisibility: number;
-  scientificSignificance: number;
+  scientificImportance: number;
   rarity: number;
   discoveryRecency: number;
-  culturalImpact: number;
+  culturalSignificance: number;
   totalScore: number;
   badgeTier: string;
   spectralType: string | null;
@@ -247,10 +247,10 @@ function mapScoredObjectToNFTData(
 ): NFTCreateData {
   // Map scoring categories:
   // - distance -> fameVisibility (nearby objects are more visible/famous)
-  // - luminosity -> scientificSignificance (brighter objects are more studied)
+  // - luminosity -> scientificImportance (brighter objects are more studied)
   // - temperature -> rarity (extreme temps are rare)
   // - discovery -> discoveryRecency
-  // - mass -> culturalImpact (massive objects capture imagination)
+  // - mass -> culturalSignificance (massive objects capture imagination)
 
   return {
     tokenId,
@@ -258,10 +258,10 @@ function mapScoredObjectToNFTData(
     description: obj.description,
     objectType: obj.objectType,
     fameVisibility: obj.scores.distance,
-    scientificSignificance: obj.scores.luminosity,
+    scientificImportance: obj.scores.luminosity,
     rarity: obj.scores.temperature,
     discoveryRecency: obj.scores.discovery,
-    culturalImpact: obj.scores.mass,
+    culturalSignificance: obj.scores.mass,
     totalScore: obj.scores.multiplied,
     badgeTier: obj.badgeTier,
     spectralType: obj.spectralType || null,
@@ -383,10 +383,10 @@ async function processSelectedObjects(
               description: nft.description,
               objectType: nft.objectType,
               fameVisibility: nft.fameVisibility,
-              scientificSignificance: nft.scientificSignificance,
+              scientificImportance: nft.scientificImportance,
               rarity: nft.rarity,
               discoveryRecency: nft.discoveryRecency,
-              culturalImpact: nft.culturalImpact,
+              culturalSignificance: nft.culturalSignificance,
               totalScore: nft.totalScore,
               badgeTier: nft.badgeTier,
               spectralType: nft.spectralType,
