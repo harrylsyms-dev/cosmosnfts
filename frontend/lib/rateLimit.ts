@@ -18,11 +18,12 @@ export default function rateLimit(options: RateLimitOptions) {
         // Clean up expired entries periodically
         if (tokenCache.size > options.uniqueTokenPerInterval) {
           const cutoff = now - options.interval;
-          for (const [key, value] of tokenCache.entries()) {
+          const entries = Array.from(tokenCache.entries());
+          entries.forEach(([key, value]) => {
             if (value.resetTime < cutoff) {
               tokenCache.delete(key);
             }
-          }
+          });
         }
 
         if (!tokenData || tokenData.resetTime < now) {
