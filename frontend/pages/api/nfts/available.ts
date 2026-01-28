@@ -41,10 +41,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const skip = offset ? parseInt(offset as string) : (pageNum - 1) * limitNum;
     const actualOrder = (order || sortOrder) as 'asc' | 'desc';
 
-    // Build filter
+    // Get current active phase
+    const siteSettings = await prisma.siteSettings.findUnique({
+      where: { id: 'main' },
+      select: { currentPhaseId: true },
+    });
+
+    const currentPhaseId = siteSettings?.currentPhaseId;
+
+    // Build filter - only show NFTs from current phase
     const where: any = {
       status: 'AVAILABLE',
     };
+
+    // If series is initialized, only show current phase NFTs
+    if (currentPhaseId) {
+      where.phaseId = currentPhaseId;
+    } else {
+      // No series initialized - don't show any NFTs to customers
+      // Or show a limited preview (optional)
+      return res.status(200).json({
+        total: 0,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: 0,
+        seriesMultiplier: 1,
+        items: [],
+        message: 'Sales have not started yet. Check back soon!',
+        seriesNotInitialized: true,
+      });
+    }
 
     if (minScore) {
       where.totalScore = { ...where.totalScore, gte: parseInt(minScore as string) };
@@ -87,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orderBy.totalScore = 'desc';
     }
 
-    const [total, nfts, seriesMultiplier] = await Promise.all([
+    const [total, nfts, seriesMultiplier, currentPhase] = await Promise.all([
       prisma.nFT.count({ where }),
       prisma.nFT.findMany({
         where,
@@ -96,6 +122,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         take: limitNum,
       }),
       getCurrentSeriesMultiplier(prisma),
+      currentPhaseId ? prisma.phase.findUnique({
+        where: { id: currentPhaseId },
+        include: { series: true },
+      }) : null,
     ]);
 
     res.status(200).json({
@@ -104,6 +134,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
       seriesMultiplier,
+      currentSeries: currentPhase?.series?.seriesNumber || null,
+      currentPhase: currentPhase?.phaseNumber || null,
       items: nfts.map((nft: { id: number; name: string; image: string | null; imageIpfsHash: string | null; totalScore: number | null; cosmicScore: number | null; badgeTier: string | null; objectType: string | null; constellation: string | null; distance: string | null; status: string }) => {
         const score = nft.totalScore || nft.cosmicScore || 0;
         const badge = (nft.badgeTier as BadgeTier) || getBadgeForScore(score);
