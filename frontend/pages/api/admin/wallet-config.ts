@@ -2,10 +2,20 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import { verifyAdminToken } from '../../../lib/adminAuth';
 
+interface WalletRecipient {
+  id?: string;
+  name: string;
+  walletAddress: string;
+  sharePercent: number;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
 /**
- * Admin API: Get/Update Wallet Configuration
+ * Admin API: Get/Update Wallet Recipients
  *
- * Manages owner and benefactor wallet addresses and revenue split settings.
+ * Manages multiple wallet recipients with flexible percentage splits.
+ * Total percentages must equal 100%.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -30,73 +40,115 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'GET') {
-      // Fetch current wallet config from site settings
-      const settings = await prisma.siteSettings.findUnique({
-        where: { id: 'main' },
-        select: {
-          ownerWalletAddress: true,
-          benefactorWalletAddress: true,
-          benefactorName: true,
-          ownerSharePercent: true,
-          benefactorSharePercent: true,
-        },
+      // Fetch all wallet recipients
+      const recipients = await prisma.walletRecipient.findMany({
+        orderBy: { sortOrder: 'asc' },
       });
 
+      // Calculate total percentage
+      const totalPercent = recipients
+        .filter(r => r.isActive)
+        .reduce((sum, r) => sum + r.sharePercent, 0);
+
       return res.json({
-        config: {
-          ownerWalletAddress: settings?.ownerWalletAddress || null,
-          benefactorWalletAddress: settings?.benefactorWalletAddress || null,
-          benefactorName: settings?.benefactorName || 'Space Exploration Fund',
-          ownerSharePercent: settings?.ownerSharePercent ?? 70,
-          benefactorSharePercent: settings?.benefactorSharePercent ?? 30,
-        },
+        recipients: recipients.map(r => ({
+          id: r.id,
+          name: r.name,
+          walletAddress: r.walletAddress,
+          sharePercent: r.sharePercent,
+          isActive: r.isActive,
+          sortOrder: r.sortOrder,
+        })),
+        totalPercent,
+        isValid: totalPercent === 100 || recipients.length === 0,
       });
     }
 
     if (req.method === 'PUT') {
-      const {
-        ownerWalletAddress,
-        benefactorWalletAddress,
-        benefactorName,
-        ownerSharePercent,
-        benefactorSharePercent,
-      } = req.body || {};
+      const { recipients } = req.body || {};
 
-      // Validate wallet addresses (basic check)
-      if (ownerWalletAddress && !/^0x[a-fA-F0-9]{40}$/.test(ownerWalletAddress)) {
-        return res.status(400).json({ error: 'Invalid owner wallet address format' });
-      }
-      if (benefactorWalletAddress && !/^0x[a-fA-F0-9]{40}$/.test(benefactorWalletAddress)) {
-        return res.status(400).json({ error: 'Invalid benefactor wallet address format' });
+      if (!Array.isArray(recipients)) {
+        return res.status(400).json({ error: 'Recipients array is required' });
       }
 
-      // Validate percentages
-      const ownerPct = typeof ownerSharePercent === 'number' ? ownerSharePercent : 70;
-      const benefactorPct = typeof benefactorSharePercent === 'number' ? benefactorSharePercent : 30;
-
-      if (ownerPct + benefactorPct !== 100) {
-        return res.status(400).json({ error: 'Owner and benefactor percentages must sum to 100' });
+      // Validate all recipients
+      for (const recipient of recipients as WalletRecipient[]) {
+        if (!recipient.name || recipient.name.trim() === '') {
+          return res.status(400).json({ error: 'All recipients must have a name' });
+        }
+        if (!recipient.walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(recipient.walletAddress)) {
+          return res.status(400).json({ error: `Invalid wallet address for "${recipient.name}"` });
+        }
+        if (typeof recipient.sharePercent !== 'number' || recipient.sharePercent < 0 || recipient.sharePercent > 100) {
+          return res.status(400).json({ error: `Invalid share percentage for "${recipient.name}"` });
+        }
       }
 
-      // Upsert site settings
-      await prisma.siteSettings.upsert({
-        where: { id: 'main' },
-        update: {
-          ownerWalletAddress: ownerWalletAddress || null,
-          benefactorWalletAddress: benefactorWalletAddress || null,
-          benefactorName: benefactorName || 'Space Exploration Fund',
-          ownerSharePercent: ownerPct,
-          benefactorSharePercent: benefactorPct,
-        },
-        create: {
-          id: 'main',
-          ownerWalletAddress: ownerWalletAddress || null,
-          benefactorWalletAddress: benefactorWalletAddress || null,
-          benefactorName: benefactorName || 'Space Exploration Fund',
-          ownerSharePercent: ownerPct,
-          benefactorSharePercent: benefactorPct,
-        },
-      });
+      // Calculate total percentage (only active recipients)
+      const activeRecipients = (recipients as WalletRecipient[]).filter(r => r.isActive !== false);
+      const totalPercent = activeRecipients.reduce((sum, r) => sum + r.sharePercent, 0);
+
+      if (activeRecipients.length > 0 && totalPercent !== 100) {
+        return res.status(400).json({
+          error: `Total percentage must equal 100%. Currently: ${totalPercent}%`,
+          totalPercent,
+        });
+      }
+
+      // Get existing recipients to determine updates vs creates
+      const existingRecipients = await prisma.walletRecipient.findMany();
+      const existingIds = existingRecipients.map(r => r.id);
+
+      // Process each recipient
+      const operations = [];
+      const newIds: string[] = [];
+
+      for (let i = 0; i < recipients.length; i++) {
+        const recipient = recipients[i] as WalletRecipient;
+
+        if (recipient.id && existingIds.includes(recipient.id)) {
+          // Update existing
+          operations.push(
+            prisma.walletRecipient.update({
+              where: { id: recipient.id },
+              data: {
+                name: recipient.name.trim(),
+                walletAddress: recipient.walletAddress,
+                sharePercent: recipient.sharePercent,
+                isActive: recipient.isActive !== false,
+                sortOrder: i,
+              },
+            })
+          );
+          newIds.push(recipient.id);
+        } else {
+          // Create new
+          operations.push(
+            prisma.walletRecipient.create({
+              data: {
+                name: recipient.name.trim(),
+                walletAddress: recipient.walletAddress,
+                sharePercent: recipient.sharePercent,
+                isActive: recipient.isActive !== false,
+                sortOrder: i,
+              },
+            })
+          );
+        }
+      }
+
+      // Delete removed recipients
+      const idsToDelete = existingIds.filter(id => !newIds.includes(id));
+      if (idsToDelete.length > 0) {
+        operations.push(
+          prisma.walletRecipient.deleteMany({
+            where: { id: { in: idsToDelete } },
+          })
+        );
+      }
+
+      // Execute all operations
+      await prisma.$transaction(operations);
 
       // Log audit
       try {
@@ -104,12 +156,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           data: {
             adminId: admin.id,
             adminEmail: admin.email,
-            action: 'WALLET_CONFIG_UPDATE',
+            action: 'WALLET_RECIPIENTS_UPDATE',
             details: JSON.stringify({
-              ownerWalletAddress: ownerWalletAddress ? `${ownerWalletAddress.slice(0, 6)}...${ownerWalletAddress.slice(-4)}` : null,
-              benefactorWalletAddress: benefactorWalletAddress ? `${benefactorWalletAddress.slice(0, 6)}...${benefactorWalletAddress.slice(-4)}` : null,
-              ownerSharePercent: ownerPct,
-              benefactorSharePercent: benefactorPct,
+              recipientCount: recipients.length,
+              totalPercent,
+              recipients: (recipients as WalletRecipient[]).map(r => ({
+                name: r.name,
+                address: `${r.walletAddress.slice(0, 6)}...${r.walletAddress.slice(-4)}`,
+                percent: r.sharePercent,
+              })),
             }),
             ipAddress: req.headers['x-forwarded-for'] as string || 'unknown',
           },
@@ -118,9 +173,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Audit log might not exist
       }
 
+      // Fetch updated recipients
+      const updatedRecipients = await prisma.walletRecipient.findMany({
+        orderBy: { sortOrder: 'asc' },
+      });
+
       return res.json({
         success: true,
-        message: 'Wallet configuration updated successfully',
+        message: 'Wallet recipients updated successfully',
+        recipients: updatedRecipients.map(r => ({
+          id: r.id,
+          name: r.name,
+          walletAddress: r.walletAddress,
+          sharePercent: r.sharePercent,
+          isActive: r.isActive,
+          sortOrder: r.sortOrder,
+        })),
+        totalPercent,
       });
     }
 

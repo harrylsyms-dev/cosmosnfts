@@ -1090,6 +1090,21 @@ model EthPriceHistory {
   @@map("eth_price_history")
 }
 
+// Wallet Recipients (Flexible payment split system)
+model WalletRecipient {
+  id              String    @id @default(uuid())
+  name            String                              // Display name (e.g., "Harry Syms", "Space Foundation")
+  walletAddress   String    @map("wallet_address")    // 0x... address
+  sharePercent    Int       @map("share_percent")     // Percentage (0-100)
+  isActive        Boolean   @default(true) @map("is_active")
+  sortOrder       Int       @default(0) @map("sort_order")  // For display ordering
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("wallet_recipients")
+}
+
 // Benefactor Payment Reminders (Track reminder status)
 model BenefactorReminder {
   id              String    @id @default(uuid())
