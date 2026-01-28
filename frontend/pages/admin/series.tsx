@@ -324,8 +324,8 @@ export default function SeriesManagement() {
     const token = localStorage.getItem('adminToken');
 
     try {
-      // Call the generate-images endpoint
-      const res = await fetch(`${apiUrl}/api/admin/phases/${phaseId}/generate-images`, {
+      // First call generate-images to initialize the phase status
+      const initRes = await fetch(`${apiUrl}/api/admin/phases/${phaseId}/generate-images`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -334,72 +334,100 @@ export default function SeriesManagement() {
         },
       });
 
-      const data = await res.json();
+      const initData = await initRes.json();
 
-      if (res.ok) {
-        // Start polling for generation progress
-        pollGenerationProgress(phaseId);
-      } else {
+      if (!initRes.ok) {
         setGenerationProgress(prev => prev ? { ...prev, status: 'error' } : null);
-        setMessage({ type: 'error', text: data.error || 'Failed to start image generation' });
+        setMessage({ type: 'error', text: initData.error || 'Failed to start image generation' });
+        return;
       }
+
+      // Check if all NFTs already have images (ready for review)
+      if (initData.stats?.needingGeneration === 0 && initData.stats?.readyForReview > 0) {
+        setGenerationProgress({ total: initData.stats.totalNFTs, completed: initData.stats.readyForReview, failed: 0, status: 'complete' });
+        loadNextNFT(phaseId);
+        return;
+      }
+
+      // Start the generation loop - call generate-next repeatedly
+      startGenerationLoop(phaseId);
     } catch (error) {
       setGenerationProgress(prev => prev ? { ...prev, status: 'error' } : null);
       setMessage({ type: 'error', text: 'Failed to start image generation' });
     }
   }
 
-  async function pollGenerationProgress(phaseId: string) {
+  async function startGenerationLoop(phaseId: string) {
     const token = localStorage.getItem('adminToken');
 
-    const poll = async () => {
+    const generateNext = async () => {
       try {
-        const res = await fetch(`${apiUrl}/api/admin/phases/${phaseId}/review-queue?limit=1`, {
+        const res = await fetch(`${apiUrl}/api/admin/phases/${phaseId}/generate-next`, {
+          method: 'POST',
           credentials: 'include',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          const stats = data.stats;
+        const data = await res.json();
 
+        if (data.stats) {
+          const stats = data.stats;
           const total = stats.total || 0;
-          const pendingGen = stats.pendingGeneration || 0;
-          const completed = total - pendingGen;
+          const completed = (stats.pendingReview || 0) + (stats.approved || 0);
 
           setGenerationProgress({
             total,
             completed,
             failed: 0,
-            status: pendingGen === 0 ? 'complete' : 'generating',
+            status: stats.pendingGeneration === 0 ? 'complete' : 'generating',
           });
 
           setReviewStats({
-            total: stats.total,
-            approved: stats.approved,
-            pending: stats.pendingReview,
-            rejected: stats.rejected,
+            total,
+            approved: stats.approved || 0,
+            pending: stats.pendingReview || 0,
+            rejected: stats.rejected || 0,
           });
 
-          // If generation complete, load first NFT for review
-          if (pendingGen === 0 && stats.pendingReview > 0) {
+          // If first NFT is ready and we don't have one to review yet, load it
+          if (stats.pendingReview > 0 && !currentNFT) {
             loadNextNFT(phaseId);
-          } else if (pendingGen === 0 && stats.pendingReview === 0 && stats.approved === total) {
-            // All approved, activate phase
-            await activatePhase(phaseId);
-          } else if (pendingGen > 0) {
-            // Still generating, poll again
-            setTimeout(() => poll(), 3000);
           }
         }
+
+        if (!res.ok) {
+          console.error('Generation error:', data.error || data.message);
+          // Continue trying with next NFT
+          if (!data.done) {
+            setTimeout(generateNext, 2000);
+          }
+          return;
+        }
+
+        if (data.done) {
+          // All generation complete
+          setGenerationProgress(prev => prev ? { ...prev, status: 'complete' } : null);
+
+          // Load first NFT for review if available
+          loadNextNFT(phaseId);
+        } else {
+          // Continue generating next NFT
+          // Small delay to not overwhelm the API
+          setTimeout(generateNext, 1000);
+        }
       } catch (error) {
-        console.error('Failed to poll progress:', error);
-        setTimeout(() => poll(), 5000);
+        console.error('Generation loop error:', error);
+        // Retry after delay
+        setTimeout(generateNext, 5000);
       }
     };
 
-    poll();
+    generateNext();
   }
+
 
   async function loadNextNFT(phaseId: string) {
     const token = localStorage.getItem('adminToken');
