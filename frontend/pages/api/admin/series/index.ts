@@ -33,7 +33,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const seriesData = await prisma.series.findMany({
       orderBy: { seriesNumber: 'asc' },
-      include: {
+      select: {
+        id: true,
+        seriesNumber: true,
+        multiplier: true,
+        status: true,
+        totalNFTs: true,
+        soldCount: true,
+        startDate: true,
+        endDate: true,
         phases: {
           orderBy: { phaseNumber: 'asc' },
           select: {
@@ -54,9 +62,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // Convert BigInt to Number for JSON serialization
+    // Convert BigInt and Decimal to Number for JSON serialization
     const series = seriesData.map(s => ({
       ...s,
+      multiplier: Number(s.multiplier),
       phases: s.phases.map(p => ({
         ...p,
         totalPausedMs: Number(p.totalPausedMs),
