@@ -137,8 +137,18 @@ export default function AdminNFTs() {
     checkAuthAndFetch();
   }, []);
 
+  // Handle search query parameter from URL
   useEffect(() => {
-    if (!isLoading) {
+    if (router.isReady && router.query.search && !isLoading) {
+      const searchParam = router.query.search as string;
+      setSearch(searchParam);
+      // Trigger search with the param
+      fetchNFTsWithSearch(searchParam);
+    }
+  }, [router.isReady, router.query.search, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading && !router.query.search) {
       fetchNFTs();
     }
   }, [page, filterStatus, filterBadge, filterObjectType]);
@@ -253,6 +263,34 @@ export default function AdminNFTs() {
       setTotal(data.total || 0);
     } catch (error) {
       console.error('Failed to fetch NFTs:', error);
+    }
+  }
+
+  // Fetch NFTs with a specific search term and auto-select if single result
+  async function fetchNFTsWithSearch(searchTerm: string) {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        page: '1',
+        search: searchTerm,
+      });
+
+      const res = await fetch(`${apiUrl}/api/admin/nfts?${params}`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      setNfts(data.items || []);
+      setTotal(data.total || 0);
+      setPage(1);
+
+      // Auto-select if exactly one result found
+      if (data.items && data.items.length === 1) {
+        handleViewNft(data.items[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch NFTs with search:', error);
     }
   }
 
