@@ -511,7 +511,7 @@ export default function AdminAuctions() {
                   <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-700">
                     {selectedAuction.nft && (
                       <Link
-                        href={`/nft/${selectedAuction.nft.tokenId}`}
+                        href={`/nft/${selectedAuction.nft.id}`}
                         className="flex-1 bg-purple-600 hover:bg-purple-500 text-white text-center font-medium px-4 py-2 rounded-lg"
                         target="_blank"
                       >

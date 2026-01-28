@@ -716,6 +716,13 @@ export default function AstronomicalDataAdmin() {
                   {/* Actions */}
                   <div className="flex gap-3 pt-4 border-t border-gray-700">
                     <Link
+                      href={`/nft/${selectedObject.id}`}
+                      target="_blank"
+                      className="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-semibold text-center"
+                    >
+                      View NFT Page
+                    </Link>
+                    <Link
                       href={`/admin/nfts?search=${encodeURIComponent(selectedObject.name)}`}
                       className="flex-1 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-semibold text-center"
                     >
@@ -723,7 +730,7 @@ export default function AstronomicalDataAdmin() {
                     </Link>
                     <button
                       onClick={() => setSelectedObject(null)}
-                      className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded font-semibold"
+                      className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded font-semibold"
                     >
                       Close
                     </button>

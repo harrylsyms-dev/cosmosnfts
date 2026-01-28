@@ -401,6 +401,15 @@ export const DEFAULT_WIDGETS: Widget[] = [
     color: 'border-gray-800 hover:border-blue-500',
     defaultSize: { cols: 1, rows: 1 },
   },
+  {
+    id: 'errors',
+    title: 'Error Tracking',
+    description: 'View system errors',
+    icon: '🐛',
+    href: '/admin/errors',
+    color: 'border-red-800 hover:border-red-500',
+    defaultSize: { cols: 1, rows: 1 },
+  },
 ];
 
 export const DEFAULT_LAYOUT: DashboardLayout = {

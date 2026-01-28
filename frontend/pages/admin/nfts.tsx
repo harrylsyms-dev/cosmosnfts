@@ -1382,7 +1382,7 @@ export default function AdminNFTs() {
                           : 'Generate Image'}
                       </button>
                       <Link
-                        href={`/nft/${selectedNft.tokenId}`}
+                        href={`/nft/${selectedNft.id}`}
                         target="_blank"
                         className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2 rounded-lg text-center"
                       >

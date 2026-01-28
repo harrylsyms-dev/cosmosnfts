@@ -30,9 +30,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Invalid NFT ID' });
     }
 
-    const nft = await prisma.nFT.findUnique({
+    // First try to find by database ID, then by tokenId
+    let nft = await prisma.nFT.findUnique({
       where: { id: nftId },
     });
+
+    // If not found by id, try by tokenId (for backward compatibility with links using tokenId)
+    if (!nft) {
+      nft = await prisma.nFT.findUnique({
+        where: { tokenId: nftId },
+      });
+    }
 
     if (!nft) {
       return res.status(404).json({ error: 'NFT not found' });
@@ -59,6 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.status(200).json({
       nftId: nft.id,
+      tokenId: nft.tokenId,
       name: nft.name,
       description: nft.description,
       image: nft.image || (nft.imageIpfsHash ? `https://gateway.pinata.cloud/ipfs/${nft.imageIpfsHash}` : null),
