@@ -62,9 +62,22 @@ export default async function handler(
   }
 
   // Verify admin authentication
-  const admin = await validateAdmin(req);
-  if (!admin) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const admin = await validateAdmin(req);
+    if (!admin) {
+      const authHeader = req.headers.authorization;
+      console.error('Admin validation failed:', {
+        hasAuthHeader: !!authHeader,
+        headerStart: authHeader?.substring(0, 20)
+      });
+      return res.status(401).json({
+        error: 'Unauthorized',
+        debug: process.env.NODE_ENV !== 'production' ? { hasAuthHeader: !!authHeader } : undefined
+      });
+    }
+  } catch (authError) {
+    console.error('Admin auth error:', authError);
+    return res.status(401).json({ error: 'Authentication failed' });
   }
 
   const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
