@@ -875,14 +875,16 @@ export default function SeriesManagement() {
                               </div>
                             )}
 
-                            {canReview && (
-                              <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-2 mt-2">
+                              {canReview && (
                                 <button
                                   onClick={() => handleReviewPhase(phase, s.seriesNumber)}
                                   className="text-xs text-yellow-400 hover:text-yellow-300 font-semibold"
                                 >
                                   {phase.status === 'PENDING' ? 'Generate & Review' : 'Continue Review'}
                                 </button>
+                              )}
+                              {phase.status !== 'ACTIVE' && phase.status !== 'COMPLETED' && (
                                 <button
                                   onClick={() => handleResetPhase(phase.id)}
                                   disabled={actionLoading === `reset-${phase.id}`}
@@ -891,8 +893,8 @@ export default function SeriesManagement() {
                                 >
                                   {actionLoading === `reset-${phase.id}` ? 'Resetting...' : 'Reset'}
                                 </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
 
                             {phase.startDate && (
                               <div className="text-xs text-gray-500 mt-1">
