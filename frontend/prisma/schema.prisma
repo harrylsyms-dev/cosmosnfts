@@ -1090,6 +1090,29 @@ model EthPriceHistory {
   @@map("eth_price_history")
 }
 
+// Discount Codes
+model DiscountCode {
+  id              String    @id @default(uuid())
+  code            String    @unique                    // The code users enter (e.g., "LAUNCH50")
+  description     String?                              // Admin note
+  discountType    String    @default("PERCENT") @map("discount_type")  // PERCENT or FIXED
+  discountValue   Int       @map("discount_value")     // Percentage (0-100) or cents for fixed
+  minPurchaseCents Int?     @map("min_purchase_cents") // Minimum purchase to apply
+  maxDiscountCents Int?     @map("max_discount_cents") // Cap on discount amount
+  maxUses         Int?      @map("max_uses")           // Total uses allowed (null = unlimited)
+  usedCount       Int       @default(0) @map("used_count")
+  startsAt        DateTime? @map("starts_at")          // When code becomes active
+  expiresAt       DateTime? @map("expires_at")         // When code expires
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdBy       String?   @map("created_by")         // Admin who created
+
+  @@index([code])
+  @@index([isActive])
+  @@map("discount_codes")
+}
+
 // Wallet Recipients (Flexible payment split system)
 model WalletRecipient {
   id              String    @id @default(uuid())

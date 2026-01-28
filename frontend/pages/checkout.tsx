@@ -19,16 +19,80 @@ export default function Checkout() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Discount code state
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    discountType: 'PERCENT' | 'FIXED';
+    discountValue: number;
+    discountCents: number;
+  } | null>(null);
+  const [discountError, setDiscountError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!cart || cart.items.length === 0) {
       router.push('/cart');
     }
   }, [cart, router]);
 
+  // Recalculate discount when cart changes
+  useEffect(() => {
+    if (appliedDiscount && cart) {
+      validateDiscount(appliedDiscount.code);
+    }
+  }, [cart?.totalPrice]);
+
+  async function validateDiscount(code: string) {
+    if (!code.trim() || !cart) return;
+
+    setDiscountLoading(true);
+    setDiscountError(null);
+
+    try {
+      const subtotalCents = Math.round(cart.totalPrice * 100);
+      const res = await fetch(`${apiUrl}/api/discount/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotalCents }),
+      });
+
+      const data = await res.json();
+
+      if (data.valid) {
+        setAppliedDiscount({
+          code: data.code,
+          discountType: data.discountType,
+          discountValue: data.discountValue,
+          discountCents: data.discountCents,
+        });
+        setDiscountError(null);
+      } else {
+        setAppliedDiscount(null);
+        setDiscountError(data.error || 'Invalid discount code');
+      }
+    } catch (err) {
+      setAppliedDiscount(null);
+      setDiscountError('Failed to validate discount code');
+    } finally {
+      setDiscountLoading(false);
+    }
+  }
+
+  function handleApplyDiscount() {
+    validateDiscount(discountCode);
+  }
+
+  function handleRemoveDiscount() {
+    setAppliedDiscount(null);
+    setDiscountCode('');
+    setDiscountError(null);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!stripe || !elements || !cart) return;
+    if (!cart) return;
 
     setIsProcessing(true);
     setError(null);
@@ -42,6 +106,7 @@ export default function Checkout() {
           cartItems: cart.items.map((item) => item.nftId),
           email,
           walletAddress: address,
+          discountCode: appliedDiscount?.code || null,
         }),
       });
 
@@ -51,7 +116,25 @@ export default function Checkout() {
         throw new Error(data.error || 'Checkout failed');
       }
 
+      // Handle free orders (100% discount)
+      if (data.freeOrder || data.amount === 0) {
+        clearCart();
+        router.push(`/success?id=${data.purchaseId}`);
+        return;
+      }
+
+      // Handle test mode
+      if (data.testMode) {
+        clearCart();
+        router.push(`/success?id=${data.purchaseId}`);
+        return;
+      }
+
       // Confirm payment with Stripe
+      if (!stripe || !elements) {
+        throw new Error('Stripe not loaded');
+      }
+
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) throw new Error('Card element not found');
 
@@ -70,11 +153,9 @@ export default function Checkout() {
       }
 
       if (paymentIntent?.status === 'succeeded') {
-        // Clear cart and redirect to success page
         clearCart();
         router.push(`/success?id=${data.purchaseId}`);
       } else if (paymentIntent?.status === 'requires_action') {
-        // 3D Secure required - Stripe handles this automatically
         setError('Additional verification required. Please complete the verification.');
       }
     } catch (err: any) {
@@ -88,13 +169,23 @@ export default function Checkout() {
     return null;
   }
 
+  // Calculate totals
   const subtotal = cart.totalPrice;
-  // Calculate in cents to avoid floating point issues
   const subtotalCents = Math.round(subtotal * 100);
-  const processingFeeCents = Math.round(subtotalCents * 0.029 + 30);
-  const totalCents = subtotalCents + processingFeeCents;
+  const discountCents = appliedDiscount?.discountCents || 0;
+  const discountedSubtotalCents = subtotalCents - discountCents;
+
+  // Processing fee on discounted amount (skip if $0)
+  const processingFeeCents = discountedSubtotalCents > 0
+    ? Math.round(discountedSubtotalCents * 0.029 + 30)
+    : 0;
+
+  const totalCents = discountedSubtotalCents + processingFeeCents;
   const processingFee = processingFeeCents / 100;
   const total = totalCents / 100;
+  const discount = discountCents / 100;
+
+  const isFreeOrder = totalCents === 0;
 
   return (
     <Layout>
@@ -124,15 +215,75 @@ export default function Checkout() {
                 <span>Subtotal</span>
                 <span>${subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-gray-400">
-                <span>Processing fee</span>
-                <span>${processingFee.toFixed(2)}</span>
-              </div>
+
+              {appliedDiscount && (
+                <div className="flex justify-between text-green-400">
+                  <span>Discount ({appliedDiscount.code})</span>
+                  <span>-${discount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {!isFreeOrder && (
+                <div className="flex justify-between text-gray-400">
+                  <span>Processing fee</span>
+                  <span>${processingFee.toFixed(2)}</span>
+                </div>
+              )}
+
               <div className="flex justify-between text-xl font-bold pt-2">
                 <span>Total</span>
-                <span className="text-green-400">${total.toFixed(2)}</span>
+                <span className={isFreeOrder ? 'text-green-400' : 'text-green-400'}>
+                  {isFreeOrder ? 'FREE' : `$${total.toFixed(2)}`}
+                </span>
               </div>
             </div>
+          </div>
+
+          {/* Discount Code */}
+          <div className="bg-gray-900 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">Discount Code</h2>
+
+            {appliedDiscount ? (
+              <div className="flex items-center justify-between bg-green-900/30 border border-green-600 rounded-lg p-4">
+                <div>
+                  <span className="text-green-400 font-semibold">{appliedDiscount.code}</span>
+                  <span className="text-green-300 ml-2">
+                    ({appliedDiscount.discountType === 'PERCENT'
+                      ? `${appliedDiscount.discountValue}% off`
+                      : `$${appliedDiscount.discountValue} off`})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveDiscount}
+                  className="text-red-400 hover:text-red-300 text-sm"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                  className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyDiscount}
+                  disabled={discountLoading || !discountCode.trim()}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {discountLoading ? 'Checking...' : 'Apply'}
+                </button>
+              </div>
+            )}
+
+            {discountError && (
+              <p className="text-red-400 text-sm mt-2">{discountError}</p>
+            )}
           </div>
 
           {/* Delivery Address (Wallet) */}
@@ -169,32 +320,44 @@ export default function Checkout() {
             </p>
           </div>
 
-          {/* Payment */}
-          <div className="bg-gray-900 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Payment Details</h2>
+          {/* Payment - Only show if not free */}
+          {!isFreeOrder && (
+            <div className="bg-gray-900 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4">Payment Details</h2>
 
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-              <CardElement
-                options={{
-                  style: {
-                    base: {
-                      fontSize: '16px',
-                      color: '#ffffff',
-                      '::placeholder': { color: '#6b7280' },
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                <CardElement
+                  options={{
+                    style: {
+                      base: {
+                        fontSize: '16px',
+                        color: '#ffffff',
+                        '::placeholder': { color: '#6b7280' },
+                      },
+                      invalid: { color: '#ef4444' },
                     },
-                    invalid: { color: '#ef4444' },
-                  },
-                }}
-              />
-            </div>
+                  }}
+                />
+              </div>
 
-            <div className="flex items-center gap-2 mt-4 text-gray-400 text-sm">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-              </svg>
-              Secured by Stripe. Your card details are encrypted.
+              <div className="flex items-center gap-2 mt-4 text-gray-400 text-sm">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+                Secured by Stripe. Your card details are encrypted.
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Free Order Notice */}
+          {isFreeOrder && (
+            <div className="bg-green-900/30 border border-green-600 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold text-green-400 mb-2">Free Order!</h2>
+              <p className="text-green-200">
+                Your discount covers the entire order. No payment required.
+              </p>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -206,7 +369,7 @@ export default function Checkout() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={!stripe || isProcessing || !email || !isConnected}
+            disabled={(!stripe && !isFreeOrder) || isProcessing || !email || !isConnected}
             className="w-full btn-primary text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? (
@@ -214,6 +377,8 @@ export default function Checkout() {
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Processing...
               </span>
+            ) : isFreeOrder ? (
+              'Complete Free Order'
             ) : (
               `Pay $${total.toFixed(2)}`
             )}

@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { cartItems, email, walletAddress } = req.body;
+    const { cartItems, email, walletAddress, discountCode } = req.body;
 
     if (!cartItems || !email) {
       return res.status(400).json({
@@ -52,14 +52,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Calculate total (in cents for Stripe)
-    // Sum up individual NFT prices (already calculated with proper rounding)
+    // Calculate subtotal (in cents for Stripe)
     const subtotalDollars = nfts.reduce((sum: number, nft: { currentPrice: number }) => sum + nft.currentPrice, 0);
     const subtotalCents = Math.round(subtotalDollars * 100);
 
-    // Add processing fee (2.9% + $0.30) to match what's shown on cart/checkout pages
-    const processingFeeCents = Math.round(subtotalCents * 0.029 + 30);
-    const totalCents = subtotalCents + processingFeeCents;
+    // Validate and apply discount code
+    let discountCents = 0;
+    let appliedDiscountCode: any = null;
+
+    if (discountCode && typeof discountCode === 'string') {
+      const code = await prisma.discountCode.findUnique({
+        where: { code: discountCode.toUpperCase().trim() },
+      });
+
+      if (code && code.isActive) {
+        const now = new Date();
+        const isValidTime = (!code.startsAt || now >= code.startsAt) &&
+                          (!code.expiresAt || now <= code.expiresAt);
+        const isUnderLimit = code.maxUses === null || code.usedCount < code.maxUses;
+        const meetsMinimum = !code.minPurchaseCents || subtotalCents >= code.minPurchaseCents;
+
+        if (isValidTime && isUnderLimit && meetsMinimum) {
+          // Calculate discount
+          if (code.discountType === 'PERCENT') {
+            discountCents = Math.round((subtotalCents * code.discountValue) / 100);
+          } else {
+            discountCents = code.discountValue;
+          }
+
+          // Apply max discount cap
+          if (code.maxDiscountCents && discountCents > code.maxDiscountCents) {
+            discountCents = code.maxDiscountCents;
+          }
+
+          // Don't allow discount greater than subtotal
+          if (discountCents > subtotalCents) {
+            discountCents = subtotalCents;
+          }
+
+          appliedDiscountCode = code;
+        }
+      }
+    }
+
+    // Calculate final totals
+    const discountedSubtotalCents = subtotalCents - discountCents;
+
+    // Add processing fee (2.9% + $0.30) on discounted amount
+    // If total is $0 (100% discount), no processing fee
+    let processingFeeCents = 0;
+    if (discountedSubtotalCents > 0) {
+      processingFeeCents = Math.round(discountedSubtotalCents * 0.029 + 30);
+    }
+
+    const totalCents = discountedSubtotalCents + processingFeeCents;
 
     // Create purchase record
     const purchaseId = uuidv4();
@@ -75,9 +121,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
+    // If total is $0 (100% discount), skip Stripe and mark as paid
+    if (totalCents === 0) {
+      console.log(`[FREE ORDER] 100% discount applied for purchase: ${purchaseId}`);
+
+      // Increment discount code usage
+      if (appliedDiscountCode) {
+        await prisma.discountCode.update({
+          where: { id: appliedDiscountCode.id },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+
+      // Mark purchase as processing (ready for minting)
+      await prisma.purchase.update({
+        where: { id: purchaseId },
+        data: {
+          status: 'PROCESSING',
+          stripeTransactionId: `free_${purchaseId}`,
+        },
+      });
+
+      // Reserve NFTs
+      await prisma.nFT.updateMany({
+        where: { id: { in: nftIdsList } },
+        data: { status: 'RESERVED' },
+      });
+
+      return res.json({
+        clientSecret: null,
+        amount: 0,
+        currency: 'usd',
+        purchaseId,
+        freeOrder: true,
+        discountApplied: {
+          code: appliedDiscountCode?.code,
+          discountCents,
+        },
+        message: 'Order completed - 100% discount applied',
+      });
+    }
+
     // If payments are disabled, simulate success (test mode)
     if (!paymentsEnabled) {
       console.log(`[TEST MODE] Simulating payment success for purchase: ${purchaseId}`);
+
+      // Increment discount code usage
+      if (appliedDiscountCode) {
+        await prisma.discountCode.update({
+          where: { id: appliedDiscountCode.id },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
 
       await prisma.purchase.update({
         where: { id: purchaseId },
@@ -98,6 +193,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         currency: 'usd',
         purchaseId,
         testMode: true,
+        discountApplied: appliedDiscountCode ? {
+          code: appliedDiscountCode.code,
+          discountCents,
+        } : null,
         message: 'Payments disabled - purchase simulated successfully',
       });
     }
@@ -110,6 +209,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: {
         purchaseId,
         nftIds: JSON.stringify(cartItems),
+        discountCode: appliedDiscountCode?.code || '',
+        discountCents: discountCents.toString(),
       },
     });
 
@@ -119,12 +220,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: { stripeTransactionId: paymentIntent.id },
     });
 
+    // Increment discount code usage after successful payment intent creation
+    if (appliedDiscountCode) {
+      await prisma.discountCode.update({
+        where: { id: appliedDiscountCode.id },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
     res.json({
       clientSecret: paymentIntent.client_secret,
       amount: totalCents,
       currency: 'usd',
       requiresAction: paymentIntent.status === 'requires_action',
       purchaseId,
+      discountApplied: appliedDiscountCode ? {
+        code: appliedDiscountCode.code,
+        discountCents,
+      } : null,
     });
   } catch (error) {
     console.error('Error creating checkout:', error);
