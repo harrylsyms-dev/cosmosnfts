@@ -1,0 +1,37 @@
+# CosmoNFTs Robots.txt
+# https://www.cosmonfts.com/robots.txt
+
+User-agent: *
+Allow: /
+
+# Disallow admin and private areas
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /account
+Disallow: /account/*
+Disallow: /cart
+Disallow: /checkout
+Disallow: /api/*
+
+# Disallow utility pages
+Disallow: /maintenance
+Disallow: /coming-soon
+Disallow: /test
+Disallow: /unlock
+
+# Allow important pages explicitly
+Allow: /browse
+Allow: /auctions
+Allow: /marketplace
+Allow: /nft/*
+Allow: /faq
+Allow: /pricing
+Allow: /impact
+Allow: /terms
+Allow: /privacy
+
+# Sitemap location
+Sitemap: https://www.cosmonfts.com/sitemap.xml
+
+# Crawl delay (optional, respected by some bots)
+Crawl-delay: 1

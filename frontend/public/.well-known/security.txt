@@ -1,0 +1,10 @@
+# CosmoNFTs Security Policy
+# https://www.cosmonfts.com/.well-known/security.txt
+
+Contact: mailto:security@cosmonfts.com
+Contact: https://www.cosmonfts.com/security/report
+Expires: 2027-12-31T23:59:59.000Z
+Acknowledgments: https://www.cosmonfts.com/security/hall-of-fame
+Preferred-Languages: en
+Canonical: https://www.cosmonfts.com/.well-known/security.txt
+Policy: https://www.cosmonfts.com/security/policy

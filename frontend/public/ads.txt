@@ -1,0 +1,6 @@
+# CosmoNFTs ads.txt
+# We don't run third-party advertising
+# This file prevents unauthorized ad inventory sales
+
+# Placeholder for future authorized sellers (if needed)
+# google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0

@@ -1,0 +1,16 @@
+/* TEAM */
+Company: CosmoNFTs
+Contact: hello@cosmonfts.com
+Twitter: @cosmonfts
+Location: Global
+
+/* THANKS */
+Built with Next.js, React, and Tailwind CSS
+Hosted on Vercel
+
+/* SITE */
+Last update: 2026/01/29
+Language: English
+Doctype: HTML5
+Standards: HTML5, CSS3, ES2022
+Components: Next.js 14, React 18, Tailwind CSS 3
