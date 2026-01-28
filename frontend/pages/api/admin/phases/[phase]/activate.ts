@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    const { phaseId } = req.query;
+    const { phase: phaseId } = req.query;
     const { force } = req.body; // Allow force activation for testing
 
     if (!phaseId || typeof phaseId !== 'string') {
@@ -46,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get phase with series
-    const phase = await prisma.phase.findUnique({
+    const phaseData = await prisma.phase.findUnique({
       where: { id: phaseId },
       include: {
         series: {
@@ -59,18 +59,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    if (!phase) {
+    if (!phaseData) {
       return res.status(404).json({ error: 'Phase not found' });
     }
 
     // Check phase status
-    if (phase.status === 'ACTIVE') {
+    if (phaseData.status === 'ACTIVE') {
       return res.status(400).json({
         error: 'Phase is already active',
       });
     }
 
-    if (phase.status === 'COMPLETED') {
+    if (phaseData.status === 'COMPLETED') {
       return res.status(400).json({
         error: 'Phase is already completed',
       });
@@ -135,9 +135,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Activate series if not already active
-    if (phase.series.status !== 'ACTIVE') {
+    if (phaseData.series.status !== 'ACTIVE') {
       await prisma.series.update({
-        where: { id: phase.series.id },
+        where: { id: phaseData.series.id },
         data: {
           status: 'ACTIVE',
           startDate: new Date(),
@@ -154,12 +154,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await prisma.siteSettings.upsert({
         where: { id: 'main' },
         update: {
-          currentSeriesId: phase.series.id,
+          currentSeriesId: phaseData.series.id,
           currentPhaseId: phaseId,
         },
         create: {
           id: 'main',
-          currentSeriesId: phase.series.id,
+          currentSeriesId: phaseData.series.id,
           currentPhaseId: phaseId,
         },
       });
@@ -174,8 +174,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           action: 'PHASE_ACTIVATE',
           details: JSON.stringify({
             phaseId,
-            phaseNumber: phase.phaseNumber,
-            seriesNumber: phase.series.seriesNumber,
+            phaseNumber: phaseData.phaseNumber,
+            seriesNumber: phaseData.series.seriesNumber,
             totalNFTs,
             approved,
             forced: force || false,
@@ -188,10 +188,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.json({
       success: true,
-      message: `Series ${phase.series.seriesNumber} Phase ${phase.phaseNumber} is now ACTIVE`,
+      message: `Series ${phaseData.series.seriesNumber} Phase ${phaseData.phaseNumber} is now ACTIVE`,
       phaseId,
-      phaseNumber: phase.phaseNumber,
-      seriesNumber: phase.series.seriesNumber,
+      phaseNumber: phaseData.phaseNumber,
+      seriesNumber: phaseData.series.seriesNumber,
       status: 'ACTIVE',
       nftsActivated: approved,
       startDate: new Date().toISOString(),

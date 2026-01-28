@@ -38,14 +38,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    const { phaseId } = req.query;
+    const { phase: phaseId } = req.query;
 
     if (!phaseId || typeof phaseId !== 'string') {
       return res.status(400).json({ error: 'Phase ID is required' });
     }
 
     // Get phase
-    const phase = await prisma.phase.findUnique({
+    const phaseData = await prisma.phase.findUnique({
       where: { id: phaseId },
       include: {
         series: {
@@ -54,15 +54,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    if (!phase) {
+    if (!phaseData) {
       return res.status(404).json({ error: 'Phase not found' });
     }
 
     // Phase must be PENDING to start generation
-    if (phase.status !== 'PENDING') {
+    if (phaseData.status !== 'PENDING') {
       return res.status(400).json({
         error: 'Phase cannot start generation',
-        currentStatus: phase.status,
+        currentStatus: phaseData.status,
         message: 'Only PENDING phases can start image generation',
       });
     }
@@ -132,8 +132,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           action: 'PHASE_GENERATE_IMAGES',
           details: JSON.stringify({
             phaseId,
-            phaseNumber: phase.phaseNumber,
-            seriesNumber: phase.series.seriesNumber,
+            phaseNumber: phaseData.phaseNumber,
+            seriesNumber: phaseData.series.seriesNumber,
             nftsNeedingGeneration: nftsNeedingImages - nftsWithImages,
             nftsReadyForReview: nftsWithImages,
             newStatus,
@@ -146,13 +146,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.json({
       success: true,
-      message: `Image generation initiated for Series ${phase.series.seriesNumber} Phase ${phase.phaseNumber}`,
+      message: `Image generation initiated for Series ${phaseData.series.seriesNumber} Phase ${phaseData.phaseNumber}`,
       phaseId,
-      phaseNumber: phase.phaseNumber,
-      seriesNumber: phase.series.seriesNumber,
+      phaseNumber: phaseData.phaseNumber,
+      seriesNumber: phaseData.series.seriesNumber,
       status: newStatus,
       stats: {
-        totalNFTs: phase.totalNFTs,
+        totalNFTs: phaseData.totalNFTs,
         needingGeneration: nftsNeedingImages - nftsWithImages,
         readyForReview: nftsWithImages,
       },

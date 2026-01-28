@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    const { phaseId } = req.query;
+    const { phase: phaseId } = req.query;
     const limit = parseInt(req.query.limit as string) || 1;
     const offset = parseInt(req.query.offset as string) || 0;
 
@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get phase with series info
-    const phase = await prisma.phase.findUnique({
+    const phaseData = await prisma.phase.findUnique({
       where: { id: phaseId },
       include: {
         series: {
@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    if (!phase) {
+    if (!phaseData) {
       return res.status(404).json({ error: 'Phase not found' });
     }
 
@@ -128,10 +128,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.json({
       phase: {
-        id: phase.id,
-        phaseNumber: phase.phaseNumber,
-        seriesNumber: phase.series.seriesNumber,
-        status: phase.status,
+        id: phaseData.id,
+        phaseNumber: phaseData.phaseNumber,
+        seriesNumber: phaseData.series.seriesNumber,
+        status: phaseData.status,
       },
       stats: {
         total: totalNFTs,
